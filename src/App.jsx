@@ -74,8 +74,23 @@ const formatDate = (date) => {
 
 const parseEventDateStr = (dateStr) => {
   if (!dateStr) return new Date(9999, 0, 1);
+  
+  // Remove day names and ordinal suffixes
   let cleanStr = dateStr.replace(/^[A-Za-z]+,\s*/, '');
   cleanStr = cleanStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
+  
+  // Check for DD/MM/YYYY format
+  if (cleanStr.includes('/')) {
+    const parts = cleanStr.split('/');
+    if (parts.length === 3) {
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const y = parseInt(parts[2], 10);
+      const dateObj = new Date(y, m, d);
+      if (!isNaN(dateObj.getTime())) return dateObj;
+    }
+  }
+
   const parsed = Date.parse(cleanStr);
   if (isNaN(parsed)) return new Date(9999, 0, 1);
   return new Date(parsed);
@@ -243,64 +258,70 @@ const SplashView = () => {
 // --- MOCK DATA (Static Fallbacks) ---
 const STATIC_EVENTS = [
   {
-    id: 1,
+    id: 'static-1',
     title: "Tunerfest South",
     date: "Sunday, 14th June 2026",
     time: "09:00 AM",
     location: "Brands Hatch Circuit, Kent",
     description: "Celebrating the UK's tuning scene with Time Attack, drifting, and massive club displays. An action-packed day out.",
     image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/615332601_1303146985173729_7017742900608760889_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=2a1932&_nc_ohc=9lMQN9k9fWwQ7kNvwEUw7bF&_nc_oc=Adrt86yG2RX2lia1fFym533-vAHlszAQe8vVA64q3g8wkzt7Jfx1KDqJcB-lJSwDnykrci9OoljCxIr8bzEGJz-K&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=2KM11XS369ylUsSZzTmGew&_nc_ss=7b2a8&oh=00_Af6PNVmhDJzfZrZCfLJXUNXvnrBMD-3wj8UQvYTlsocLqg&oe=6A067D2C",
-    link: "https://www.brandshatch.co.uk/2026/june/tunerfest-south"
+    link: "https://www.brandshatch.co.uk/2026/june/tunerfest-south",
+    isStatic: true
   },
   {
-    id: 2,
+    id: 'static-2',
     title: "Isle of Wight Takeover",
     date: "Saturday, 16th May 2026",
     time: "10:00 AM",
     location: "Isle of Wight",
     description: "The ultimate weekend away for car enthusiasts. Join our club stand as we head over on the ferry for a massive island takeover.",
     image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/370897411_788936759904376_6556989917387874387_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=1d70fc&_nc_ohc=BAm1Zb4f-a8Q7kNvwF4HI_P&_nc_oc=AdoHjuaouRTMphGXdxORfQlSFYaOroD7I3nl0lfqQkZpAyG2i1rLmcZEMgm5HRjZLJl3rYRR_4AemK172VSwxXe1&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=EmZtuaqTOlSEllcyBAYDPA&_nc_ss=7b2a8&oh=00_Af5oVHzQmfxAuzDJ3SjQBwDnCKIR9t4QvxmZImjX9Z_j3w&oe=6A0678E0",
-    link: "https://www.iowtakeover.co.uk/"
+    link: "https://www.iowtakeover.co.uk/",
+    isStatic: true
   },
   {
-    id: 3,
+    id: 'static-3',
     title: "TRAX",
     date: "Sunday, 16th August 2026",
     time: "09:00 AM",
     location: "Silverstone Circuit",
     description: "Britain's biggest performance car show. We will have a dedicated club stand. Features live track time and professional drifting displays.",
     image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597894646_1257634839745045_372102352193919714_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=2a1932&_nc_ohc=35X4SY7dnmkQ7kNvwEwboEG&_nc_oc=Adpg8NNV3a0AdvHzh8yEsEk_Qa3DtyI9a-SuyKblDuqTTqFiV8iWIqHOWc0djpS_gQ6z0ZS327EGchEspfksXzEf&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=kofn6rvocXLB_bC8mS405w&_nc_ss=7b2a8&oh=00_Af6xgBQDE6Ks8tXI5Q5WdNok7Nw_o37QF3mqQJXef9ayuA&oe=6A069083",
-    link: "https://traxshows.co.uk/"
+    link: "https://traxshows.co.uk/",
+    isStatic: true
   },
   {
-    id: 4,
+    id: 'static-4',
     title: "Ford Fair",
     date: "Sunday, 23rd August 2026",
     time: "08:30 AM",
     location: "Silverstone Circuit",
     description: "The biggest and best Ford festival in Europe. Expect thousands of club cars, intense track action, and huge retail villages.",
     image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597864318_1331850388984316_4749659490145813671_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=2a1932&_nc_ohc=Eyzst_iXSeEQ7kNvwF165SD&_nc_oc=AdoDsCCTTBzrUNBCRp75jZ0jIv8H2XjTev23iPy3bQNpiE5djXJXpSvQo0oJpyfotxjSytru99gpgebiIDOv8cQJ&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=9XwwuzQfNhIwISHL8RR-KA&_nc_ss=7b2a8&oh=00_Af5tVKR_W4mxaLAaIVKvPgimkVJs48pQ6CJ_NztkYJQ3zw&oe=6A068DDB",
-    link: "https://fordshows.co.uk/ford-fair"
+    link: "https://fordshows.co.uk/ford-fair",
+    isStatic: true
   },
   {
-    id: 5,
+    id: 'static-5',
     title: "Ford Power Live",
     date: "Sunday, 13th September 2026",
     time: "09:00 AM",
     location: "Brands Hatch Circuit, Kent",
     description: "A dedicated celebration of all things Ford, from classic RS models to the latest STs taking to the famous Indy circuit.",
     image: "https://i.ibb.co/Nd6d6L3m/Untitled-design-9.png",
-    link: "https://www.fordpowerlive.co.uk/"
+    link: "https://www.fordpowerlive.co.uk/",
+    isStatic: true
   },
   {
-    id: 6,
+    id: 'static-6',
     title: "Lancing Motor Show",
     date: "Sunday, 27th September 2026",
     time: "09:00 AM",
     location: "Lancing Beach Green, West Sussex",
     description: "600+ cars on display at Lancing Beach Green. FREE ENTRY to public, with Children's Amusements, Trade Stalls, Hot & Cold Drinks, Food refreshments and much more to see and do on the day. A display of motoring excellence.",
     image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/673478652_1411226824381514_8742350712894671620_n.png?_nc_cat=108&ccb=1-7&_nc_sid=2a1932&_nc_ohc=HIDGrimsPmAQ7kNvwHOoubY&_nc_oc=AdrAY5sMilU7z84ghmC3VwRtoff35i3jmKvEEdmM2bUFHGBX7AS-wl4iiBmxSBroVyo6SJgOSKceHXnT3-telYcb&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=ZjADEz4Aukm54gCOUIAKUw&_nc_ss=7b2a8&oh=00_Af58pi1U-_VlcuRajrZMqDu2Gk0NK83QXmn8qD7jv7Q01g&oe=6A06721B",
-    link: "https://lancingmotorshow.onlineticketseller.com/"
+    link: "https://lancingmotorshow.onlineticketseller.com/",
+    isStatic: true
   }
 ];
 
@@ -906,7 +927,7 @@ const CharityView = () => (
   </div>
 );
 
-const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, userProfile }) => {
+const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -916,6 +937,7 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
   const [memberRoles, setMemberRoles] = useState({});
+  const [memberRanks, setMemberRanks] = useState({});
 
   useEffect(() => {
     if (clubDescription) setEditDescription(clubDescription);
@@ -934,14 +956,15 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
+  // In the Admin View, we want to allow editing of BOTH static and cloud events.
   const editableUpcoming = useMemo(() => 
-    cloudEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
-    [cloudEvents, now]
+    combinedEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
+    [combinedEvents]
   );
   
   const editablePast = useMemo(() => 
-    cloudEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
-    [cloudEvents, now]
+    combinedEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
+    [combinedEvents]
   );
 
   const handleDeployEvent = async () => {
@@ -955,7 +978,14 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
 
   const handleUpdateEvent = async () => {
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id), editingEvent, { merge: true });
+      // If it was a static event, we "addDoc" to promote it to cloud. 
+      // If it already had a database ID, we "setDoc" to update it.
+      if (editingEvent.isStatic) {
+        const { isStatic, id, ...cleanEvent } = editingEvent;
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), cleanEvent);
+      } else {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id), editingEvent, { merge: true });
+      }
       setEditingEvent(null);
     } catch (err) {
       console.error("Error updating event:", err);
@@ -963,7 +993,11 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
   };
 
   const handleDeleteEvent = async () => {
-    if(!window.confirm('Delete this event?')) return;
+    if (editingEvent.isStatic) {
+        setEditingEvent(null);
+        return; // Can't delete hardcoded ones from DB
+    }
+    if(!window.confirm('Delete this event from the database?')) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id));
       setEditingEvent(null);
@@ -989,11 +1023,16 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
     }
   };
 
-  const handleSetRole = async (memberId) => {
+  const handleUpdateMember = async (memberId, currentData) => {
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', memberId), { role: memberRoles[memberId] || 'Member' }, { merge: true });
+      const newRole = memberRoles[memberId] !== undefined ? memberRoles[memberId] : (currentData.role || 'Member');
+      const newRank = memberRanks[memberId] !== undefined ? memberRanks[memberId] : (currentData.rank || '');
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', memberId), { 
+        role: newRole,
+        rank: newRank
+      }, { merge: true });
     } catch (err) {
-      console.error("Error updating role:", err);
+      console.error("Error updating member:", err);
     }
   };
 
@@ -1029,8 +1068,11 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
       className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
     >
        <div>
-         <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{event.title}</p>
-         <p className="text-zinc-500 text-[10px] font-bold mt-2 uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
+         <div className="flex justify-between items-start mb-2">
+            <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
+            {event.isStatic && <span className="bg-zinc-800 text-zinc-500 text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 ml-2">Standard</span>}
+         </div>
+         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
        </div>
        <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
     </div>
@@ -1071,7 +1113,10 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
         {editingEvent ? (
           <div className="grid md:grid-cols-2 gap-6 bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300">
             <div className="md:col-span-2 flex justify-between items-center border-b border-zinc-800 pb-4">
-               <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
+               <div>
+                  <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
+                  {editingEvent.isStatic && <p className="text-zinc-500 text-[10px] mt-1 italic font-bold">Standard event: Saving will create a database copy.</p>}
+               </div>
                <button onClick={() => setEditingEvent(null)} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
             <InputField label="Event Title" value={editingEvent.title} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
@@ -1089,14 +1134,16 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
             </div>
             <div className="md:col-span-2 flex gap-4 mt-2">
               <button onClick={handleUpdateEvent} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Changes</button>
-              <button onClick={handleDeleteEvent} className="flex-1 bg-red-900/50 hover:bg-red-600 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest">Delete Event</button>
+              {!editingEvent.isStatic && (
+                <button onClick={handleDeleteEvent} className="flex-1 bg-red-900/50 hover:bg-red-600 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest">Delete Event</button>
+              )}
             </div>
           </div>
         ) : (
           <div className="space-y-10">
             {editableUpcoming.length > 0 && (
               <div>
-                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-pink-500 pl-3">Upcoming Board</p>
+                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-pink-500 pl-3">Upcoming Events</p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {editableUpcoming.map(e => <EventListTile key={e.id} event={e} />)}
                 </div>
@@ -1105,17 +1152,11 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
             
             {editablePast.length > 0 && (
               <div>
-                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-zinc-700 pl-3">Past Events Gallery</p>
+                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-zinc-700 pl-3">Past Events</p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {editablePast.map(e => <EventListTile key={e.id} event={e} />)}
                 </div>
               </div>
-            )}
-
-            {cloudEvents.length === 0 && (
-              <p className="text-zinc-600 text-xs italic py-8 text-center uppercase font-bold tracking-widest border border-dashed border-zinc-800 rounded-2xl">
-                No cloud-based events found. Static events cannot be edited here.
-              </p>
             )}
           </div>
         )}
@@ -1245,29 +1286,50 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
         </section>
 
         <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
-          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><Users className="w-4 h-4 text-pink-500" /> Member Moderation Hub</h3>
+          <div className="flex justify-between items-center border-b border-zinc-800 pb-3 mb-4">
+              <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4 text-pink-500" /> Member Moderation Hub</h3>
+              <span className="text-[10px] text-zinc-500 font-bold uppercase italic">Rank members 1-5 to show them first</span>
+          </div>
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
             {members.map(m => (
               <div key={m.id} className="flex flex-col gap-3 bg-black/50 p-4 rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-colors">
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col">
-                      <span className="text-white text-xs font-bold truncate max-w-[120px]">{m.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white text-xs font-bold truncate max-w-[100px]">{m.name}</span>
+                        {m.rank && (
+                          <span className="bg-pink-600/20 text-pink-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-pink-500/30">#{m.rank}</span>
+                        )}
+                      </div>
                       <span className="text-zinc-600 text-[9px] uppercase tracking-tighter">{m.nickname || 'NO NICKNAME'}</span>
                   </div>
                   <button onClick={() => handleExpelMember(m.id)} className="text-zinc-700 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
                 </div>
-                <div className="flex gap-2 mt-auto">
-                   <input 
-                     type="text" 
-                     value={memberRoles[m.id] !== undefined ? memberRoles[m.id] : (m.role || 'Member')} 
-                     onChange={e => setMemberRoles({...memberRoles, [m.id]: e.target.value})} 
-                     className="flex-grow w-full bg-zinc-900 border border-zinc-800 text-pink-500 rounded p-2 text-[10px] uppercase font-bold tracking-wider outline-none focus:border-pink-500"
-                   />
+                <div className="space-y-2 mt-auto">
+                   <div className="flex gap-2">
+                     <div className="w-12 shrink-0">
+                       <input 
+                         type="number" 
+                         min="1" 
+                         max="5"
+                         placeholder="#"
+                         value={memberRanks[m.id] !== undefined ? memberRanks[m.id] : (m.rank || '')} 
+                         onChange={e => setMemberRanks({...memberRanks, [m.id]: e.target.value})} 
+                         className="w-full bg-zinc-900 border border-zinc-800 text-pink-500 rounded p-2 text-[10px] uppercase font-bold text-center outline-none focus:border-pink-500"
+                       />
+                     </div>
+                     <input 
+                       type="text" 
+                       value={memberRoles[m.id] !== undefined ? memberRoles[m.id] : (m.role || 'Member')} 
+                       onChange={e => setMemberRoles({...memberRoles, [m.id]: e.target.value})} 
+                       className="flex-grow w-full bg-zinc-900 border border-zinc-800 text-pink-500 rounded p-2 text-[10px] uppercase font-bold tracking-wider outline-none focus:border-pink-500"
+                     />
+                   </div>
                    <button 
-                     onClick={() => handleSetRole(m.id)}
-                     className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 rounded border border-zinc-700 transition-colors text-[10px] uppercase font-bold tracking-widest active:scale-95"
+                     onClick={() => handleUpdateMember(m.id, m)}
+                     className="w-full bg-zinc-800 hover:bg-zinc-700 text-white py-2 rounded border border-zinc-700 transition-colors text-[10px] uppercase font-bold tracking-widest active:scale-95"
                    >
-                     Set
+                     Update Status & Rank
                    </button>
                 </div>
               </div>
@@ -1290,6 +1352,37 @@ export default function App() {
   const [cloudRsvps, setCloudRsvps] = useState({});
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.\n\nToday? We have blossomed into a chaotic, dysfunctional family of high-revving enthusiasts, a collection of soot-belching dirty diesels, and one highly optimistic weirdo who thinks they can finish a 300-mile road trip in a glorified, battery-powered toaster. We are united by the smell of unburnt hydrocarbons (mostly) and a mutual inability to leave anything stock.");
+
+  // Correct Hook Order: Define all useMemo hooks at the top, before any return statements
+  const sortedMembers = useMemo(() => {
+    return [...cloudMembers].sort((a, b) => {
+      const rankA = parseInt(a.rank) || 999;
+      const rankB = parseInt(b.rank) || 999;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [cloudMembers]);
+
+  // Combined Events Logic: Moved to the top to fix Rules of Hooks error
+  const combinedEvents = useMemo(() => {
+    const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
+    const visibleStatic = STATIC_EVENTS.filter(s => !cloudTitles.has(s.title.toLowerCase()));
+    return [...visibleStatic, ...cloudEvents];
+  }, [cloudEvents]);
+
+  const combinedRaffles = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
+
+  // Event sorting logic moved to top
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); 
+  const upcomingEvents = useMemo(() => 
+    combinedEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
+    [combinedEvents, now]
+  );
+  const pastEvents = useMemo(() => 
+    combinedEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
+    [combinedEvents, now]
+  );
 
   useEffect(() => {
     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -1370,18 +1463,6 @@ export default function App() {
     { id: 'charity', label: 'Charity', icon: Heart },
   ];
 
-  const combinedEvents = [...STATIC_EVENTS, ...cloudEvents];
-  const combinedRaffles = [...STATIC_RAFFLES, ...cloudRaffles];
-  
-  const now = new Date();
-  now.setHours(0, 0, 0, 0); 
-
-  const upcomingEvents = combinedEvents.filter(e => parseEventDateStr(e.date) >= now);
-  const pastEvents = combinedEvents.filter(e => parseEventDateStr(e.date) < now);
-
-  upcomingEvents.sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date));
-  pastEvents.sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date));
-
   const currentUserProfile = cloudMembers.find(m => m.id === user?.uid) || null;
 
   const renderContent = () => {
@@ -1390,11 +1471,11 @@ export default function App() {
         return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} />;
       case 'past_events': 
         return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={true} showHero={false} clubDescription={clubDescription} />;
-      case 'members': return <MembersView members={cloudMembers} />;
+      case 'members': return <MembersView members={sortedMembers} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
-      case 'admin': return <AdminView members={cloudMembers} events={combinedEvents} cloudEvents={cloudEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} />;
+      case 'admin': return <AdminView members={sortedMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} />;
       default: return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} />;
     }
   };
