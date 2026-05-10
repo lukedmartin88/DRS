@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -36,7 +36,7 @@ import {
   Facebook,
   Instagram,
   History,
-  Home as HomeIcon
+  Home
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
@@ -125,12 +125,13 @@ const SplashView = () => {
       }
     } catch (err) {
       console.error(err);
-      const message = err.message.includes('auth/invalid-credential') 
+      const message = err.message?.includes('auth/invalid-credential') 
         ? 'Invalid email or password.' 
-        : err.message.includes('auth/email-already-in-use')
+        : err.message?.includes('auth/email-already-in-use')
         ? 'An account with this email already exists.'
-        : err.message.replace('Firebase: ', '');
+        : err.message?.replace('Firebase: ', '') || 'An authentication error occurred.';
       setError(message);
+    } finally {
       setLoading(false);
     }
   };
@@ -148,9 +149,10 @@ const SplashView = () => {
         await sendPasswordResetEmail(auth, email);
         setResetMsg('Password reset link sent to your email.');
     } catch(err) {
-        setError(err.message.replace('Firebase: ', ''));
+        setError(err.message?.replace('Firebase: ', '') || 'Failed to send reset email.');
+    } finally {
+        setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -332,6 +334,15 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
     window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
   };
 
+  // Performance Optimization: Memoize the member dictionary so we don't scan the array 
+  // repeatedly inside the event render loops!
+  const membersById = useMemo(() => {
+    return cloudMembers.reduce((acc, member) => {
+      acc[member.id] = member;
+      return acc;
+    }, {});
+  }, [cloudMembers]);
+
   return (
     <div className="space-y-6">
       {showHero && (
@@ -366,7 +377,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
           const isMarked = user && rsvpList.includes(user.uid);
           
           const attendeeMembers = rsvpList.map(uid => 
-            cloudMembers.find(m => m.id === uid) || { id: uid, name: 'Member', avatar: DEFAULT_AVATAR }
+            membersById[uid] || { id: uid, name: 'Member', avatar: DEFAULT_AVATAR }
           );
 
           return (
@@ -480,6 +491,7 @@ const MembersView = ({ members }) => {
             <h2 className="text-3xl font-bold text-white flex items-center gap-3">
               {selectedMember.name}
               {selectedMember.nickname && <span className="text-zinc-500 text-xl font-normal italic">"{selectedMember.nickname}"</span>}
+              {selectedMember.role === "Admin" && <Shield className="w-6 h-6 text-pink-500" />}
               {selectedMember.role === "Club President" && <Award className="w-6 h-6 text-yellow-500" />}
             </h2>
             <p className="text-pink-500 font-medium text-lg">{selectedMember.role || 'Member'}</p>
@@ -686,14 +698,18 @@ const ProfileView = ({ user, userProfile }) => {
 
   const handleSave = async () => {
     if (!user) return;
-    const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
-    await setDoc(profileRef, {
-      name, nickname, bio, location, avatar, cars,
-      role: userProfile?.role || 'Member',
-      joinDate: userProfile?.joinDate || formatDate(new Date())
-    }, { merge: true });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
+      await setDoc(profileRef, {
+        name, nickname, bio, location, avatar, cars,
+        role: userProfile?.role || 'Member',
+        joinDate: userProfile?.joinDate || formatDate(new Date())
+      }, { merge: true });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error("Save failed:", err);
+    }
   };
 
   if (!user) return <div className="text-center py-20 text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">Establishing Secure Connection...</div>;
@@ -723,23 +739,23 @@ const ProfileView = ({ user, userProfile }) => {
 
       <div className="flex items-center justify-between mt-12 border-b border-zinc-800 pb-4">
         <h3 className="text-2xl font-bold text-white">My Garage</h3>
-        <button onClick={() => setCars([...cars, { reg: '', make: '', model: '', year: 2026, specs: '', mods: '', image: '', gallery: [] }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
+        <button onClick={() => setCars(prev => [...prev, { reg: '', make: '', model: '', year: 2026, specs: '', mods: '', image: '', gallery: [] }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
       </div>
 
       <div className="space-y-6">
         {cars.map((car, idx) => (
           <div key={idx} className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 relative shadow-lg animate-in slide-in-from-left-4 duration-300">
-            <button onClick={() => setCars(cars.filter((_, i) => i !== idx))} className="absolute top-4 right-4 text-zinc-500 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5"/></button>
+            <button onClick={() => setCars(prev => prev.filter((_, i) => i !== idx))} className="absolute top-4 right-4 text-zinc-500 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5"/></button>
             <div className="grid md:grid-cols-2 gap-4">
-              <InputField label="Registration" value={car.reg} onChange={e => { const n = [...cars]; n[idx].reg = e.target.value; setCars(n); }} />
-              <InputField label="Make" value={car.make} onChange={e => { const n = [...cars]; n[idx].make = e.target.value; setCars(n); }} />
-              <InputField label="Model" value={car.model} onChange={e => { const n = [...cars]; n[idx].model = e.target.value; setCars(n); }} />
-              <InputField label="Year" type="number" value={car.year} onChange={e => { const n = [...cars]; n[idx].year = e.target.value; setCars(n); }} />
-              <InputField label="Specs" value={car.specs} onChange={e => { const n = [...cars]; n[idx].specs = e.target.value; setCars(n); }} />
-              <InputField label="Mods" value={car.mods} onChange={e => { const n = [...cars]; n[idx].mods = e.target.value; setCars(n); }} />
+              <InputField label="Registration" value={car.reg} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, reg: e.target.value } : c))} />
+              <InputField label="Make" value={car.make} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, make: e.target.value } : c))} />
+              <InputField label="Model" value={car.model} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, model: e.target.value } : c))} />
+              <InputField label="Year" type="number" value={car.year} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, year: e.target.value } : c))} />
+              <InputField label="Specs" value={car.specs} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, specs: e.target.value } : c))} />
+              <InputField label="Mods" value={car.mods} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, mods: e.target.value } : c))} />
               
               <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50 mt-2">
-                  <ImageUpload label="Upload Main Vehicle Photo (Cover)" onUploadSuccess={url => { const n = [...cars]; n[idx].image = url; setCars(n); }} />
+                  <ImageUpload label="Upload Main Vehicle Photo (Cover)" onUploadSuccess={url => setCars(prev => prev.map((c, i) => i === idx ? { ...c, image: url } : c))} />
                   {car.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest flex items-center gap-1">Cover Photo Uploaded Successfully</p>}
               </div>
 
@@ -750,11 +766,7 @@ const ProfileView = ({ user, userProfile }) => {
                           <div key={gIdx} className="relative w-24 h-24 group rounded-xl overflow-hidden border border-zinc-700 shadow-md">
                               <img src={gImg} alt={`Gallery item ${gIdx + 1}`} className="w-full h-full object-cover" />
                               <button 
-                                  onClick={() => { 
-                                      const n = [...cars]; 
-                                      n[idx].gallery.splice(gIdx, 1); 
-                                      setCars(n); 
-                                  }} 
+                                  onClick={() => setCars(prev => prev.map((c, i) => i === idx ? { ...c, gallery: c.gallery.filter((_, deleteIdx) => deleteIdx !== gIdx) } : c))} 
                                   className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                                   title="Remove image"
                               >
@@ -766,12 +778,7 @@ const ProfileView = ({ user, userProfile }) => {
                   <div className="bg-black/30 p-4 rounded-lg border border-zinc-800/50 border-dashed">
                       <ImageUpload 
                           label="Add Another Photo to Gallery" 
-                          onUploadSuccess={url => { 
-                              const n = [...cars]; 
-                              if (!n[idx].gallery) n[idx].gallery = [];
-                              n[idx].gallery.push(url); 
-                              setCars(n); 
-                          }} 
+                          onUploadSuccess={url => setCars(prev => prev.map((c, i) => i === idx ? { ...c, gallery: [...(c.gallery || []), url] } : c))} 
                       />
                   </div>
               </div>
@@ -893,8 +900,8 @@ const CharityView = () => (
   </div>
 );
 
-const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, userProfile }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', location: '', description: '', image: '', link: '' });
@@ -910,8 +917,74 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
 
   const handleLogin = (e) => {
     e.preventDefault();
-    if (password === 'dailyride2026') { setIsAuthenticated(true); setError(''); }
-    else { setError('Access Denied: Incorrect credentials.'); }
+    if (password === 'dailyride2026' || userProfile?.role === 'Admin') { 
+        setIsAuthenticated(true); 
+        setError(''); 
+    } else { 
+        setError('Access Denied: Incorrect credentials.'); 
+    }
+  };
+
+  const handleDeployEvent = async () => {
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
+      setNewEvent({ title: '', date: '', time: '', location: '', description: '', image: '', link: '' });
+    } catch (err) {
+      console.error("Error saving event:", err);
+    }
+  };
+
+  const handleUpdateEvent = async () => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id), editingEvent, { merge: true });
+      setEditingEvent(null);
+    } catch (err) {
+      console.error("Error updating event:", err);
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if(!window.confirm('Delete this event?')) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id));
+      setEditingEvent(null);
+    } catch (err) {
+      console.error("Error deleting event:", err);
+    }
+  };
+
+  const handlePublishRaffle = async () => {
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), newRaffle);
+      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
+    } catch (err) {
+      console.error("Error saving raffle:", err);
+    }
+  };
+
+  const handleUpdateDescription = async () => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), { description: editDescription }, { merge: true });
+    } catch (err) {
+      console.error("Error saving description:", err);
+    }
+  };
+
+  const handleSetRole = async (memberId) => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', memberId), { role: memberRoles[memberId] || 'Member' }, { merge: true });
+    } catch (err) {
+      console.error("Error updating role:", err);
+    }
+  };
+
+  const handleExpelMember = async (memberId) => {
+    if(!window.confirm('EXPEL MEMBER FROM CLUB?')) return;
+    try {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', memberId));
+    } catch (err) {
+      console.error("Error removing member:", err);
+    }
   };
 
   if (!isAuthenticated) return (
@@ -955,7 +1028,7 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
              <label className="block text-sm font-medium text-zinc-400">Event Description</label>
              <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})} placeholder="Detailed brief for club members..." rows={3} />
           </div>
-          <button onClick={async () => { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent); setNewEvent({ title: '', date: '', time: '', location: '', description: '', image: '', link: '' }); }} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Publish to Public Board</button>
+          <button onClick={handleDeployEvent} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Publish to Public Board</button>
         </div>
       </section>
 
@@ -983,8 +1056,8 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
                <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingEvent.description} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} rows={3} />
             </div>
             <div className="md:col-span-2 flex gap-4 mt-2">
-              <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id), editingEvent, { merge: true }); setEditingEvent(null); }} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Changes</button>
-              <button onClick={async () => { if(window.confirm('Delete this event?')) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id)); setEditingEvent(null); } }} className="flex-1 bg-red-900/50 hover:bg-red-600 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest">Delete Event</button>
+              <button onClick={handleUpdateEvent} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Changes</button>
+              <button onClick={handleDeleteEvent} className="flex-1 bg-red-900/50 hover:bg-red-600 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest">Delete Event</button>
             </div>
           </div>
         ) : (
@@ -1017,7 +1090,7 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
              <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
              <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
           </div>
-          <button onClick={async () => { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), newRaffle); setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' }); }} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
+          <button onClick={handlePublishRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
         </div>
         
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
@@ -1036,8 +1109,10 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
                       <button 
                         onClick={async () => {
                           if (r.id.startsWith('mock-')) return;
-                          const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
-                          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                          try {
+                            const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                          } catch (err) { console.error(err); }
                         }} 
                         className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
                       >
@@ -1047,8 +1122,10 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
                       <button 
                         onClick={async () => {
                           if (r.id.startsWith('mock-')) return;
-                          const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
-                          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                          try {
+                            const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                          } catch (err) { console.error(err); }
                         }} 
                         className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
                       >
@@ -1071,7 +1148,9 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
                   <button 
                     onClick={async () => { 
                       if (!raffleWinners[r.id]) return;
-                      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
+                      try {
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
+                      } catch (err) { console.error(err); }
                     }} 
                     disabled={!raffleWinners[r.id]}
                     className="w-full bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 hover:border-pink-500"
@@ -1082,7 +1161,18 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
               )}
 
               {!r.id.startsWith('mock-') && (
-                <button onClick={async () => { if(window.confirm('PERMANENTLY DELETE RAFFLE?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id)); }} className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] mt-4 flex items-center gap-1 transition-colors tracking-widest"><Trash2 className="w-3 h-3" /> Purge Entry</button>
+                <button 
+                  onClick={async () => { 
+                    if(window.confirm('PERMANENTLY DELETE RAFFLE?')) {
+                      try {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id));
+                      } catch (err) { console.error(err); }
+                    }
+                  }} 
+                  className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] mt-4 flex items-center gap-1 transition-colors tracking-widest"
+                >
+                  <Trash2 className="w-3 h-3" /> Purge Entry
+                </button>
               )}
             </div>
           ))}
@@ -1099,7 +1189,7 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
               className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all h-32 whitespace-pre-wrap"
             />
             <button 
-              onClick={async () => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), { description: editDescription }, { merge: true })}
+              onClick={handleUpdateDescription}
               className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
             >
               Update Homepage Description
@@ -1117,7 +1207,7 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
                       <span className="text-white text-xs font-bold truncate max-w-[120px]">{m.name}</span>
                       <span className="text-zinc-600 text-[9px] uppercase tracking-tighter">{m.nickname || 'NO NICKNAME'}</span>
                   </div>
-                  <button onClick={async () => { if(window.confirm('EXPEL MEMBER FROM CLUB?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id)); }} className="text-zinc-700 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => handleExpelMember(m.id)} className="text-zinc-700 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
                 </div>
                 <div className="flex gap-2 mt-auto">
                    <input 
@@ -1127,7 +1217,7 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) =
                      className="flex-grow w-full bg-zinc-900 border border-zinc-800 text-pink-500 rounded p-2 text-[10px] uppercase font-bold tracking-wider outline-none focus:border-pink-500"
                    />
                    <button 
-                     onClick={async () => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id), { role: memberRoles[m.id] || m.role || 'Member' }, { merge: true })}
+                     onClick={() => handleSetRole(m.id)}
                      className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 rounded border border-zinc-700 transition-colors text-[10px] uppercase font-bold tracking-widest active:scale-95"
                    >
                      Set
@@ -1199,17 +1289,21 @@ export default function App() {
 
   const toggleRsvp = async (eventId, isPast) => {
     if (!user) return;
-    const rsvpDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rsvps', String(eventId));
-    const currentEventRsvps = cloudRsvps[eventId] || { attending: [], attended: [] };
-    const field = isPast ? 'attended' : 'attending';
-    const list = currentEventRsvps[field] || [];
-    const isMarked = list.includes(user.uid);
-    
-    const newList = isMarked ? list.filter(id => id !== user.uid) : [...list, user.uid];
-    
-    await setDoc(rsvpDocRef, {
-      [field]: newList
-    }, { merge: true });
+    try {
+      const rsvpDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rsvps', String(eventId));
+      const currentEventRsvps = cloudRsvps[eventId] || { attending: [], attended: [] };
+      const field = isPast ? 'attended' : 'attending';
+      const list = currentEventRsvps[field] || [];
+      const isMarked = list.includes(user.uid);
+      
+      const newList = isMarked ? list.filter(id => id !== user.uid) : [...list, user.uid];
+      
+      await setDoc(rsvpDocRef, {
+        [field]: newList
+      }, { merge: true });
+    } catch (err) {
+      console.error("Error saving RSVP:", err);
+    }
   };
 
   if (isLoadingAuth) {
@@ -1221,7 +1315,7 @@ export default function App() {
   }
 
   const navItems = [
-    { id: 'events', label: 'Home', icon: HomeIcon },
+    { id: 'events', label: 'Home', icon: Home },
     { id: 'past_events', label: 'Past Events', icon: History },
     { id: 'members', label: 'Members', icon: Users },
     { id: 'profile', label: 'My Profile', icon: UserCircle },
@@ -1253,7 +1347,7 @@ export default function App() {
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
-      case 'admin': return <AdminView members={cloudMembers} events={combinedEvents} cloudEvents={cloudEvents} raffles={combinedRaffles} clubDescription={clubDescription} />;
+      case 'admin': return <AdminView members={cloudMembers} events={combinedEvents} cloudEvents={cloudEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} />;
       default: return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} />;
     }
   };
