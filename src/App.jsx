@@ -176,7 +176,7 @@ const SplashView = () => {
         {isResetMode ? (
           <form onSubmit={handlePasswordReset} className="space-y-5">
             <p className="text-zinc-300 text-sm text-center mb-4">Enter your email address and we will send you a link to reset your password.</p>
-            <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="member@dailyridesouth.com" required />
+            <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="enter your email" required />
             
             {error && (
               <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
@@ -202,7 +202,7 @@ const SplashView = () => {
         ) : (
           <>
             <form onSubmit={handleSubmit} className="space-y-5">
-              <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="member@dailyridesouth.com" required />
+              <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="enter your email" required />
               <div className="space-y-1">
                 <InputField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
                 {isLogin && (
@@ -931,6 +931,19 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
     }
   };
 
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  const editableUpcoming = useMemo(() => 
+    cloudEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
+    [cloudEvents, now]
+  );
+  
+  const editablePast = useMemo(() => 
+    cloudEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
+    [cloudEvents, now]
+  );
+
   const handleDeployEvent = async () => {
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
@@ -1010,6 +1023,19 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
     </div>
   );
 
+  const EventListTile = ({ event }) => (
+    <div 
+      onClick={() => setEditingEvent(event)} 
+      className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
+    >
+       <div>
+         <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{event.title}</p>
+         <p className="text-zinc-500 text-[10px] font-bold mt-2 uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
+       </div>
+       <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
+    </div>
+  );
+
   return (
     <div className="space-y-12 max-w-5xl mx-auto pb-24 animate-in fade-in duration-700">
       <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
@@ -1040,10 +1066,10 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
 
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
-        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Edit3 className="w-5 h-5 text-pink-500" /> Manage Cloud Events</h3>
+        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Edit3 className="w-5 h-5 text-pink-500" /> Manage Existing Events</h3>
         
         {editingEvent ? (
-          <div className="grid md:grid-cols-2 gap-6 bg-black/50 p-6 rounded-2xl border border-pink-500/50">
+          <div className="grid md:grid-cols-2 gap-6 bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300">
             <div className="md:col-span-2 flex justify-between items-center border-b border-zinc-800 pb-4">
                <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
                <button onClick={() => setEditingEvent(null)} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
@@ -1067,15 +1093,30 @@ const AdminView = ({ members, events, cloudEvents, raffles, clubDescription, use
             </div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {cloudEvents && cloudEvents.map(e => (
-              <div key={e.id} onClick={() => setEditingEvent(e)} className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg">
-                 <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{e.title}</p>
-                 <p className="text-zinc-500 text-[10px] font-bold mt-2 uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {e.date}</p>
-                 <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Click to Edit</p>
+          <div className="space-y-10">
+            {editableUpcoming.length > 0 && (
+              <div>
+                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-pink-500 pl-3">Upcoming Board</p>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {editableUpcoming.map(e => <EventListTile key={e.id} event={e} />)}
+                </div>
               </div>
-            ))}
-            {(!cloudEvents || cloudEvents.length === 0) && <p className="text-zinc-600 text-xs italic py-4 col-span-full uppercase font-bold tracking-widest">No cloud events to manage.</p>}
+            )}
+            
+            {editablePast.length > 0 && (
+              <div>
+                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-zinc-700 pl-3">Past Events Gallery</p>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {editablePast.map(e => <EventListTile key={e.id} event={e} />)}
+                </div>
+              </div>
+            )}
+
+            {cloudEvents.length === 0 && (
+              <p className="text-zinc-600 text-xs italic py-8 text-center uppercase font-bold tracking-widest border border-dashed border-zinc-800 rounded-2xl">
+                No cloud-based events found. Static events cannot be edited here.
+              </p>
+            )}
           </div>
         )}
       </section>
