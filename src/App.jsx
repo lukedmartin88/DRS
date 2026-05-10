@@ -6,7 +6,8 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -30,11 +31,15 @@ import {
   Edit3,
   Menu,
   X,
-  LogOut
+  LogOut,
+  ImageIcon,
+  Facebook,
+  Instagram,
+  History,
+  Home as HomeIcon
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
-// Using your live V3 credentials for local deployment, with a fallback for the Canvas preview
 const canvasConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : null;
 const firebaseConfig = canvasConfig && Object.keys(canvasConfig).length > 0 ? canvasConfig : {
   apiKey: "AIzaSyCZDpOOlu6CcBNG5mNd9qLO0w3UihBB3-g",
@@ -69,11 +74,19 @@ const formatDate = (date) => {
   return `${d}${getOrdinalSuffix(d)} ${month} ${year}`;
 };
 
+const parseEventDateStr = (dateStr) => {
+  if (!dateStr) return new Date(9999, 0, 1);
+  let cleanStr = dateStr.replace(/^[A-Za-z]+,\s*/, '');
+  cleanStr = cleanStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
+  const parsed = Date.parse(cleanStr);
+  if (isNaN(parsed)) return new Date(9999, 0, 1);
+  return new Date(parsed);
+};
+
 const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=200";
 const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
 
 // --- SHARED COMPONENTS ---
-
 const InputField = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
   <div className="w-full">
     <label className="block text-sm font-medium text-zinc-400 mb-1">{label}</label>
@@ -89,17 +102,19 @@ const InputField = ({ label, value, onChange, placeholder, type = "text", requir
 );
 
 // --- AUTHENTICATION SPLASH SCREEN ---
-
 const SplashView = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [isResetMode, setIsResetMode] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [resetMsg, setResetMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setResetMsg('');
     setLoading(true);
     
     try {
@@ -110,7 +125,6 @@ const SplashView = () => {
       }
     } catch (err) {
       console.error(err);
-      // Clean up Firebase error messages for the user
       const message = err.message.includes('auth/invalid-credential') 
         ? 'Invalid email or password.' 
         : err.message.includes('auth/email-already-in-use')
@@ -121,72 +135,104 @@ const SplashView = () => {
     }
   };
 
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMsg('');
+    if (!email) {
+        setError('Please enter your email address first.');
+        return;
+    }
+    setLoading(true);
+    try {
+        await sendPasswordResetEmail(auth, email);
+        setResetMsg('Password reset link sent to your email.');
+    } catch(err) {
+        setError(err.message.replace('Firebase: ', ''));
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30 selection:text-pink-200">
-      {/* Background styling */}
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center opacity-20 blur-sm scale-105"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-zinc-950/40"></div>
 
       <div className="relative z-10 w-full max-w-md bg-black/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl shadow-pink-500/5 animate-in zoom-in-95 duration-700">
-        
         <div className="flex flex-col items-center mb-8">
           <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-20 w-20 rounded-2xl object-cover border border-zinc-700 shadow-lg shadow-pink-500/20 mb-4" alt="DRS Logo" />
           <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
           <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">Petrolhead Community</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <InputField 
-            label="Email Address" 
-            type="email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            placeholder="member@dailyridesouth.com" 
-            required 
-          />
-          <InputField 
-            label="Password" 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            placeholder="••••••••" 
-            required 
-          />
+        {isResetMode ? (
+          <form onSubmit={handlePasswordReset} className="space-y-5">
+            <p className="text-zinc-300 text-sm text-center mb-4">Enter your email address and we will send you a link to reset your password.</p>
+            <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="member@dailyridesouth.com" required />
+            
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
+                <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
+              </div>
+            )}
+            {resetMsg && (
+              <div className="bg-green-500/10 border border-green-500/50 p-3 rounded-lg">
+                <p className="text-green-500 text-xs font-bold uppercase tracking-widest text-center">{resetMsg}</p>
+              </div>
+            )}
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
-              <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
+            <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
+              {loading ? 'Processing...' : 'Send Reset Link'}
+            </button>
+
+            <div className="mt-6 text-center border-t border-zinc-800/50 pt-6">
+              <button type="button" onClick={() => { setIsResetMode(false); setError(''); setResetMsg(''); }} className="text-zinc-400 hover:text-white font-bold uppercase text-xs tracking-widest transition-colors">
+                Back to Login
+              </button>
             </div>
-          )}
+          </form>
+        ) : (
+          <>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="member@dailyridesouth.com" required />
+              <div className="space-y-1">
+                <InputField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                {isLogin && (
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => { setIsResetMode(true); setError(''); setResetMsg(''); }} className="text-pink-500 hover:text-pink-400 text-xs font-bold uppercase tracking-widest transition-colors mt-2">
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
+              </div>
 
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]"
-          >
-            {loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}
-          </button>
-        </form>
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
+                  <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
+                </div>
+              )}
 
-        <div className="mt-8 text-center border-t border-zinc-800/50 pt-6">
-          <p className="text-zinc-400 text-sm">
-            {isLogin ? "Don't have an account yet?" : "Already part of the club?"}
-          </p>
-          <button 
-            onClick={() => { setIsLogin(!isLogin); setError(''); }}
-            className="text-pink-500 hover:text-pink-400 font-bold uppercase text-xs tracking-widest mt-2 transition-colors"
-          >
-            {isLogin ? 'Sign up here' : 'Log in instead'}
-          </button>
-        </div>
+              <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
+                {loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}
+              </button>
+            </form>
+
+            <div className="mt-8 text-center border-t border-zinc-800/50 pt-6">
+              <p className="text-zinc-400 text-sm">
+                {isLogin ? "Don't have an account yet?" : "Already part of the club?"}
+              </p>
+              <button onClick={() => { setIsLogin(!isLogin); setError(''); setResetMsg(''); }} className="text-pink-500 hover:text-pink-400 font-bold uppercase text-xs tracking-widest mt-2 transition-colors">
+                {isLogin ? 'Sign up here' : 'Log in instead'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-
 // --- MOCK DATA (Static Fallbacks) ---
-
 const STATIC_EVENTS = [
   {
     id: 1,
@@ -255,70 +301,153 @@ const STATIC_CHARITY = [
     id: 1,
     title: "Coastguard Association 50th Anniversary",
     description: "Daily Ride South is supporting the Coastguard for their 50th year. These dedicated volunteers look after our coastline and are on call day and night. Purchase official merchandise to support them directly.",
-    raised: 1250,
     deadline: "31st December 2026",
     image: "https://images.unsplash.com/photo-1468276311594-df7cb65d8df6?auto=format&fit=crop&q=80&w=800",
     link: "https://coastguardassociation.sumupstore.com/"
   }
 ];
 
+const STATIC_RAFFLES = [
+  {
+    id: 'mock-past-raffle',
+    title: "Premium Prize Bundle",
+    description: "A massive thank you to everyone who entered.",
+    drawDate: "20th April 2026",
+    ticketPrice: 5,
+    totalTickets: 100,
+    ticketsSold: 100,
+    image: "https://i.ibb.co/fzbH9zQj/Whats-App-Image-2026-05-10-at-10-23-14-PM.jpg",
+    isEnded: true,
+    winner: "Steve Ronnie"
+  }
+];
+
 // --- COMPONENTS ---
 
-const EventsView = ({ events }) => {
+const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp, isPast, showHero, clubDescription }) => {
   const handleRSVP = (event) => {
     const recipient = "Dailyridesouth@gmail.com";
-    const subject = encodeURIComponent(`RSVP for ${event.title}`);
-    const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI would like to RSVP for the following event:\n\nEvent: ${event.title}\nDate: ${event.date}\nLocation: ${event.location}\n\nPlease let me know if there are any specific meeting details for the club stand.\n\nThanks!`);
+    const subject = encodeURIComponent(`Questions about ${event.title}`);
+    const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI have a question regarding the following event:\n\nEvent: ${event.title}\nDate: ${event.date}\nLocation: ${event.location}\n\nThanks!`);
     window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
   };
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">Upcoming Events</h2>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {events.map(event => (
-          <div key={event.id} className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 hover:border-pink-500 transition-colors flex flex-col">
-            <div className="h-48 overflow-hidden shrink-0">
-              <img src={event.image} alt={event.title} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-            </div>
-            <div className="p-5 flex flex-col flex-grow">
-              <h3 className="text-xl font-bold text-white mb-3">{event.title}</h3>
-              <div className="space-y-2 text-sm text-zinc-300 mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-pink-500" />
-                  <span>{event.date}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-pink-500" />
-                  <span>{event.time}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-pink-500" />
-                  <span>{event.location}</span>
-                </div>
-              </div>
-              <p className="text-zinc-400 text-sm flex-grow mb-5">{event.description}</p>
-              <div className="grid grid-cols-2 gap-3 mt-auto">
-                <button 
-                  onClick={() => handleRSVP(event)}
-                  className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-2 rounded-lg transition-colors border border-zinc-700"
-                >
-                  RSVP
-                </button>
-                {event.link && (
-                  <a 
-                    href={event.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-full bg-pink-600 hover:bg-pink-700 text-white font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    Details <ExternalLink className="w-4 h-4" />
-                  </a>
-                )}
-              </div>
-            </div>
+      {showHero && (
+        <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-10">
+          <p className="text-zinc-300 text-sm md:text-base leading-relaxed mb-4 italic whitespace-pre-wrap">
+            {clubDescription}
+          </p>
+          <div className="flex flex-wrap items-center gap-6 mt-6 pt-6 border-t border-zinc-800/50">
+            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
+              <Facebook className="w-5 h-5" /> Facebook
+            </a>
+            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
+              <Instagram className="w-5 h-5" /> Instagram
+            </a>
           </div>
-        ))}
+        </div>
+      )}
+
+      <h2 className="text-3xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">{title}</h2>
+      
+      {events.length === 0 && (
+        <p className="text-zinc-500 text-center py-12 italic border border-dashed border-zinc-800 rounded-3xl">
+          No {isPast ? 'past' : 'upcoming'} events to display.
+        </p>
+      )}
+
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        {events.map(event => {
+          const eventRsvps = cloudRsvps[event.id] || { attending: [], attended: [] };
+          const listField = isPast ? 'attended' : 'attending';
+          const rsvpList = eventRsvps[listField] || [];
+          const isMarked = user && rsvpList.includes(user.uid);
+          
+          const attendeeMembers = rsvpList.map(uid => 
+            cloudMembers.find(m => m.id === uid) || { id: uid, name: 'Member', avatar: DEFAULT_AVATAR }
+          );
+
+          return (
+            <div key={event.id} className="bg-zinc-900 rounded-2xl overflow-hidden shadow-xl border border-zinc-800 flex flex-col transition-all hover:shadow-pink-500/5">
+              <div className="h-48 overflow-hidden shrink-0 relative group">
+                <img src={event.image} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
+              </div>
+              <div className="p-6 flex flex-col flex-grow">
+                <h3 className="text-2xl font-black text-white mb-3 uppercase tracking-tighter leading-tight">{event.title}</h3>
+                <div className="space-y-2 text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-pink-500" />
+                    <span className="text-zinc-300">{event.date}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-pink-500" />
+                    <span>{event.time}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-pink-500" />
+                    <span className="truncate">{event.location}</span>
+                  </div>
+                </div>
+                <p className="text-zinc-400 text-sm flex-grow mb-6 leading-relaxed">{event.description}</p>
+                
+                <div className="mt-auto">
+                  <div className="pt-4 border-t border-zinc-800/50 mb-5">
+                    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">
+                      {isPast ? 'Members who attended' : 'Members attending'}
+                    </p>
+                    <div className="flex -space-x-3 overflow-hidden">
+                        {attendeeMembers.slice(0, 6).map(m => (
+                          <img key={m.id} src={m.avatar || DEFAULT_AVATAR} title={m.name} className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover" alt="avatar" />
+                        ))}
+                        {attendeeMembers.length > 6 && (
+                          <div className="flex items-center justify-center h-10 w-10 rounded-full ring-2 ring-zinc-900 bg-zinc-800 text-xs font-bold text-white z-10">
+                            +{attendeeMembers.length - 6}
+                          </div>
+                        )}
+                        {attendeeMembers.length === 0 && (
+                          <span className="text-xs text-zinc-600 font-medium italic py-2">Be the first to mark your attendance!</span>
+                        )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <button 
+                      onClick={() => toggleRsvp(event.id, isPast)}
+                      className={`w-full font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] text-[10px] shadow-lg active:scale-[0.98] ${isMarked ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-500/20' : 'bg-pink-600 hover:bg-pink-700 text-white shadow-pink-500/20'}`}
+                    >
+                      {isMarked ? (isPast ? 'Attended ✓' : 'Attending ✓') : (isPast ? 'Mark as Attended' : 'Mark as Attending')}
+                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        onClick={() => handleRSVP(event)}
+                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 rounded-xl transition-colors border border-zinc-700 text-[10px] uppercase tracking-widest flex items-center justify-center"
+                      >
+                        Email Organiser
+                      </button>
+                      {event.link ? (
+                        <a 
+                          href={event.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold py-3 rounded-xl transition-colors border border-zinc-700 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
+                        >
+                          Details <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <div className="w-full bg-zinc-800/50 text-zinc-600 font-bold py-3 rounded-xl border border-zinc-800/50 text-[10px] uppercase tracking-widest flex items-center justify-center cursor-not-allowed">
+                          No Link
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -326,6 +455,7 @@ const EventsView = ({ events }) => {
 
 const MembersView = ({ members }) => {
   const [selectedMember, setSelectedMember] = useState(null);
+  const [viewingCar, setViewingCar] = useState(null);
 
   if (selectedMember) {
     const cars = selectedMember.cars || [];
@@ -368,16 +498,23 @@ const MembersView = ({ members }) => {
         </div>
 
         <h3 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-zinc-800 pb-2">Garage Gallery</h3>
+        <p className="text-sm text-zinc-500 mb-4 uppercase tracking-widest font-bold flex items-center gap-2">
+          <ImageIcon className="w-4 h-4" /> Click on a vehicle to open the full gallery
+        </p>
         <div className="grid gap-6 md:grid-cols-2">
           {cars.map((car, idx) => (
-            <div key={idx} className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800">
-              <div className="h-64 overflow-hidden relative group">
+            <div 
+              key={idx} 
+              onClick={() => setViewingCar(car)} 
+              className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all transform hover:-translate-y-1 group"
+            >
+              <div className="h-64 overflow-hidden relative">
                 <img 
                   src={car.image || DEFAULT_CAR} 
                   alt={`${car.make} ${car.model}`} 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
                 <div className="absolute bottom-4 left-4 right-4">
                   <div className="flex justify-between items-end mb-1">
                     <h4 className="text-2xl font-bold text-white">{car.make} {car.model}</h4>
@@ -387,11 +524,53 @@ const MembersView = ({ members }) => {
                   {car.mods && (
                     <p className="text-pink-400 text-sm font-medium mt-2 line-clamp-2">Mods: <span className="text-zinc-300 font-normal">{car.mods}</span></p>
                   )}
+                  {car.gallery && car.gallery.length > 0 && (
+                     <div className="mt-3 flex items-center gap-1 text-[10px] text-white font-bold uppercase tracking-widest bg-pink-600/80 w-fit px-2 py-1 rounded backdrop-blur-md">
+                        <ImageIcon className="w-3 h-3" /> +{car.gallery.length} More Images
+                     </div>
+                  )}
                 </div>
               </div>
             </div>
           ))}
+          {cars.length === 0 && (
+            <p className="text-zinc-500 italic col-span-2 py-10 text-center">No cars added to this garage yet.</p>
+          )}
         </div>
+
+        {/* Modal for viewing car gallery */}
+        {viewingCar && (
+          <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col p-4 md:p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-300">
+            <button 
+                onClick={() => setViewingCar(null)} 
+                className="fixed top-6 right-6 bg-zinc-800 hover:bg-pink-600 text-white p-3 rounded-full transition-all z-[110] shadow-lg"
+            >
+                <X className="w-6 h-6"/>
+            </button>
+            <div className="w-full max-w-4xl mx-auto mt-10 md:mt-4 mb-20 flex flex-col">
+              <div className="mb-8 shrink-0 text-center">
+                <h3 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter">
+                    {viewingCar.make} <span className="text-pink-600 not-italic">{viewingCar.model}</span>
+                </h3>
+                {viewingCar.reg && <span className="inline-block mt-4 bg-yellow-400 text-black font-bold px-4 py-1.5 rounded-md text-sm tracking-[0.2em] uppercase">{viewingCar.reg}</span>}
+                <p className="text-zinc-400 mt-6 text-sm md:text-base font-medium max-w-2xl mx-auto leading-relaxed">{viewingCar.specs}</p>
+                {viewingCar.mods && <p className="text-pink-400 mt-4 text-sm font-medium">Mods: <span className="text-zinc-300 font-normal">{viewingCar.mods}</span></p>}
+              </div>
+              
+              <div className="space-y-8">
+                <img src={viewingCar.image || DEFAULT_CAR} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt="Main vehicle profile" />
+                
+                {viewingCar.gallery && viewingCar.gallery.map((img, i) => (
+                  <img key={i} src={img} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt={`Gallery item ${i+1}`} />
+                ))}
+                
+                {(!viewingCar.gallery || viewingCar.gallery.length === 0) && viewingCar.image && (
+                   <p className="text-zinc-600 text-center uppercase tracking-[0.3em] text-xs font-bold py-16">End of Gallery</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -439,7 +618,6 @@ const ImageUpload = ({ label, onUploadSuccess, className }) => {
     setUploading(true);
     setErrorMsg(null);
     
-    // MANDATORY STORAGE RULE: Path must include artifacts/{appId}/users/{userId}/data/ or artifacts/{appId}/users/{userId}/uploads/
     const storageRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser.uid}/uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
     const uploadTask = uploadBytesResumable(storageRef, file);
 
@@ -545,7 +723,7 @@ const ProfileView = ({ user, userProfile }) => {
 
       <div className="flex items-center justify-between mt-12 border-b border-zinc-800 pb-4">
         <h3 className="text-2xl font-bold text-white">My Garage</h3>
-        <button onClick={() => setCars([...cars, { reg: '', make: '', model: '', year: 2026, specs: '', mods: '', image: '' }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
+        <button onClick={() => setCars([...cars, { reg: '', make: '', model: '', year: 2026, specs: '', mods: '', image: '', gallery: [] }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
       </div>
 
       <div className="space-y-6">
@@ -559,9 +737,43 @@ const ProfileView = ({ user, userProfile }) => {
               <InputField label="Year" type="number" value={car.year} onChange={e => { const n = [...cars]; n[idx].year = e.target.value; setCars(n); }} />
               <InputField label="Specs" value={car.specs} onChange={e => { const n = [...cars]; n[idx].specs = e.target.value; setCars(n); }} />
               <InputField label="Mods" value={car.mods} onChange={e => { const n = [...cars]; n[idx].mods = e.target.value; setCars(n); }} />
-              <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
-                  <ImageUpload label="Upload Vehicle Photo" onUploadSuccess={url => { const n = [...cars]; n[idx].image = url; setCars(n); }} />
-                  {car.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest flex items-center gap-1">Photo Uploaded Successfully</p>}
+              
+              <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50 mt-2">
+                  <ImageUpload label="Upload Main Vehicle Photo (Cover)" onUploadSuccess={url => { const n = [...cars]; n[idx].image = url; setCars(n); }} />
+                  {car.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest flex items-center gap-1">Cover Photo Uploaded Successfully</p>}
+              </div>
+
+              <div className="md:col-span-2 mt-4 pt-4 border-t border-zinc-800/50">
+                  <h4 className="text-sm font-medium text-zinc-400 mb-3">Additional Gallery Images</h4>
+                  <div className="flex flex-wrap gap-3 mb-4">
+                      {car.gallery && car.gallery.map((gImg, gIdx) => (
+                          <div key={gIdx} className="relative w-24 h-24 group rounded-xl overflow-hidden border border-zinc-700 shadow-md">
+                              <img src={gImg} alt={`Gallery item ${gIdx + 1}`} className="w-full h-full object-cover" />
+                              <button 
+                                  onClick={() => { 
+                                      const n = [...cars]; 
+                                      n[idx].gallery.splice(gIdx, 1); 
+                                      setCars(n); 
+                                  }} 
+                                  className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Remove image"
+                              >
+                                  <Trash2 className="w-6 h-6 text-red-500" />
+                              </button>
+                          </div>
+                      ))}
+                  </div>
+                  <div className="bg-black/30 p-4 rounded-lg border border-zinc-800/50 border-dashed">
+                      <ImageUpload 
+                          label="Add Another Photo to Gallery" 
+                          onUploadSuccess={url => { 
+                              const n = [...cars]; 
+                              if (!n[idx].gallery) n[idx].gallery = [];
+                              n[idx].gallery.push(url); 
+                              setCars(n); 
+                          }} 
+                      />
+                  </div>
               </div>
             </div>
           </div>
@@ -576,46 +788,92 @@ const ProfileView = ({ user, userProfile }) => {
   );
 };
 
-const RafflesView = ({ raffles }) => (
-  <div className="space-y-6">
-    <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
-    <div className="grid gap-6 lg:grid-cols-2">
-      {raffles.map(raffle => {
-        const progress = (raffle.ticketsSold / raffle.totalTickets) * 100;
-        return (
-          <div key={raffle.id} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col md:flex-row hover:border-pink-500 transition-colors shadow-lg">
-            <div className="md:w-2/5 h-48 md:h-auto relative">
-              <img src={raffle.image || DEFAULT_CAR} alt="" className="w-full h-full object-cover" />
-              <div className="absolute top-2 left-2 bg-pink-600 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">£{raffle.ticketPrice} / Ticket</div>
-            </div>
-            <div className="p-5 md:w-3/5 space-y-4">
-              <div>
-                <h3 className="text-xl font-bold text-white">{raffle.title}</h3>
-                <p className="text-zinc-400 text-sm mt-1">{raffle.description}</p>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
-                    <span>{raffle.ticketsSold} Tickets Taken</span>
-                    <span>{Math.round(progress)}% Full</span>
-                </div>
-                <div className="w-full bg-zinc-800 rounded-full h-2 shadow-inner">
-                  <div className="bg-pink-500 h-2 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ width: `${progress}%` }}></div>
-                </div>
-              </div>
-              <div className="flex justify-between items-center text-xs text-zinc-400 pt-2">
-                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Draws {raffle.drawDate}</span>
-                <button className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-3 py-1 rounded border border-zinc-700 text-[10px] transition-colors uppercase tracking-widest">Reserve</button>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-      {raffles.length === 0 && <p className="text-zinc-500 py-12 text-center col-span-full italic">No active raffles available at the moment. Check back soon!</p>}
-    </div>
-  </div>
-);
+const RafflesView = ({ raffles }) => {
+  const handleReserve = (raffle) => {
+    const recipient = "Dailyridesouth@gmail.com";
+    const subject = encodeURIComponent(`Raffle Ticket Reservation: ${raffle.title}`);
+    const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI would like to reserve a ticket for the following raffle:\n\nPrize: ${raffle.title}\nTicket Cost: £${raffle.ticketPrice}\n\nPlease let me know the payment details.\n\nThanks!`);
+    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+  };
 
-const CharityView = ({ charityRaised }) => (
+  const activeRaffles = raffles.filter(r => !r.isEnded);
+  const pastRaffles = raffles.filter(r => r.isEnded);
+
+  return (
+    <div className="space-y-12">
+      <div className="space-y-6">
+        <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
+        <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-8">
+          <p className="text-zinc-300 text-sm md:text-base leading-relaxed italic">
+            Try your luck and win some incredible club prizes whilst raising funds to keep the club going. Once you have reserved your tickets, check the raffle whatsapp group for payment instructions.
+          </p>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          {activeRaffles.map(raffle => {
+            const progress = (raffle.ticketsSold / raffle.totalTickets) * 100;
+            return (
+              <div key={raffle.id} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col md:flex-row hover:border-pink-500 transition-colors shadow-lg">
+                <div className="md:w-2/5 h-48 md:h-auto relative">
+                  <img src={raffle.image || DEFAULT_CAR} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute top-2 left-2 bg-pink-600 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">£{raffle.ticketPrice} / Ticket</div>
+                </div>
+                <div className="p-5 md:w-3/5 space-y-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-white">{raffle.title}</h3>
+                    <p className="text-zinc-400 text-sm mt-1">{raffle.description}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
+                        <span>{raffle.ticketsSold} Tickets Taken</span>
+                        <span>{Math.round(progress)}% Full</span>
+                    </div>
+                    <div className="w-full bg-zinc-800 rounded-full h-2 shadow-inner">
+                      <div className="bg-pink-500 h-2 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ width: `${progress}%` }}></div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-zinc-400 pt-2">
+                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Draws {raffle.drawDate}</span>
+                    <button onClick={() => handleReserve(raffle)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-3 py-1 rounded border border-zinc-700 text-[10px] transition-colors uppercase tracking-widest">Reserve</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {activeRaffles.length === 0 && <p className="text-zinc-500 py-12 text-center col-span-full italic">No active raffles available at the moment. Check back soon!</p>}
+        </div>
+      </div>
+
+      {pastRaffles.length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Past Winners</h2>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {pastRaffles.map(raffle => (
+              <div key={raffle.id} className="bg-zinc-900/50 rounded-2xl overflow-hidden border border-zinc-800 flex flex-col shadow-lg opacity-90 hover:opacity-100 transition-opacity">
+                <div className="h-56 relative group">
+                  <img src={raffle.image || DEFAULT_CAR} alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
+                  <div className="absolute inset-0 bg-pink-900/20 mix-blend-multiply"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                     <span className="bg-black/90 text-pink-500 font-black text-xl uppercase tracking-[0.3em] px-6 py-3 border border-pink-500/50 transform -rotate-6 shadow-2xl backdrop-blur-sm">Concluded</span>
+                  </div>
+                </div>
+                <div className="p-6 flex flex-col flex-grow text-center items-center justify-center space-y-3">
+                  <h3 className="text-xl font-black text-white truncate w-full uppercase tracking-tight">{raffle.title}</h3>
+                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Ended: {raffle.drawDate}</p>
+                  <div className="mt-4 p-4 bg-zinc-950 rounded-xl w-full border border-zinc-800 shadow-inner">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Winner</p>
+                    <p className="text-pink-500 font-black text-xl uppercase tracking-widest">{raffle.winner}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const CharityView = () => (
   <div className="space-y-6">
     <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Charity Initiatives</h2>
     <div className="grid gap-6 lg:grid-cols-2">
@@ -627,11 +885,7 @@ const CharityView = ({ charityRaised }) => (
           <div className="p-5 space-y-4 flex-grow flex flex-col">
             <h3 className="text-2xl font-bold text-white leading-tight">{campaign.title}</h3>
             <p className="text-zinc-400 text-sm flex-grow">{campaign.description}</p>
-            <div className="bg-black/50 p-6 rounded-xl text-center border border-zinc-800 shadow-inner">
-              <p className="text-pink-500 uppercase text-xs font-black mb-2 tracking-[0.2em]">Total Raised to Date</p>
-              <p className="text-5xl font-black text-white tracking-tighter shadow-pink-500/5 drop-shadow-md">£{(charityRaised || campaign.raised).toLocaleString()}</p>
-            </div>
-            <a href={campaign.link} target="_blank" rel="noopener noreferrer" className="bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-pink-500/10 uppercase tracking-widest"><Heart className="w-5 h-5 fill-white" /> Support the Coastguard</a>
+            <a href={campaign.link} target="_blank" rel="noopener noreferrer" className="bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-pink-500/10 uppercase tracking-widest mt-auto"><Heart className="w-5 h-5 fill-white" /> Support the Coastguard</a>
           </div>
         </div>
       ))}
@@ -639,13 +893,20 @@ const CharityView = ({ charityRaised }) => (
   </div>
 );
 
-const AdminView = ({ members, events, raffles, charityRaised }) => {
+const AdminView = ({ members, events, cloudEvents, raffles, clubDescription }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', location: '', description: '', image: '', link: '' });
+  const [editingEvent, setEditingEvent] = useState(null);
   const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
-  const [newCharityTotal, setNewCharityTotal] = useState(charityRaised || 1250);
+  const [raffleWinners, setRaffleWinners] = useState({});
+  const [editDescription, setEditDescription] = useState(clubDescription || '');
+  const [memberRoles, setMemberRoles] = useState({});
+
+  useEffect(() => {
+    if (clubDescription) setEditDescription(clubDescription);
+  }, [clubDescription]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -685,7 +946,10 @@ const AdminView = ({ members, events, raffles, charityRaised }) => {
           <InputField label="Date (e.g. Sunday, 1st Oct)" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} />
           <InputField label="Start Time" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} />
           <InputField label="Location / Venue" value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
-          <InputField label="Poster Image URL" value={newEvent.image} onChange={e => setNewEvent({...newEvent, image: e.target.value})} />
+          <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
+             <ImageUpload label="Upload Event Poster Image" onUploadSuccess={url => setNewEvent({...newEvent, image: url})} />
+             {newEvent.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">Poster Uploaded Successfully</p>}
+          </div>
           <InputField label="External Ticket Link" value={newEvent.link} onChange={e => setNewEvent({...newEvent, link: e.target.value})} />
           <div className="md:col-span-2 space-y-1">
              <label className="block text-sm font-medium text-zinc-400">Event Description</label>
@@ -697,14 +961,57 @@ const AdminView = ({ members, events, raffles, charityRaised }) => {
 
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
+        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Edit3 className="w-5 h-5 text-pink-500" /> Manage Cloud Events</h3>
+        
+        {editingEvent ? (
+          <div className="grid md:grid-cols-2 gap-6 bg-black/50 p-6 rounded-2xl border border-pink-500/50">
+            <div className="md:col-span-2 flex justify-between items-center border-b border-zinc-800 pb-4">
+               <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
+               <button onClick={() => setEditingEvent(null)} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+            </div>
+            <InputField label="Event Title" value={editingEvent.title} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
+            <InputField label="Date (e.g. Sunday, 1st Oct)" value={editingEvent.date} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} />
+            <InputField label="Start Time" value={editingEvent.time} onChange={e => setEditingEvent({...editingEvent, time: e.target.value})} />
+            <InputField label="Location / Venue" value={editingEvent.location} onChange={e => setEditingEvent({...editingEvent, location: e.target.value})} />
+            <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
+               <ImageUpload label="Update Event Poster" onUploadSuccess={url => setEditingEvent({...editingEvent, image: url})} />
+               {editingEvent.image && <img src={editingEvent.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
+            </div>
+            <InputField label="External Ticket Link" value={editingEvent.link || ''} onChange={e => setEditingEvent({...editingEvent, link: e.target.value})} />
+            <div className="md:col-span-2 space-y-1">
+               <label className="block text-sm font-medium text-zinc-400">Event Description</label>
+               <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingEvent.description} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} rows={3} />
+            </div>
+            <div className="md:col-span-2 flex gap-4 mt-2">
+              <button onClick={async () => { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id), editingEvent, { merge: true }); setEditingEvent(null); }} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Changes</button>
+              <button onClick={async () => { if(window.confirm('Delete this event?')) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id)); setEditingEvent(null); } }} className="flex-1 bg-red-900/50 hover:bg-red-600 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest">Delete Event</button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {cloudEvents && cloudEvents.map(e => (
+              <div key={e.id} onClick={() => setEditingEvent(e)} className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg">
+                 <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{e.title}</p>
+                 <p className="text-zinc-500 text-[10px] font-bold mt-2 uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {e.date}</p>
+                 <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Click to Edit</p>
+              </div>
+            ))}
+            {(!cloudEvents || cloudEvents.length === 0) && <p className="text-zinc-600 text-xs italic py-4 col-span-full uppercase font-bold tracking-widest">No cloud events to manage.</p>}
+          </div>
+        )}
+      </section>
+
+      <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
         <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Ticket className="w-5 h-5 text-pink-500" /> Raffle Administration</h3>
         <div className="grid md:grid-cols-2 gap-6">
           <InputField label="Prize Title" value={newRaffle.title} onChange={e => setNewRaffle({...newRaffle, title: e.target.value})} />
           <InputField label="Live Draw Date" value={newRaffle.drawDate} onChange={e => setNewRaffle({...newRaffle, drawDate: e.target.value})} />
           <InputField label="Ticket Cost (£)" value={newRaffle.ticketPrice} onChange={e => setNewRaffle({...newRaffle, ticketPrice: e.target.value})} />
           <InputField label="Maximum Ticket Cap" type="number" value={newRaffle.totalTickets} onChange={e => setNewRaffle({...newRaffle, totalTickets: Number(e.target.value)})} />
-          <div className="md:col-span-2">
-            <InputField label="Prize Image URL" value={newRaffle.image} onChange={e => setNewRaffle({...newRaffle, image: e.target.value})} />
+          <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
+             <ImageUpload label="Upload Prize Image" onUploadSuccess={url => setNewRaffle({...newRaffle, image: url})} />
+             {newRaffle.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">Prize Photo Uploaded Successfully</p>}
           </div>
           <div className="md:col-span-2 space-y-1">
              <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
@@ -712,37 +1019,120 @@ const AdminView = ({ members, events, raffles, charityRaised }) => {
           </div>
           <button onClick={async () => { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), newRaffle); setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' }); }} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
         </div>
+        
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
           {raffles.map(r => (
-            <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group">
+            <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
               <div>
                 <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{r.title}</p>
-                <p className="text-zinc-500 text-[10px] font-bold mt-1 uppercase tracking-[0.1em] italic">Tickets Sold: {r.ticketsSold}</p>
+                {r.isEnded ? (
+                  <div className="mt-4 p-3 bg-pink-900/20 border border-pink-500/30 rounded-lg text-center">
+                    <span className="text-pink-500 font-black uppercase text-xs tracking-widest">Winner: {r.winner}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between mt-4 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                    <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Tickets Sold:</span>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={async () => {
+                          if (r.id.startsWith('mock-')) return;
+                          const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
+                          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                        }} 
+                        className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                      >
+                        -
+                      </button>
+                      <span className="text-white font-bold text-sm w-4 text-center">{r.ticketsSold || 0}</span>
+                      <button 
+                        onClick={async () => {
+                          if (r.id.startsWith('mock-')) return;
+                          const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
+                          await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                        }} 
+                        className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <button onClick={async () => { if(window.confirm('PERMANENTLY DELETE RAFFLE?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id)); }} className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] mt-4 flex items-center gap-1 transition-colors tracking-widest"><Trash2 className="w-3 h-3" /> Purge Entry</button>
+              
+              {!r.isEnded && !r.id.startsWith('mock-') && (
+                <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-2">
+                  <input 
+                    type="text" 
+                    placeholder="Winner's Name" 
+                    value={raffleWinners[r.id] || ''} 
+                    onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
+                    className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                  />
+                  <button 
+                    onClick={async () => { 
+                      if (!raffleWinners[r.id]) return;
+                      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
+                    }} 
+                    disabled={!raffleWinners[r.id]}
+                    className="w-full bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 hover:border-pink-500"
+                  >
+                    End & Announce
+                  </button>
+                </div>
+              )}
+
+              {!r.id.startsWith('mock-') && (
+                <button onClick={async () => { if(window.confirm('PERMANENTLY DELETE RAFFLE?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id)); }} className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] mt-4 flex items-center gap-1 transition-colors tracking-widest"><Trash2 className="w-3 h-3" /> Purge Entry</button>
+              )}
             </div>
           ))}
         </div>
       </section>
 
-      <div className="grid md:grid-cols-3 gap-8">
-        <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 space-y-4 shadow-xl">
-          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3"><Edit3 className="w-4 h-4 text-pink-500" /> Funds Raised</h3>
-          <div className="space-y-4">
-            <input type="number" value={newCharityTotal} onChange={e => setNewCharityTotal(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 text-xl font-bold tracking-tight shadow-inner" />
-            <button onClick={async () => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'charity'), { raised: Number(newCharityTotal) }, { merge: true })} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl transition-all uppercase text-xs tracking-widest border border-zinc-700">Update Counter</button>
+      <div className="grid grid-cols-1 gap-8">
+        <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
+          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><Edit3 className="w-4 h-4 text-pink-500" /> Edit Club Description</h3>
+          <div className="space-y-3">
+            <textarea 
+              value={editDescription} 
+              onChange={e => setEditDescription(e.target.value)} 
+              className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all h-32 whitespace-pre-wrap"
+            />
+            <button 
+              onClick={async () => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), { description: editDescription }, { merge: true })}
+              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
+            >
+              Update Homepage Description
+            </button>
           </div>
         </section>
-        <section className="md:col-span-2 bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
+
+        <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
           <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><Users className="w-4 h-4 text-pink-500" /> Member Moderation Hub</h3>
-          <div className="grid sm:grid-cols-2 gap-3 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
             {members.map(m => (
-              <div key={m.id} className="flex justify-between items-center bg-black/50 p-3 rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-colors">
-                <div className="flex flex-col">
-                    <span className="text-white text-xs font-bold truncate max-w-[120px]">{m.name}</span>
-                    <span className="text-zinc-600 text-[9px] uppercase tracking-tighter">{m.nickname || 'NO NICKNAME'}</span>
+              <div key={m.id} className="flex flex-col gap-3 bg-black/50 p-4 rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-colors">
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col">
+                      <span className="text-white text-xs font-bold truncate max-w-[120px]">{m.name}</span>
+                      <span className="text-zinc-600 text-[9px] uppercase tracking-tighter">{m.nickname || 'NO NICKNAME'}</span>
+                  </div>
+                  <button onClick={async () => { if(window.confirm('EXPEL MEMBER FROM CLUB?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id)); }} className="text-zinc-700 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
                 </div>
-                <button onClick={async () => { if(window.confirm('EXPEL MEMBER FROM CLUB?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id)); }} className="text-zinc-700 hover:text-red-500 transition-colors p-2"><Trash2 className="w-4 h-4" /></button>
+                <div className="flex gap-2 mt-auto">
+                   <input 
+                     type="text" 
+                     value={memberRoles[m.id] !== undefined ? memberRoles[m.id] : (m.role || 'Member')} 
+                     onChange={e => setMemberRoles({...memberRoles, [m.id]: e.target.value})} 
+                     className="flex-grow w-full bg-zinc-900 border border-zinc-800 text-pink-500 rounded p-2 text-[10px] uppercase font-bold tracking-wider outline-none focus:border-pink-500"
+                   />
+                   <button 
+                     onClick={async () => await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', m.id), { role: memberRoles[m.id] || m.role || 'Member' }, { merge: true })}
+                     className="bg-zinc-800 hover:bg-zinc-700 text-white px-3 rounded border border-zinc-700 transition-colors text-[10px] uppercase font-bold tracking-widest active:scale-95"
+                   >
+                     Set
+                   </button>
+                </div>
               </div>
             ))}
           </div>
@@ -753,7 +1143,6 @@ const AdminView = ({ members, events, raffles, charityRaised }) => {
 };
 
 // --- MAIN APP ---
-
 export default function App() {
   const [activeTab, setActiveTab] = useState('events');
   const [user, setUser] = useState(null);
@@ -761,11 +1150,11 @@ export default function App() {
   const [cloudMembers, setCloudMembers] = useState([]);
   const [cloudEvents, setCloudEvents] = useState([]);
   const [cloudRaffles, setCloudRaffles] = useState([]);
-  const [charityRaised, setCharityRaised] = useState(null);
+  const [cloudRsvps, setCloudRsvps] = useState({});
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.\n\nToday? We have blossomed into a chaotic, dysfunctional family of high-revving enthusiasts, a collection of soot-belching dirty diesels, and one highly optimistic weirdo who thinks they can finish a 300-mile road trip in a glorified, battery-powered toaster. We are united by the smell of unburnt hydrocarbons (mostly) and a mutual inability to leave anything stock.");
 
   useEffect(() => {
-    // Only use the custom token if running within the initial Canvas preview environment
     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
       signInWithCustomToken(auth, __initial_auth_token).catch(console.error);
     }
@@ -795,23 +1184,45 @@ export default function App() {
       const f = []; snapshot.forEach(d => f.push({ id: d.id, ...d.data() })); setCloudRaffles(f);
     }, (err) => console.error("Raffles error:", err));
 
-    const charityRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'charity');
-    const unsubCharity = onSnapshot(charityRef, d => { if (d.exists()) setCharityRaised(d.data().raised); });
+    const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rsvps');
+    const unsubRsvps = onSnapshot(rsvpsRef, snapshot => {
+      const f = {}; snapshot.forEach(d => f[d.id] = d.data()); setCloudRsvps(f);
+    }, (err) => console.error("RSVPs error:", err));
     
-    return () => { unsubMembers(); unsubEvents(); unsubRaffles(); unsubCharity(); };
+    const infoRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo');
+    const unsubInfo = onSnapshot(infoRef, d => {
+      if (d.exists() && d.data().description) setClubDescription(d.data().description);
+    });
+
+    return () => { unsubMembers(); unsubEvents(); unsubRaffles(); unsubRsvps(); unsubInfo(); };
   }, [user]);
+
+  const toggleRsvp = async (eventId, isPast) => {
+    if (!user) return;
+    const rsvpDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rsvps', String(eventId));
+    const currentEventRsvps = cloudRsvps[eventId] || { attending: [], attended: [] };
+    const field = isPast ? 'attended' : 'attending';
+    const list = currentEventRsvps[field] || [];
+    const isMarked = list.includes(user.uid);
+    
+    const newList = isMarked ? list.filter(id => id !== user.uid) : [...list, user.uid];
+    
+    await setDoc(rsvpDocRef, {
+      [field]: newList
+    }, { merge: true });
+  };
 
   if (isLoadingAuth) {
     return <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">Initialising Framework...</div>;
   }
 
-  // If no user is logged in, show the splash view
   if (!user) {
     return <SplashView />;
   }
 
   const navItems = [
-    { id: 'events', label: 'Events', icon: Calendar },
+    { id: 'events', label: 'Home', icon: HomeIcon },
+    { id: 'past_events', label: 'Past Events', icon: History },
     { id: 'members', label: 'Members', icon: Users },
     { id: 'profile', label: 'My Profile', icon: UserCircle },
     { id: 'raffles', label: 'Raffles', icon: Ticket },
@@ -819,17 +1230,31 @@ export default function App() {
   ];
 
   const combinedEvents = [...STATIC_EVENTS, ...cloudEvents];
+  const combinedRaffles = [...STATIC_RAFFLES, ...cloudRaffles];
+  
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); 
+
+  const upcomingEvents = combinedEvents.filter(e => parseEventDateStr(e.date) >= now);
+  const pastEvents = combinedEvents.filter(e => parseEventDateStr(e.date) < now);
+
+  upcomingEvents.sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date));
+  pastEvents.sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date));
+
   const currentUserProfile = cloudMembers.find(m => m.id === user?.uid) || null;
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'events': return <EventsView events={combinedEvents} />;
+      case 'events': 
+        return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} />;
+      case 'past_events': 
+        return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={true} showHero={false} clubDescription={clubDescription} />;
       case 'members': return <MembersView members={cloudMembers} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
-      case 'raffles': return <RafflesView raffles={cloudRaffles} />;
-      case 'charity': return <CharityView charityRaised={charityRaised} />;
-      case 'admin': return <AdminView members={cloudMembers} events={combinedEvents} raffles={cloudRaffles} charityRaised={charityRaised} />;
-      default: return <EventsView events={combinedEvents} />;
+      case 'raffles': return <RafflesView raffles={combinedRaffles} />;
+      case 'charity': return <CharityView />;
+      case 'admin': return <AdminView members={cloudMembers} events={combinedEvents} cloudEvents={cloudEvents} raffles={combinedRaffles} clubDescription={clubDescription} />;
+      default: return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} />;
     }
   };
 
@@ -863,8 +1288,8 @@ export default function App() {
 
       {/* Sidebar Navigation */}
       {isMenuOpen && <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] animate-in fade-in duration-300" onClick={() => setIsMenuOpen(false)} />}
-      <div className={`fixed top-0 right-0 h-full w-80 bg-zinc-950 z-[70] border-l border-zinc-800 transform transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) p-8 shadow-[0_0_50px_rgba(0,0,0,1)] ${isMenuOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
-        <div className="flex justify-between items-center mb-12">
+      <div className={`fixed top-0 right-0 h-full w-80 bg-zinc-950 z-[70] border-l border-zinc-800 transform transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) p-8 shadow-[0_0_50px_rgba(0,0,0,1)] ${isMenuOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} overflow-y-auto`}>
+        <div className="flex justify-between items-center mb-10">
           <div className="flex flex-col">
               <span className="text-white font-black uppercase text-xl tracking-tighter">DRS <span className="text-pink-600 italic">Menu</span></span>
               <span className="text-zinc-600 font-bold uppercase text-[10px] tracking-[0.3em]">Navigation Board</span>
@@ -872,15 +1297,23 @@ export default function App() {
           <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
         
-        <nav className="space-y-3 flex-grow">
+        <nav className="space-y-3 mb-10">
           {navItems.map(item => <NavLink key={item.id} item={item} mobile />)}
         </nav>
         
-        <div className="absolute bottom-8 left-8 right-8 space-y-4">
+        <div className="pt-8 border-t border-zinc-900 space-y-4">
+          <div className="flex justify-center gap-6 mb-2">
+            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
+              <Facebook className="w-6 h-6" />
+            </a>
+            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
+              <Instagram className="w-6 h-6" />
+            </a>
+          </div>
           <button onClick={() => signOut(auth)} className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors uppercase tracking-widest text-xs font-bold">
             <LogOut className="w-4 h-4" /> Sign Out
           </button>
-          <div className="p-6 bg-zinc-900/50 rounded-2xl border border-zinc-800/50 text-center">
+          <div className="p-6 bg-zinc-900/50 rounded-2xl border border-zinc-800/50 text-center mt-6">
               <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2">Member Since 2026</p>
               <p className="text-white text-xs font-bold">Stay Tuned. Drive Hard.</p>
           </div>
@@ -903,6 +1336,14 @@ export default function App() {
           <div className="flex flex-col gap-2">
             <p className="text-zinc-700 text-[10px] font-black uppercase tracking-[0.5em]">Webapp Created by Luke Martin</p>
             <div className="h-px w-12 bg-zinc-800 mx-auto"></div>
+          </div>
+          <div className="flex gap-6 mt-2">
+            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
+              <Facebook className="w-5 h-5" />
+            </a>
+            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
+              <Instagram className="w-5 h-5" />
+            </a>
           </div>
           <div className="flex gap-4 pt-4">
             <button onClick={() => { setActiveTab('admin'); window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
