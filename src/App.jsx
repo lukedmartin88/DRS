@@ -33,8 +33,6 @@ import {
   X,
   LogOut,
   ImageIcon,
-  Facebook,
-  Instagram,
   History,
   Home
 } from 'lucide-react';
@@ -87,6 +85,14 @@ const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1633332755192-727a05c4
 const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
 
 // --- SHARED COMPONENTS ---
+const FacebookIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+);
+
+const InstagramIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+);
+
 const InputField = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
   <div className="w-full">
     <label className="block text-sm font-medium text-zinc-400 mb-1">{label}</label>
@@ -352,10 +358,10 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
           </p>
           <div className="flex flex-wrap items-center gap-6 mt-6 pt-6 border-t border-zinc-800/50">
             <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
-              <Facebook className="w-5 h-5" /> Facebook
+              <FacebookIcon className="w-5 h-5" /> Facebook
             </a>
             <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
-              <Instagram className="w-5 h-5" /> Instagram
+              <InstagramIcon className="w-5 h-5" /> Instagram
             </a>
           </div>
         </div>
@@ -1398,10 +1404,10 @@ export default function App() {
         <div className="pt-8 border-t border-zinc-900 space-y-4">
           <div className="flex justify-center gap-6 mb-2">
             <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
-              <Facebook className="w-6 h-6" />
+              <FacebookIcon className="w-6 h-6" />
             </a>
             <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
-              <Instagram className="w-6 h-6" />
+              <InstagramIcon className="w-6 h-6" />
             </a>
           </div>
           <button onClick={() => signOut(auth)} className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors uppercase tracking-widest text-xs font-bold">
@@ -1433,10 +1439,10 @@ export default function App() {
           </div>
           <div className="flex gap-6 mt-2">
             <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
-              <Facebook className="w-5 h-5" />
+              <FacebookIcon className="w-5 h-5" />
             </a>
             <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
-              <Instagram className="w-5 h-5" />
+              <InstagramIcon className="w-5 h-5" />
             </a>
           </div>
           <div className="flex gap-4 pt-4">
