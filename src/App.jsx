@@ -353,7 +353,7 @@ const STATIC_RAFFLES = [
 
 // --- COMPONENTS ---
 
-const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp, isPast, showHero, clubDescription }) => {
+const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp, isPast, showHero, clubDescription, spotlightMember }) => {
   const handleRSVP = (event) => {
     const recipient = "Dailyridesouth@gmail.com";
     const subject = encodeURIComponent(`Questions about ${event.title}`);
@@ -370,6 +370,25 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
 
   return (
     <div className="space-y-6">
+      {showHero && spotlightMember && (
+        <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => window.location.hash = 'members'}>
+          <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Spotlight Car" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+          <div className="absolute top-4 right-4 bg-pink-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">Member Spotlight</div>
+          <div className="absolute bottom-6 left-6 flex items-center gap-4">
+             <div className="relative">
+               <img src={spotlightMember.avatar || DEFAULT_AVATAR} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" alt={spotlightMember.name} />
+             </div>
+             <div>
+                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name}</h3>
+                {spotlightMember.nickname && <p className="text-pink-500 italic text-lg md:text-xl font-medium leading-none mt-1">"{spotlightMember.nickname}"</p>}
+                <p className="text-zinc-300 font-bold text-xs uppercase tracking-widest mt-2">{spotlightMember.role || 'Member'}</p>
+                {(spotlightMember.cars && spotlightMember.cars[0]) && <p className="text-zinc-400 text-xs mt-1">{spotlightMember.cars[0].make} {spotlightMember.cars[0].model}</p>}
+             </div>
+          </div>
+        </div>
+      )}
+
       {showHero && (
         <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-10">
           <p className="text-zinc-300 text-sm md:text-base leading-relaxed mb-4 italic whitespace-pre-wrap">
@@ -957,7 +976,7 @@ const CharityView = () => (
   </div>
 );
 
-const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile }) => {
+const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile, spotlightMemberId }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -966,12 +985,17 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
+  const [editSpotlightId, setEditSpotlightId] = useState(spotlightMemberId || '');
   const [memberRoles, setMemberRoles] = useState({});
   const [memberRanks, setMemberRanks] = useState({});
 
   useEffect(() => {
     if (clubDescription) setEditDescription(clubDescription);
   }, [clubDescription]);
+
+  useEffect(() => {
+    if (spotlightMemberId) setEditSpotlightId(spotlightMemberId);
+  }, [spotlightMemberId]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -1063,11 +1087,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     }
   };
 
-  const handleUpdateDescription = async () => {
+  const handleUpdateSettings = async () => {
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), { description: editDescription }, { merge: true });
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), { 
+        description: editDescription,
+        spotlightMemberId: editSpotlightId 
+      }, { merge: true });
     } catch (err) {
-      console.error("Error saving description:", err);
+      console.error("Error saving settings:", err);
     }
   };
 
@@ -1317,18 +1344,28 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
       <div className="grid grid-cols-1 gap-8">
         <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
-          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><Edit3 className="w-4 h-4 text-pink-500" /> Edit Club Description</h3>
-          <div className="space-y-3">
-            <textarea 
-              value={editDescription} 
-              onChange={e => setEditDescription(e.target.value)} 
-              className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all h-32 whitespace-pre-wrap"
-            />
+          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><Edit3 className="w-4 h-4 text-pink-500" /> Club Homepage Settings</h3>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-zinc-400 uppercase tracking-widest">Spotlight Member</label>
+              <select value={editSpotlightId} onChange={e => setEditSpotlightId(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
+                 <option value="">None</option>
+                 {members.map(m => <option key={m.id} value={m.id}>{m.name || 'Anonymous'}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-zinc-400 uppercase tracking-widest">Club Description</label>
+              <textarea 
+                value={editDescription} 
+                onChange={e => setEditDescription(e.target.value)} 
+                className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all h-32 whitespace-pre-wrap"
+              />
+            </div>
             <button 
-              onClick={handleUpdateDescription}
+              onClick={handleUpdateSettings}
               className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
             >
-              Update Homepage Description
+              Update Homepage Settings
             </button>
           </div>
         </section>
@@ -1400,6 +1437,7 @@ export default function App() {
   const [cloudRsvps, setCloudRsvps] = useState({});
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.\n\nToday? We have blossomed into a chaotic, dysfunctional family of high-revving enthusiasts, a collection of soot-belching dirty diesels, and one highly optimistic weirdo who thinks they can finish a 300-mile road trip in a glorified, battery-powered toaster. We are united by the smell of unburnt hydrocarbons (mostly) and a mutual inability to leave anything stock.");
+  const [spotlightMemberId, setSpotlightMemberId] = useState(null);
 
   const setActiveTab = (tab) => {
     window.location.hash = tab;
@@ -1423,6 +1461,10 @@ export default function App() {
       return (a.name || '').localeCompare(b.name || '');
     });
   }, [cloudMembers]);
+
+  const spotlightMember = useMemo(() => {
+    return cloudMembers.find(m => m.id === spotlightMemberId) || null;
+  }, [cloudMembers, spotlightMemberId]);
 
   const combinedEvents = useMemo(() => {
     const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
@@ -1480,7 +1522,10 @@ export default function App() {
     
     const infoRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo');
     const unsubInfo = onSnapshot(infoRef, d => {
-      if (d.exists() && d.data().description) setClubDescription(d.data().description);
+      if (d.exists()) {
+        if (d.data().description) setClubDescription(d.data().description);
+        if (d.data().spotlightMemberId) setSpotlightMemberId(d.data().spotlightMemberId);
+      }
     });
 
     return () => { unsubMembers(); unsubEvents(); unsubRaffles(); unsubRsvps(); unsubInfo(); };
@@ -1527,15 +1572,15 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'events': 
-        return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} />;
+        return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} spotlightMember={spotlightMember} />;
       case 'past_events': 
         return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={true} showHero={false} clubDescription={clubDescription} />;
       case 'members': return <MembersView members={sortedMembers} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
-      case 'admin': return <AdminView members={sortedMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} />;
-      default: return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} />;
+      case 'admin': return <AdminView members={sortedMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
+      default: return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} spotlightMember={spotlightMember} />;
     }
   };
 
