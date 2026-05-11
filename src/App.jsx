@@ -34,7 +34,11 @@ import {
   LogOut,
   ImageIcon,
   History,
-  Home
+  Home,
+  Eye,
+  EyeOff,
+  UserCog,
+  Download
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
@@ -75,11 +79,9 @@ const formatDate = (date) => {
 const parseEventDateStr = (dateStr) => {
   if (!dateStr) return new Date(9999, 0, 1);
   
-  // Remove day names and ordinal suffixes
   let cleanStr = dateStr.replace(/^[A-Za-z]+,\s*/, '');
   cleanStr = cleanStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
   
-  // Check for DD/MM/YYYY format
   if (cleanStr.includes('/')) {
     const parts = cleanStr.split('/');
     if (parts.length === 3) {
@@ -106,6 +108,10 @@ const FacebookIcon = ({ className }) => (
 
 const InstagramIcon = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+);
+
+const TikTokIcon = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>
 );
 
 const InputField = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
@@ -353,7 +359,129 @@ const STATIC_RAFFLES = [
 
 // --- COMPONENTS ---
 
-const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight }) => {
+const MemberProfileModal = ({ member, onClose, onCarClick }) => {
+  const cars = member.cars || [];
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-[40]">
+      <button 
+        onClick={onClose}
+        className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group"
+      >
+        <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        Back
+      </button>
+
+      <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 flex flex-col md:flex-row gap-6 items-start shadow-2xl">
+        <img 
+          src={member.avatar || DEFAULT_AVATAR} 
+          alt={member.name} 
+          className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800"
+        />
+        <div>
+          <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+            {member.name}
+            {member.nickname && <span className="text-zinc-500 text-xl font-normal italic">"{member.nickname}"</span>}
+            {member.role === "Admin" && <Shield className="w-6 h-6 text-pink-500" />}
+            {member.role === "Club President" && <Award className="w-6 h-6 text-yellow-500" />}
+          </h2>
+          <p className="text-pink-500 font-medium text-lg">{member.role || 'Member'}</p>
+          <p className="text-zinc-400 mt-2 max-w-2xl">{member.bio || 'No bio provided.'}</p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mt-4 flex-wrap">
+            <p className="text-zinc-500 text-sm flex items-center gap-2">
+              <Calendar className="w-4 h-4" /> Member since {member.joinDate}
+            </p>
+            {member.location && (
+              <p className="text-zinc-500 text-sm flex items-center gap-2">
+                <MapPin className="w-4 h-4" /> {member.location}
+              </p>
+            )}
+            {member.instagram && (
+              <a href={member.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-500 hover:text-pink-400 text-sm flex items-center gap-2 transition-colors font-bold uppercase tracking-widest">
+                <InstagramIcon className="w-4 h-4" /> Instagram Profile
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <h3 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-zinc-800 pb-2">Garage Gallery</h3>
+      <p className="text-sm text-zinc-500 mb-4 uppercase tracking-widest font-bold flex items-center gap-2">
+        <ImageIcon className="w-4 h-4" /> Click on a vehicle to open the full gallery
+      </p>
+      <div className="grid gap-6 md:grid-cols-2">
+        {cars.map((car, idx) => (
+          <div 
+            key={idx} 
+            onClick={() => onCarClick(car)} 
+            className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all transform hover:-translate-y-1 group"
+          >
+            <div className="h-64 overflow-hidden relative">
+              <img 
+                src={car.image || DEFAULT_CAR} 
+                alt={`${car.make} ${car.model}`} 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
+              <div className="absolute bottom-4 left-4 right-4">
+                <div className="flex justify-between items-end mb-1">
+                  <h4 className="text-2xl font-bold text-white">{car.make} {car.model}</h4>
+                </div>
+                <p className="text-zinc-300 font-medium">{car.year} • {car.specs}</p>
+                {car.mods && (
+                  <p className="text-pink-400 text-sm font-medium mt-2 line-clamp-2">Mods: <span className="text-zinc-300 font-normal">{car.mods}</span></p>
+                )}
+                {car.gallery && car.gallery.length > 0 && (
+                   <div className="mt-3 flex items-center gap-1 text-[10px] text-white font-bold uppercase tracking-widest bg-pink-600/80 w-fit px-2 py-1 rounded backdrop-blur-md">
+                      <ImageIcon className="w-3 h-3" /> +{car.gallery.length} More Images
+                   </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        {cars.length === 0 && (
+          <p className="text-zinc-500 italic col-span-2 py-10 text-center">No cars added to this garage yet.</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const CarGalleryModal = ({ viewingCar, onClose }) => {
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col p-4 md:p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-300">
+      <button 
+          onClick={onClose} 
+          className="fixed top-6 right-6 bg-zinc-800 hover:bg-pink-600 text-white p-3 rounded-full transition-all z-[110] shadow-lg"
+      >
+          <X className="w-6 h-6"/>
+      </button>
+      <div className="w-full max-w-4xl mx-auto mt-10 md:mt-4 mb-20 flex flex-col">
+        <div className="mb-8 shrink-0 text-center">
+          <h3 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter">
+              {viewingCar.make} <span className="text-pink-600 not-italic">{viewingCar.model}</span>
+          </h3>
+          <p className="text-zinc-400 mt-6 text-sm md:text-base font-medium max-w-2xl mx-auto leading-relaxed">{viewingCar.specs}</p>
+          {viewingCar.mods && <p className="text-pink-400 mt-4 text-sm font-medium">Mods: <span className="text-zinc-300 font-normal">{viewingCar.mods}</span></p>}
+        </div>
+        
+        <div className="space-y-8">
+          <img src={viewingCar.image || DEFAULT_CAR} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt="Main vehicle profile" />
+          
+          {viewingCar.gallery && viewingCar.gallery.map((img, i) => (
+            <img key={i} src={img} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt={`Gallery item ${i+1}`} />
+          ))}
+          
+          {(!viewingCar.gallery || viewingCar.gallery.length === 0) && viewingCar.image && (
+             <p className="text-zinc-600 text-center uppercase tracking-[0.3em] text-xs font-bold py-16">End of Gallery</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMemberClick }) => {
   return (
     <div className="space-y-6">
       <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center">
@@ -381,11 +509,14 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight }) => 
           <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
             <InstagramIcon className="w-5 h-5" /> Instagram
           </a>
+          <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
+            <TikTokIcon className="w-5 h-5" /> TikTok
+          </a>
         </div>
       </div>
 
       {spotlightMember && (
-        <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => window.location.hash = 'members'}>
+        <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => onMemberClick(spotlightMember)}>
           <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Spotlight Car" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
           <div className="absolute top-4 right-4 bg-pink-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">
@@ -410,7 +541,9 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight }) => 
   );
 };
 
-const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp, isPast }) => {
+const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile, toggleRsvp, isPast, onMemberClick }) => {
+  const isAdmin = userProfile?.role === 'Admin';
+  
   const handleRSVP = (event) => {
     const recipient = "Dailyridesouth@gmail.com";
     const subject = encodeURIComponent(`Questions about ${event.title}`);
@@ -424,6 +557,36 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
       return acc;
     }, {});
   }, [cloudMembers]);
+
+  const downloadGuestList = async (event, attendees) => {
+    try {
+      const { jsPDF } = await import('https://esm.sh/jspdf@2.5.1');
+      const autoTableModule = await import('https://esm.sh/jspdf-autotable@3.8.2');
+      const autoTable = autoTableModule.default;
+      
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Guest List: ${event.title}`, 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Date: ${event.date} | Time: ${event.time}`, 14, 22);
+      
+      autoTable(doc, {
+        startY: 30,
+        head: [['#', 'Name', 'Nickname', 'Vehicle']],
+        body: attendees.map((m, i) => [
+          i + 1,
+          m.name || 'Unknown',
+          m.nickname || '-',
+          m.cars && m.cars[0] ? `${m.cars[0].make} ${m.cars[0].model}` : '-'
+        ])
+      });
+      
+      doc.save(`${event.title.replace(/\s+/g, '_')}_GuestList.pdf`);
+    } catch (err) {
+      console.error("Failed to generate PDF", err);
+      alert("Failed to download PDF. Please try again later.");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -476,6 +639,45 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
                     <span className="truncate">{event.location}</span>
                   </div>
                 </div>
+
+                {(event.meetingPoint || event.meetingTime || event.w3w) && (
+                  <div className="mt-2 mb-4 p-3 bg-zinc-950 rounded-xl border border-zinc-800/50 space-y-2">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Pre-Meet Details</p>
+                    {event.meetingTime && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <Clock className="w-3 h-3 text-pink-500" />
+                        <span className="text-zinc-300">Meet at {event.meetingTime}</span>
+                      </div>
+                    )}
+                    {event.meetingPoint && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <MapPin className="w-3 h-3 text-pink-500" />
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.meetingPoint)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-pink-500 hover:text-pink-400 transition-colors underline decoration-pink-500/30 underline-offset-2 truncate"
+                        >
+                          {event.meetingPoint}
+                        </a>
+                      </div>
+                    )}
+                    {event.w3w && (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-pink-500 font-bold">///</span>
+                        <a 
+                          href={`https://what3words.com/${event.w3w.replace('///', '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-pink-500 hover:text-pink-400 transition-colors truncate"
+                        >
+                          {event.w3w.replace('///', '')}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <p className="text-zinc-400 text-sm flex-grow mb-6 leading-relaxed">{event.description}</p>
                 
                 <div className="mt-auto">
@@ -483,9 +685,16 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
                     <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">
                       {isPast ? 'Members who attended' : 'Members attending'}
                     </p>
-                    <div className="flex -space-x-3 overflow-hidden">
+                    <div className="flex -space-x-3 overflow-hidden p-1">
                         {attendeeMembers.slice(0, 6).map(m => (
-                          <img key={m.id} src={m.avatar || DEFAULT_AVATAR} title={m.name} className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover" alt="avatar" />
+                          <img 
+                            key={m.id} 
+                            src={m.avatar || DEFAULT_AVATAR} 
+                            title={m.name} 
+                            onClick={(e) => { e.stopPropagation(); onMemberClick(m); }}
+                            className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover cursor-pointer hover:scale-110 transition-transform relative z-10 hover:z-20 shadow-lg" 
+                            alt="avatar" 
+                          />
                         ))}
                         {attendeeMembers.length > 6 && (
                           <div className="flex items-center justify-center h-10 w-10 rounded-full ring-2 ring-zinc-900 bg-zinc-800 text-xs font-bold text-white z-10">
@@ -527,6 +736,14 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
                         </div>
                       )}
                     </div>
+                    {isAdmin && (
+                      <button 
+                        onClick={() => downloadGuestList(event, attendeeMembers)}
+                        className="w-full bg-zinc-950 hover:bg-black text-pink-500 font-bold py-2 rounded-xl transition-colors border border-zinc-800 hover:border-pink-500/50 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"
+                      >
+                        <Download className="w-3 h-3" /> Download Guest List
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -538,166 +755,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
   );
 };
 
-const MembersView = ({ members }) => {
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [viewingCar, setViewingCar] = useState(null);
-
-  useEffect(() => {
-    const handlePopState = () => {
-      if (viewingCar) {
-        setViewingCar(null);
-      } else if (selectedMember) {
-        setSelectedMember(null);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [viewingCar, selectedMember]);
-
-  const handleMemberClick = (member) => {
-    window.history.pushState({ modal: 'member' }, '');
-    setSelectedMember(member);
-  };
-
-  const closeMember = () => {
-    setSelectedMember(null);
-    window.history.back();
-  };
-
-  const handleCarClick = (car) => {
-    window.history.pushState({ modal: 'car' }, '');
-    setViewingCar(car);
-  };
-
-  const closeCar = () => {
-    setViewingCar(null);
-    window.history.back();
-  };
-
-  if (selectedMember) {
-    const cars = selectedMember.cars || [];
-    
-    return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <button 
-          onClick={closeMember}
-          className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group"
-        >
-          <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          Back to Directory
-        </button>
-
-        <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 flex flex-col md:flex-row gap-6 items-start">
-          <img 
-            src={selectedMember.avatar || DEFAULT_AVATAR} 
-            alt={selectedMember.name} 
-            className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800"
-          />
-          <div>
-            <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-              {selectedMember.name}
-              {selectedMember.nickname && <span className="text-zinc-500 text-xl font-normal italic">"{selectedMember.nickname}"</span>}
-              {selectedMember.role === "Admin" && <Shield className="w-6 h-6 text-pink-500" />}
-              {selectedMember.role === "Club President" && <Award className="w-6 h-6 text-yellow-500" />}
-            </h2>
-            <p className="text-pink-500 font-medium text-lg">{selectedMember.role || 'Member'}</p>
-            <p className="text-zinc-400 mt-2 max-w-2xl">{selectedMember.bio || 'No bio provided.'}</p>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mt-4 flex-wrap">
-              <p className="text-zinc-500 text-sm flex items-center gap-2">
-                <Calendar className="w-4 h-4" /> Member since {selectedMember.joinDate}
-              </p>
-              {selectedMember.location && (
-                <p className="text-zinc-500 text-sm flex items-center gap-2">
-                  <MapPin className="w-4 h-4" /> {selectedMember.location}
-                </p>
-              )}
-              {selectedMember.instagram && (
-                <a href={selectedMember.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-500 hover:text-pink-400 text-sm flex items-center gap-2 transition-colors font-bold uppercase tracking-widest">
-                  <InstagramIcon className="w-4 h-4" /> Instagram Profile
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <h3 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-zinc-800 pb-2">Garage Gallery</h3>
-        <p className="text-sm text-zinc-500 mb-4 uppercase tracking-widest font-bold flex items-center gap-2">
-          <ImageIcon className="w-4 h-4" /> Click on a vehicle to open the full gallery
-        </p>
-        <div className="grid gap-6 md:grid-cols-2">
-          {cars.map((car, idx) => (
-            <div 
-              key={idx} 
-              onClick={() => handleCarClick(car)} 
-              className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all transform hover:-translate-y-1 group"
-            >
-              <div className="h-64 overflow-hidden relative">
-                <img 
-                  src={car.image || DEFAULT_CAR} 
-                  alt={`${car.make} ${car.model}`} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
-                <div className="absolute bottom-4 left-4 right-4">
-                  <div className="flex justify-between items-end mb-1">
-                    <h4 className="text-2xl font-bold text-white">{car.make} {car.model}</h4>
-                    {car.reg && <span className="bg-yellow-400 text-black font-bold px-2 py-0.5 rounded text-xs tracking-wider">{car.reg.toUpperCase()}</span>}
-                  </div>
-                  <p className="text-zinc-300 font-medium">{car.year} • {car.specs}</p>
-                  {car.mods && (
-                    <p className="text-pink-400 text-sm font-medium mt-2 line-clamp-2">Mods: <span className="text-zinc-300 font-normal">{car.mods}</span></p>
-                  )}
-                  {car.gallery && car.gallery.length > 0 && (
-                     <div className="mt-3 flex items-center gap-1 text-[10px] text-white font-bold uppercase tracking-widest bg-pink-600/80 w-fit px-2 py-1 rounded backdrop-blur-md">
-                        <ImageIcon className="w-3 h-3" /> +{car.gallery.length} More Images
-                     </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-          {cars.length === 0 && (
-            <p className="text-zinc-500 italic col-span-2 py-10 text-center">No cars added to this garage yet.</p>
-          )}
-        </div>
-
-        {/* Modal for viewing car gallery */}
-        {viewingCar && (
-          <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col p-4 md:p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-300">
-            <button 
-                onClick={closeCar} 
-                className="fixed top-6 right-6 bg-zinc-800 hover:bg-pink-600 text-white p-3 rounded-full transition-all z-[110] shadow-lg"
-            >
-                <X className="w-6 h-6"/>
-            </button>
-            <div className="w-full max-w-4xl mx-auto mt-10 md:mt-4 mb-20 flex flex-col">
-              <div className="mb-8 shrink-0 text-center">
-                <h3 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter">
-                    {viewingCar.make} <span className="text-pink-600 not-italic">{viewingCar.model}</span>
-                </h3>
-                {viewingCar.reg && <span className="inline-block mt-4 bg-yellow-400 text-black font-bold px-4 py-1.5 rounded-md text-sm tracking-[0.2em] uppercase">{viewingCar.reg}</span>}
-                <p className="text-zinc-400 mt-6 text-sm md:text-base font-medium max-w-2xl mx-auto leading-relaxed">{viewingCar.specs}</p>
-                {viewingCar.mods && <p className="text-pink-400 mt-4 text-sm font-medium">Mods: <span className="text-zinc-300 font-normal">{viewingCar.mods}</span></p>}
-              </div>
-              
-              <div className="space-y-8">
-                <img src={viewingCar.image || DEFAULT_CAR} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt="Main vehicle profile" />
-                
-                {viewingCar.gallery && viewingCar.gallery.map((img, i) => (
-                  <img key={i} src={img} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt={`Gallery item ${i+1}`} />
-                ))}
-                
-                {(!viewingCar.gallery || viewingCar.gallery.length === 0) && viewingCar.image && (
-                   <p className="text-zinc-600 text-center uppercase tracking-[0.3em] text-xs font-bold py-16">End of Gallery</p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
+const MembersView = ({ members, onMemberClick }) => {
   return (
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">Members Directory</h2>
@@ -705,7 +763,7 @@ const MembersView = ({ members }) => {
         {members.map(member => (
           <div 
             key={member.id} 
-            onClick={() => handleMemberClick(member)}
+            onClick={() => onMemberClick(member)}
             className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 hover:border-pink-500 hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-4"
           >
             <img src={member.avatar || DEFAULT_AVATAR} alt={member.name} className="w-16 h-16 rounded-full object-cover" />
@@ -820,7 +878,8 @@ const ProfileView = ({ user, userProfile }) => {
       await setDoc(profileRef, {
         name, nickname, bio, location, instagram, birthdayDay, birthdayMonth, avatar, cars,
         role: userProfile?.role || 'Member',
-        joinDate: userProfile?.joinDate || formatDate(new Date())
+        joinDate: userProfile?.joinDate || formatDate(new Date()),
+        email: user.email || '' 
       }, { merge: true });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -870,7 +929,7 @@ const ProfileView = ({ user, userProfile }) => {
 
       <div className="flex items-center justify-between mt-12 border-b border-zinc-800 pb-4">
         <h3 className="text-2xl font-bold text-white">My Garage</h3>
-        <button onClick={() => setCars(prev => [...prev, { reg: '', make: '', model: '', year: 2026, specs: '', mods: '', image: '', gallery: [] }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
+        <button onClick={() => setCars(prev => [...prev, { make: '', model: '', year: 2026, specs: '', mods: '', image: '', gallery: [] }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
       </div>
 
       <div className="space-y-6">
@@ -878,12 +937,13 @@ const ProfileView = ({ user, userProfile }) => {
           <div key={idx} className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 relative shadow-lg animate-in slide-in-from-left-4 duration-300">
             <button onClick={() => setCars(prev => prev.filter((_, i) => i !== idx))} className="absolute top-4 right-4 text-zinc-500 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5"/></button>
             <div className="grid md:grid-cols-2 gap-4">
-              <InputField label="Registration" value={car.reg} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, reg: e.target.value } : c))} />
               <InputField label="Make" value={car.make} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, make: e.target.value } : c))} />
               <InputField label="Model" value={car.model} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, model: e.target.value } : c))} />
               <InputField label="Year" type="number" value={car.year} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, year: e.target.value } : c))} />
               <InputField label="Specs" value={car.specs} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, specs: e.target.value } : c))} />
-              <InputField label="Mods" value={car.mods} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, mods: e.target.value } : c))} />
+              <div className="md:col-span-2">
+                <InputField label="Mods" value={car.mods} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, mods: e.target.value } : c))} />
+              </div>
               
               <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50 mt-2">
                   <ImageUpload label="Upload Main Vehicle Photo (Cover)" onUploadSuccess={url => setCars(prev => prev.map((c, i) => i === idx ? { ...c, image: url } : c))} />
@@ -1035,8 +1095,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', location: '', description: '', image: '', link: '' });
+  const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', location: '', meetingPoint: '', meetingTime: '', w3w: '', description: '', image: '', link: '' });
   const [editingEvent, setEditingEvent] = useState(null);
+  const [editingMember, setEditingMember] = useState(null);
   const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
@@ -1055,10 +1116,11 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   useEffect(() => {
     const handlePopState = () => {
       if (editingEvent) setEditingEvent(null);
+      if (editingMember) setEditingMember(null);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [editingEvent]);
+  }, [editingEvent, editingMember]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -1086,7 +1148,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const handleDeployEvent = async () => {
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
-      setNewEvent({ title: '', date: '', time: '', location: '', description: '', image: '', link: '' });
+      setNewEvent({ title: '', date: '', time: '', location: '', meetingPoint: '', meetingTime: '', w3w: '', description: '', image: '', link: '' });
     } catch (err) {
       console.error("Error saving event:", err);
     }
@@ -1097,9 +1159,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     setEditingEvent(event);
   };
 
-  const closeEditEvent = () => {
-    setEditingEvent(null);
-    window.history.back();
+  const handleEditMemberClick = (member) => {
+    window.history.pushState({ modal: 'editMember' }, '');
+    setEditingMember(member);
   };
 
   const handleUpdateEvent = async () => {
@@ -1166,12 +1228,51 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     }
   };
 
+  const handleToggleHide = async (member) => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', member.id), { isHidden: !member.isHidden }, { merge: true });
+    } catch (err) {
+      console.error("Error toggling hide status:", err);
+    }
+  };
+
   const handleExpelMember = async (memberId) => {
     if(!window.confirm('EXPEL MEMBER FROM CLUB?')) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', memberId));
     } catch (err) {
       console.error("Error removing member:", err);
+    }
+  };
+
+  const handleDownloadMembers = async () => {
+    try {
+      const { jsPDF } = await import('https://esm.sh/jspdf@2.5.1');
+      const autoTableModule = await import('https://esm.sh/jspdf-autotable@3.8.2');
+      const autoTable = autoTableModule.default;
+      
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Daily Ride South - Member Roster`, 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Generated: ${formatDate(new Date())}`, 14, 22);
+      
+      autoTable(doc, {
+        startY: 30,
+        head: [['Name', 'Nickname', 'Email', 'Location', 'Status']],
+        body: members.map(m => [
+          m.name || 'Anonymous',
+          m.nickname || '-',
+          m.email || 'No email saved',
+          m.location || '-',
+          m.isHidden ? 'Banned' : (m.role || 'Member')
+        ])
+      });
+      
+      doc.save('DRS_Member_Roster.pdf');
+    } catch (err) {
+      console.error("Failed to generate PDF", err);
+      alert("Failed to download PDF. Please try again.");
     }
   };
 
@@ -1221,13 +1322,16 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         <div className="grid md:grid-cols-2 gap-6">
           <InputField label="Event Title" value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} />
           <InputField label="Date (e.g. Sunday, 1st Oct)" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} />
-          <InputField label="Start Time" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} />
+          <InputField label="Event Start Time" value={newEvent.time} onChange={e => setNewEvent({...newEvent, time: e.target.value})} />
           <InputField label="Location / Venue" value={newEvent.location} onChange={e => setNewEvent({...newEvent, location: e.target.value})} />
+          <InputField label="Meeting Point" value={newEvent.meetingPoint} onChange={e => setNewEvent({...newEvent, meetingPoint: e.target.value})} placeholder="e.g. Tesco Extra Car Park" />
+          <InputField label="Meeting Time" value={newEvent.meetingTime} onChange={e => setNewEvent({...newEvent, meetingTime: e.target.value})} placeholder="e.g. 08:00 AM" />
+          <InputField label="What3Words Location" value={newEvent.w3w} onChange={e => setNewEvent({...newEvent, w3w: e.target.value})} placeholder="e.g. ///apple.banana.cherry" />
+          <InputField label="External Ticket Link" value={newEvent.link} onChange={e => setNewEvent({...newEvent, link: e.target.value})} />
           <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
              <ImageUpload label="Upload Event Poster Image" onUploadSuccess={url => setNewEvent({...newEvent, image: url})} />
              {newEvent.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">Poster Uploaded Successfully</p>}
           </div>
-          <InputField label="External Ticket Link" value={newEvent.link} onChange={e => setNewEvent({...newEvent, link: e.target.value})} />
           <div className="md:col-span-2 space-y-1">
              <label className="block text-sm font-medium text-zinc-400">Event Description</label>
              <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})} placeholder="Detailed brief for club members..." rows={3} />
@@ -1247,17 +1351,20 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                   <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
                   {editingEvent.isStatic && <p className="text-zinc-500 text-[10px] mt-1 italic font-bold">Standard event: Saving will create a database copy.</p>}
                </div>
-               <button onClick={closeEditEvent} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+               <button onClick={() => { setEditingEvent(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
             <InputField label="Event Title" value={editingEvent.title} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
             <InputField label="Date (e.g. Sunday, 1st Oct)" value={editingEvent.date} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} />
-            <InputField label="Start Time" value={editingEvent.time} onChange={e => setEditingEvent({...editingEvent, time: e.target.value})} />
+            <InputField label="Event Start Time" value={editingEvent.time} onChange={e => setEditingEvent({...editingEvent, time: e.target.value})} />
             <InputField label="Location / Venue" value={editingEvent.location} onChange={e => setEditingEvent({...editingEvent, location: e.target.value})} />
+            <InputField label="Meeting Point" value={editingEvent.meetingPoint || ''} onChange={e => setEditingEvent({...editingEvent, meetingPoint: e.target.value})} />
+            <InputField label="Meeting Time" value={editingEvent.meetingTime || ''} onChange={e => setEditingEvent({...editingEvent, meetingTime: e.target.value})} />
+            <InputField label="What3Words Location" value={editingEvent.w3w || ''} onChange={e => setEditingEvent({...editingEvent, w3w: e.target.value})} />
+            <InputField label="External Ticket Link" value={editingEvent.link || ''} onChange={e => setEditingEvent({...editingEvent, link: e.target.value})} />
             <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
                <ImageUpload label="Update Event Poster" onUploadSuccess={url => setEditingEvent({...editingEvent, image: url})} />
                {editingEvent.image && <img src={editingEvent.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
             </div>
-            <InputField label="External Ticket Link" value={editingEvent.link || ''} onChange={e => setEditingEvent({...editingEvent, link: e.target.value})} />
             <div className="md:col-span-2 space-y-1">
                <label className="block text-sm font-medium text-zinc-400">Event Description</label>
                <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingEvent.description} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} rows={3} />
@@ -1426,13 +1533,50 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         </section>
 
         <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
-          <div className="flex justify-between items-center border-b border-zinc-800 pb-3 mb-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-800 pb-3 mb-4 gap-4">
               <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4 text-pink-500" /> Member Moderation Hub</h3>
-              <span className="text-[10px] text-zinc-500 font-bold uppercase italic">Rank members 1-5 to show them first</span>
+              <div className="flex items-center gap-4">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase italic hidden lg:inline">Rank members 1-5 to show them first</span>
+                <button onClick={handleDownloadMembers} className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-pink-500 px-3 py-1.5 rounded border border-zinc-700 transition-colors uppercase tracking-widest font-bold flex items-center gap-2">
+                  <Download className="w-3 h-3" /> Download Roster PDF
+                </button>
+              </div>
           </div>
+
+          {editingMember ? (
+            <div className="bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300 mb-6">
+              <div className="flex justify-between items-center border-b border-zinc-800 pb-4 mb-4">
+                 <h4 className="font-bold text-white uppercase tracking-wider flex items-center gap-2"><UserCog className="w-5 h-5 text-pink-500" /> Editing Profile: {editingMember.name}</h4>
+                 <button onClick={() => { setEditingMember(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <InputField label="Name" value={editingMember.name} onChange={e => setEditingMember({...editingMember, name: e.target.value})} />
+                <InputField label="Nickname" value={editingMember.nickname || ''} onChange={e => setEditingMember({...editingMember, nickname: e.target.value})} />
+                <InputField label="Location" value={editingMember.location || ''} onChange={e => setEditingMember({...editingMember, location: e.target.value})} />
+                <InputField label="Instagram Link" value={editingMember.instagram || ''} onChange={e => setEditingMember({...editingMember, instagram: e.target.value})} />
+                <div className="sm:col-span-2 space-y-1">
+                   <label className="block text-sm font-medium text-zinc-400">Bio</label>
+                   <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingMember.bio || ''} onChange={e => setEditingMember({...editingMember, bio: e.target.value})} rows={3} />
+                </div>
+              </div>
+              <button 
+                onClick={async () => {
+                  try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', editingMember.id), editingMember, { merge: true });
+                    setEditingMember(null);
+                    window.history.back();
+                  } catch (err) { console.error(err); }
+                }} 
+                className="w-full mt-6 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20"
+              >
+                Save Profile Changes
+              </button>
+            </div>
+          ) : null}
+
           <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
             {members.map(m => (
-              <div key={m.id} className="flex flex-col gap-3 bg-black/50 p-4 rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-colors">
+              <div key={m.id} className={`flex flex-col gap-3 p-4 rounded-xl border transition-colors ${m.isHidden ? 'bg-red-900/10 border-red-900/50' : 'bg-black/50 border-zinc-800/50 hover:border-zinc-700'}`}>
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col">
                       <div className="flex items-center gap-2">
@@ -1440,10 +1584,19 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         {m.rank && (
                           <span className="bg-pink-600/20 text-pink-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-pink-500/30">#{m.rank}</span>
                         )}
+                        {m.isHidden && (
+                          <span className="bg-red-600/20 text-red-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-500/30">BANNED</span>
+                        )}
                       </div>
                       <span className="text-zinc-600 text-[9px] uppercase tracking-tighter">{m.nickname || 'NO NICKNAME'}</span>
                   </div>
-                  <button onClick={() => handleExpelMember(m.id)} className="text-zinc-700 hover:text-red-500 transition-colors p-1"><Trash2 className="w-4 h-4" /></button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => handleEditMemberClick(m)} className="text-zinc-500 hover:text-pink-500 transition-colors p-1" title="Edit Profile"><UserCog className="w-4 h-4" /></button>
+                    <button onClick={() => handleToggleHide(m)} className={`p-1 transition-colors ${m.isHidden ? 'text-red-500 hover:text-green-500' : 'text-zinc-500 hover:text-red-500'}`} title={m.isHidden ? "Unban Member" : "Ban/Hide Member"}>
+                      {m.isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                    <button onClick={() => handleExpelMember(m.id)} className="text-zinc-700 hover:text-red-500 transition-colors p-1" title="Delete Member"><Trash2 className="w-4 h-4" /></button>
+                  </div>
                 </div>
                 <div className="space-y-2 mt-auto">
                    <div className="flex gap-2">
@@ -1493,6 +1646,9 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.\n\nToday? We have blossomed into a chaotic, dysfunctional family of high-revving enthusiasts, a collection of soot-belching dirty diesels, and one highly optimistic weirdo who thinks they can finish a 300-mile road trip in a glorified, battery-powered toaster. We are united by the smell of unburnt hydrocarbons (mostly) and a mutual inability to leave anything stock.");
   const [spotlightMemberId, setSpotlightMemberId] = useState(null);
+  const [birthdayIndex, setBirthdayIndex] = useState(0);
+  const [globalSelectedMember, setGlobalSelectedMember] = useState(null);
+  const [globalViewingCar, setGlobalViewingCar] = useState(null);
 
   const setActiveTab = (tab) => {
     window.location.hash = tab;
@@ -1508,7 +1664,39 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const sortedMembers = useMemo(() => {
+  useEffect(() => {
+    const handlePopState = () => {
+      if (globalViewingCar) {
+        setGlobalViewingCar(null);
+      } else if (globalSelectedMember) {
+        setGlobalSelectedMember(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [globalViewingCar, globalSelectedMember]);
+
+  const handleMemberClick = (member) => {
+    window.history.pushState({ modal: 'member' }, '');
+    setGlobalSelectedMember(member);
+  };
+
+  const closeMember = () => {
+    setGlobalSelectedMember(null);
+    window.history.back();
+  };
+
+  const handleCarClick = (car) => {
+    window.history.pushState({ modal: 'car' }, '');
+    setGlobalViewingCar(car);
+  };
+
+  const closeCar = () => {
+    setGlobalViewingCar(null);
+    window.history.back();
+  };
+
+  const allAdminMembers = useMemo(() => {
     return [...cloudMembers].sort((a, b) => {
       const rankA = parseInt(a.rank) || 999;
       const rankB = parseInt(b.rank) || 999;
@@ -1517,20 +1705,35 @@ export default function App() {
     });
   }, [cloudMembers]);
 
+  const sortedMembers = useMemo(() => {
+    return allAdminMembers.filter(m => !m.isHidden);
+  }, [allAdminMembers]);
+
   const today = new Date();
   const currentDay = today.getDate().toString();
   const currentMonth = (today.getMonth() + 1).toString();
 
-  const birthdayMember = useMemo(() => {
-    return cloudMembers.find(m => m.birthdayDay === currentDay && m.birthdayMonth === currentMonth) || null;
+  const birthdayMembers = useMemo(() => {
+    return cloudMembers.filter(m => !m.isHidden && m.birthdayDay === currentDay && m.birthdayMonth === currentMonth);
   }, [cloudMembers, currentDay, currentMonth]);
 
-  const isBirthdaySpotlight = !!birthdayMember;
+  useEffect(() => {
+    let interval;
+    if (birthdayMembers.length > 1) {
+      interval = setInterval(() => {
+        setBirthdayIndex(prev => (prev + 1) % birthdayMembers.length);
+      }, 5000); 
+    }
+    return () => clearInterval(interval);
+  }, [birthdayMembers.length]);
+
+  const isBirthdaySpotlight = birthdayMembers.length > 0;
 
   const spotlightMember = useMemo(() => {
-    if (birthdayMember) return birthdayMember;
-    return cloudMembers.find(m => m.id === spotlightMemberId) || null;
-  }, [cloudMembers, spotlightMemberId, birthdayMember]);
+    if (birthdayMembers.length > 0) return birthdayMembers[birthdayIndex] || birthdayMembers[0];
+    const selected = cloudMembers.find(m => m.id === spotlightMemberId && !m.isHidden);
+    return selected || null;
+  }, [cloudMembers, spotlightMemberId, birthdayMembers, birthdayIndex]);
 
   const combinedEvents = useMemo(() => {
     const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
@@ -1638,17 +1841,17 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'home': 
-        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} />;
+        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberClick} />;
       case 'events': 
-        return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} />;
+        return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={false} onMemberClick={handleMemberClick} />;
       case 'past_events': 
-        return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={true} />;
-      case 'members': return <MembersView members={sortedMembers} />;
+        return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={true} onMemberClick={handleMemberClick} />;
+      case 'members': return <MembersView members={sortedMembers} onMemberClick={handleMemberClick} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
-      case 'admin': return <AdminView members={sortedMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
-      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} />;
+      case 'admin': return <AdminView members={allAdminMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
+      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberClick} />;
     }
   };
 
@@ -1664,7 +1867,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-pink-500/30 selection:text-pink-200">
+    <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-pink-500/30 selection:text-pink-200 relative">
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 h-full flex justify-between items-center">
           <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('home')}>
@@ -1703,6 +1906,9 @@ export default function App() {
             <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
               <InstagramIcon className="w-6 h-6" />
             </a>
+            <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
+              <TikTokIcon className="w-6 h-6" />
+            </a>
           </div>
           <button onClick={() => signOut(auth)} className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors uppercase tracking-widest text-xs font-bold">
             <LogOut className="w-4 h-4" /> Sign Out
@@ -1719,9 +1925,15 @@ export default function App() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 pt-10">
-        {renderContent()}
+      <main className="max-w-6xl mx-auto px-4 pt-10 relative">
+        {globalSelectedMember ? (
+          <MemberProfileModal member={globalSelectedMember} onClose={closeMember} onCarClick={handleCarClick} />
+        ) : (
+          renderContent()
+        )}
       </main>
+
+      {globalViewingCar && <CarGalleryModal viewingCar={globalViewingCar} onClose={closeCar} />}
 
       <footer className="mt-32 border-t border-zinc-900 py-16 bg-black/40">
         <div className="max-w-6xl mx-auto px-4 flex flex-col items-center gap-8 text-center">
@@ -1742,6 +1954,9 @@ export default function App() {
             </a>
             <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
               <InstagramIcon className="w-5 h-5" />
+            </a>
+            <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
+              <TikTokIcon className="w-5 h-5" />
             </a>
           </div>
           <div className="flex gap-4 pt-4">
