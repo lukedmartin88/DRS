@@ -353,7 +353,7 @@ const STATIC_RAFFLES = [
 
 // --- COMPONENTS ---
 
-const HomeView = ({ clubDescription, spotlightMember }) => {
+const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight }) => {
   return (
     <div className="space-y-6">
       <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center">
@@ -388,13 +388,17 @@ const HomeView = ({ clubDescription, spotlightMember }) => {
         <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => window.location.hash = 'members'}>
           <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Spotlight Car" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
-          <div className="absolute top-4 right-4 bg-pink-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">Member Spotlight</div>
+          <div className="absolute top-4 right-4 bg-pink-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">
+            {isBirthdaySpotlight ? '🎉 Happy Birthday! 🎉' : 'Member Spotlight'}
+          </div>
           <div className="absolute bottom-6 left-6 flex items-center gap-4">
              <div className="relative">
                <img src={spotlightMember.avatar || DEFAULT_AVATAR} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" alt={spotlightMember.name} />
              </div>
              <div>
-                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name}</h3>
+                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">
+                  {spotlightMember.name} {isBirthdaySpotlight && '🎂'}
+                </h3>
                 {spotlightMember.nickname && <p className="text-pink-500 italic text-lg md:text-xl font-medium leading-none mt-1">"{spotlightMember.nickname}"</p>}
                 <p className="text-zinc-300 font-bold text-xs uppercase tracking-widest mt-2">{spotlightMember.role || 'Member'}</p>
                 {(spotlightMember.cars && spotlightMember.cars[0]) && <p className="text-zinc-400 text-xs mt-1">{spotlightMember.cars[0].make} {spotlightMember.cars[0].model}</p>}
@@ -789,6 +793,8 @@ const ProfileView = ({ user, userProfile }) => {
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [instagram, setInstagram] = useState('');
+  const [birthdayDay, setBirthdayDay] = useState('');
+  const [birthdayMonth, setBirthdayMonth] = useState('');
   const [avatar, setAvatar] = useState('');
   const [cars, setCars] = useState([]);
   const [saved, setSaved] = useState(false);
@@ -800,6 +806,8 @@ const ProfileView = ({ user, userProfile }) => {
       setBio(userProfile.bio || '');
       setLocation(userProfile.location || '');
       setInstagram(userProfile.instagram || '');
+      setBirthdayDay(userProfile.birthdayDay || '');
+      setBirthdayMonth(userProfile.birthdayMonth || '');
       setAvatar(userProfile.avatar || '');
       setCars(userProfile.cars || []);
     }
@@ -810,7 +818,7 @@ const ProfileView = ({ user, userProfile }) => {
     try {
       const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
       await setDoc(profileRef, {
-        name, nickname, bio, location, instagram, avatar, cars,
+        name, nickname, bio, location, instagram, birthdayDay, birthdayMonth, avatar, cars,
         role: userProfile?.role || 'Member',
         joinDate: userProfile?.joinDate || formatDate(new Date())
       }, { merge: true });
@@ -838,6 +846,19 @@ const ProfileView = ({ user, userProfile }) => {
             <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
                 <InputField label="Town / City" value={location} onChange={e => setLocation(e.target.value)} />
                 <InputField label="Instagram Profile Link" value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="https://instagram.com/username" />
+                <div className="sm:col-span-2 w-full">
+                   <label className="block text-sm font-medium text-zinc-400 mb-1">Birthday (Optional)</label>
+                   <div className="flex gap-2">
+                     <select value={birthdayDay} onChange={e => setBirthdayDay(e.target.value)} className="w-1/3 bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
+                        <option value="">Day</option>
+                        {[...Array(31)].map((_, i) => <option key={i+1} value={(i+1).toString()}>{i+1}{getOrdinalSuffix(i+1)}</option>)}
+                     </select>
+                     <select value={birthdayMonth} onChange={e => setBirthdayMonth(e.target.value)} className="w-2/3 bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
+                        <option value="">Month</option>
+                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => <option key={i+1} value={(i+1).toString()}>{m}</option>)}
+                     </select>
+                   </div>
+                </div>
             </div>
           </div>
         </div>
@@ -1496,9 +1517,20 @@ export default function App() {
     });
   }, [cloudMembers]);
 
+  const today = new Date();
+  const currentDay = today.getDate().toString();
+  const currentMonth = (today.getMonth() + 1).toString();
+
+  const birthdayMember = useMemo(() => {
+    return cloudMembers.find(m => m.birthdayDay === currentDay && m.birthdayMonth === currentMonth) || null;
+  }, [cloudMembers, currentDay, currentMonth]);
+
+  const isBirthdaySpotlight = !!birthdayMember;
+
   const spotlightMember = useMemo(() => {
+    if (birthdayMember) return birthdayMember;
     return cloudMembers.find(m => m.id === spotlightMemberId) || null;
-  }, [cloudMembers, spotlightMemberId]);
+  }, [cloudMembers, spotlightMemberId, birthdayMember]);
 
   const combinedEvents = useMemo(() => {
     const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
@@ -1606,7 +1638,7 @@ export default function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'home': 
-        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} />;
+        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} />;
       case 'events': 
         return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} />;
       case 'past_events': 
@@ -1616,7 +1648,7 @@ export default function App() {
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
       case 'admin': return <AdminView members={sortedMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
-      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} />;
+      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} />;
     }
   };
 
