@@ -10,7 +10,7 @@ import {
   sendPasswordResetEmail,
   signInAnonymously
 } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, deleteField, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   Calendar, 
@@ -440,186 +440,10 @@ const STATIC_RAFFLES = [
     ticketPrice: 5,
     totalTickets: 100,
     ticketsSold: 100,
+    reservations: {},
     image: "https://i.ibb.co/fzbH9zQj/Whats-App-Image-2026-05-10-at-10-23-14-PM.jpg",
     isEnded: true,
     winner: "Steve Ronnie"
-  }
-];
-
-// --- GUIDE DATA ---
-const guideSections = [
-  {
-    id: 'events',
-    title: 'Events Centre',
-    icon: Calendar,
-    description: 'Deploy new events, manage existing ones, and download guest lists.',
-    steps: [
-      {
-        title: 'Deploy a New Event',
-        content: 'Fill in the details for a new meetup or show. You can add titles, ordinal dates (e.g. Sunday, 14th June), times, and exact meeting points including What3Words links. Upload a poster image, then click "Publish to Public Board".',
-        mockup: (
-          <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl mt-4 text-xs space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-black border border-zinc-800 p-2 rounded text-zinc-400">Tunerfest South 2026</div>
-              <div className="bg-black border border-zinc-800 p-2 rounded text-zinc-400">Sunday, 14th June</div>
-              <div className="bg-black border border-zinc-800 p-2 rounded text-zinc-400 col-span-2">///engine.revs.loudly</div>
-            </div>
-            <div className="bg-pink-600 text-white text-center p-2 rounded font-bold uppercase tracking-widest">Publish to Public Board</div>
-          </div>
-        )
-      },
-      {
-        title: 'Manage & Edit Events',
-        content: 'Click on any existing event tile to open the editor. Here you can update information or replace the poster. If you edit a "Standard" (built-in) event, saving it will create a fresh database copy. Custom events can be permanently deleted using the red "Delete Event" button.',
-        mockup: (
-          <div className="flex gap-2 mt-4">
-            <div className="flex-1 bg-pink-600 text-white p-2 rounded text-center text-[10px] font-bold uppercase">Save Changes</div>
-            <div className="flex-1 bg-red-900/50 text-white p-2 rounded text-center text-[10px] font-bold uppercase">Delete Event</div>
-          </div>
-        )
-      },
-      {
-        title: 'Download Guest Lists',
-        content: 'For any event you have deployed, open the event details on the public Events page. As an admin, you will see a special "Download Guest List" button. Clicking this generates a PDF roster of all members who have RSVP\'d.',
-        mockup: (
-          <div className="bg-zinc-950 border border-pink-500/50 text-pink-500 p-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase mt-4">
-            <Download className="w-4 h-4" /> Download Guest List
-          </div>
-        )
-      }
-    ]
-  },
-  {
-    id: 'raffles',
-    title: 'Raffle Administration',
-    icon: Ticket,
-    description: 'Set up club prizes, track ticket sales, and announce winners.',
-    steps: [
-      {
-        title: 'Create a Live Raffle',
-        content: 'Under "Raffle Administration", enter the prize name, the draw date (e.g. 21st October), the cost per ticket, and the total number of tickets available. Upload an appealing photo of the prize and click "Go Live with Raffle".',
-        mockup: (
-          <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl mt-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Ticket className="w-4 h-4 text-pink-500" />
-              <span className="text-white text-sm font-bold">Premium Detailing Kit</span>
-            </div>
-            <div className="bg-black p-2 rounded text-zinc-400 text-xs mb-2">£5 per ticket | 100 Tickets max</div>
-          </div>
-        )
-      },
-      {
-        title: 'Track Ticket Sales',
-        content: 'Once a raffle is live, use the "+" and "-" buttons on the admin card to manually adjust the number of tickets sold as members pay for their reservations via WhatsApp.',
-        mockup: (
-          <div className="flex justify-between items-center bg-zinc-800 p-2 rounded mt-4 max-w-xs">
-            <span className="text-zinc-400 text-[10px] uppercase font-bold">Tickets Sold:</span>
-            <div className="flex items-center gap-4">
-              <span className="text-pink-500 font-black text-lg">-</span>
-              <span className="text-white font-bold">45</span>
-              <span className="text-pink-500 font-black text-lg">+</span>
-            </div>
-          </div>
-        )
-      },
-      {
-        title: 'End Raffle & Declare Winner',
-        content: 'When all tickets are sold or the draw date arrives, type the winner\'s name into the text box and click "End & Announce". The raffle will move to the "Past Winners" gallery. To remove it entirely, click "Purge Entry".'
-      }
-    ]
-  },
-  {
-    id: 'homepage',
-    title: 'Homepage Customisation',
-    icon: Edit3,
-    description: 'Update the welcome message and highlight specific members.',
-    steps: [
-      {
-        title: 'Update Club Description',
-        content: 'Edit the main welcome text displayed on the club\'s homepage. You can use this space to highlight club rules, history, or upcoming news.',
-        mockup: (
-          <div className="bg-black border border-zinc-800 p-3 rounded-xl mt-4 text-zinc-400 text-xs italic">
-            "It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel..."
-          </div>
-        )
-      },
-      {
-        title: 'Select a Spotlight Member',
-        content: 'Use the dropdown menu to select a member to feature on the homepage. Their car and profile will be highlighted. Note: If it is a member\'s birthday, the system will automatically spotlight the birthday member instead.',
-        mockup: (
-          <div className="bg-black border border-zinc-800 p-3 rounded-xl mt-4 text-white text-xs flex justify-between items-center">
-            <span>Select Member...</span>
-            <ChevronRight className="w-4 h-4 rotate-90 text-pink-500" />
-          </div>
-        )
-      }
-    ]
-  },
-  {
-    id: 'members',
-    title: 'Member Moderation',
-    icon: Users,
-    description: 'Manage the club roster, assign ranks, and handle disciplinary actions.',
-    steps: [
-      {
-        title: 'Edit Member Details',
-        content: 'Click the "Edit Profile" (cog icon) next to any member to open their profile editor. Here you can moderate and update their name, nickname, location, Instagram link, and personal bio. Click "Save Profile Changes" when finished.',
-        mockup: (
-          <div className="bg-black/50 border border-pink-500/50 p-4 rounded-xl mt-4 max-w-md">
-            <div className="flex items-center gap-2 mb-4 border-b border-zinc-800 pb-2">
-              <UserCog className="w-4 h-4 text-pink-500" />
-              <span className="text-white text-xs font-bold uppercase">Editing Profile: Speedy</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-[10px]">
-               <div className="bg-zinc-900 border border-zinc-800 p-2 rounded text-zinc-400">Name: John Doe</div>
-               <div className="bg-zinc-900 border border-zinc-800 p-2 rounded text-zinc-400">Nickname: Speedy</div>
-               <div className="bg-zinc-900 border border-zinc-800 p-2 rounded text-zinc-400 col-span-2">Bio: Loves fast cars...</div>
-            </div>
-            <div className="bg-pink-600 text-white text-center p-2 rounded font-bold uppercase tracking-widest mt-2 text-[10px]">Save Profile Changes</div>
-          </div>
-        )
-      },
-      {
-        title: 'Assign Roles',
-        content: 'In the main list, you can type a custom title (e.g., "Club President" or "Admin") in the role box and click "Update Status & Rank".',
-        mockup: (
-          <div className="flex gap-2 mt-4 max-w-sm">
-            <input type="text" value="Club President" readOnly className="bg-black border border-zinc-800 text-pink-500 p-2 rounded w-full text-xs font-bold" />
-            <button className="bg-zinc-800 text-white px-3 py-2 rounded text-[10px] font-bold uppercase">Update</button>
-          </div>
-        )
-      },
-      {
-        title: 'Ranking Members',
-        content: 'To ensure specific staff members appear at the top of the member directory, enter a number from 1 to 5 in the small "#" box next to their role, then save. Lower numbers appear first.',
-        mockup: (
-          <div className="flex items-center gap-2 mt-4">
-            <div className="bg-black border border-zinc-800 text-pink-500 w-10 text-center p-2 rounded text-xs font-bold">1</div>
-            <span className="text-zinc-400 text-xs">Appears at the very top of the directory.</span>
-          </div>
-        )
-      },
-      {
-        title: 'Banning and Expelling',
-        content: 'To temporarily hide a member from the public directory without deleting their data, click the "Ban/Hide" (eye) icon. Their card will turn red. To permanently delete their account and garage, click the "Delete" (trash) icon.',
-        mockup: (
-          <div className="bg-red-900/10 border border-red-900/50 p-3 rounded-xl mt-4 flex justify-between items-center max-w-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-white text-xs font-bold">Rule Breaker</span>
-              <span className="bg-red-600/20 text-red-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-500/30">BANNED</span>
-            </div>
-            <div className="flex gap-2">
-              <EyeOff className="w-4 h-4 text-red-500" />
-              <Trash2 className="w-4 h-4 text-zinc-500" />
-            </div>
-          </div>
-        )
-      },
-      {
-        title: 'Download Roster',
-        content: 'Click the "Download Roster PDF" button at the top of the moderation hub to export a clean document of all current club members, including their statuses and contact details.',
-      }
-    ]
   }
 ];
 
@@ -1428,9 +1252,12 @@ const RafflesView = ({ raffles, user, members }) => {
       if (!reservingRaffle.id.startsWith('mock-')) {
          const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', reservingRaffle.id);
          const currentReservations = reservingRaffle.reservations || {};
-         const newReservations = { ...currentReservations };
-         newReservations[user.uid] = (newReservations[user.uid] || 0) + reserveQuantity;
-         await setDoc(rRef, { reservations: newReservations }, { merge: true });
+         const currentVal = currentReservations[user.uid] || 0;
+         await setDoc(rRef, { 
+           reservations: {
+             [user.uid]: currentVal + reserveQuantity
+           }
+         }, { merge: true });
       }
 
       const recipient = "Dailyridesouth@gmail.com";
@@ -1491,10 +1318,13 @@ const RafflesView = ({ raffles, user, members }) => {
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           {activeRaffles.map(raffle => {
-            const progress = (raffle.ticketsSold / raffle.totalTickets) * 100;
             const reservations = raffle.reservations || {};
             const reservedUids = Object.keys(reservations);
             const reservedMembers = reservedUids.map(uid => membersById[uid]).filter(Boolean);
+            const totalReserved = reservedUids.reduce((sum, uid) => sum + reservations[uid], 0);
+            const manualSold = raffle.ticketsSold || 0;
+            const totalTaken = totalReserved + manualSold;
+            const progress = (totalTaken / raffle.totalTickets) * 100;
 
             return (
               <div key={raffle.id} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col md:flex-row hover:border-pink-500 transition-colors shadow-lg">
@@ -1509,7 +1339,7 @@ const RafflesView = ({ raffles, user, members }) => {
                   </div>
                   <div className="space-y-2 mt-4">
                     <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
-                        <span>{raffle.ticketsSold} Tickets Taken</span>
+                        <span>{totalTaken} Tickets Taken</span>
                         <span>{Math.round(progress)}% Full</span>
                     </div>
                     <div className="w-full bg-zinc-800 rounded-full h-2 shadow-inner">
@@ -1610,7 +1440,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [editingRaffle, setEditingRaffle] = useState(null);
-  const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
+  const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '' });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
   const [editSpotlightId, setEditSpotlightId] = useState(spotlightMemberId || '');
@@ -1714,7 +1544,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const handlePublishRaffle = async () => {
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), newRaffle);
-      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
+      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '' });
     } catch (err) {
       console.error("Error saving raffle:", err);
     }
@@ -1728,6 +1558,31 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       window.history.back();
     } catch (err) {
       console.error("Error updating raffle:", err);
+    }
+  };
+
+  const handleUpdateReservation = async (raffle, memberId, delta) => {
+    if (raffle.id.startsWith('mock-')) return;
+    try {
+      const currentReservations = raffle.reservations || {};
+      const currentVal = currentReservations[memberId] || 0;
+      const newVal = currentVal + delta;
+      
+      const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
+      
+      if (newVal <= 0) {
+        await updateDoc(rRef, {
+          [`reservations.${memberId}`]: deleteField()
+        });
+      } else {
+        await setDoc(rRef, { 
+          reservations: {
+            [memberId]: newVal
+          }
+        }, { merge: true });
+      }
+    } catch (err) {
+      console.error("Error updating reservation:", err);
     }
   };
 
@@ -1993,7 +1848,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <InputField label="Live Draw Date" value={editingRaffle.drawDate || ''} onChange={e => setEditingRaffle({...editingRaffle, drawDate: e.target.value})} />
               <InputField label="Ticket Cost (£)" value={editingRaffle.ticketPrice || ''} onChange={e => setEditingRaffle({...editingRaffle, ticketPrice: e.target.value})} />
               <InputField label="Maximum Ticket Cap" type="number" value={editingRaffle.totalTickets || 100} onChange={e => setEditingRaffle({...editingRaffle, totalTickets: Number(e.target.value)})} />
-              <InputField label="Tickets Sold" type="number" value={editingRaffle.ticketsSold || 0} onChange={e => setEditingRaffle({...editingRaffle, ticketsSold: Number(e.target.value)})} />
               <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
                  <ImageUpload label="Update Prize Image" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image: url})} />
                  {editingRaffle.image && <img src={editingRaffle.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
@@ -2028,6 +1882,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 const reservations = r.reservations || {};
                 const reservedUids = Object.keys(reservations);
                 const reservedMembers = reservedUids.map(uid => members.find(m => m.id === uid)).filter(Boolean);
+                const totalReserved = reservedUids.reduce((sum, uid) => sum + reservations[uid], 0);
+                const manualSold = r.ticketsSold || 0;
+                const totalTaken = totalReserved + manualSold;
 
                 return (
                   <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
@@ -2038,49 +1895,72 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                           <span className="text-pink-500 font-black uppercase text-xs tracking-widest">Winner: {r.winner}</span>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between mt-4 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
-                          <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Tickets Sold:</span>
-                          <div className="flex items-center gap-3">
-                            <button 
-                              onClick={async () => {
-                                if (r.id.startsWith('mock-')) return;
-                                try {
-                                  const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
-                                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
-                                } catch (err) { console.error(err); }
-                              }} 
-                              className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
-                            >
-                              -
-                            </button>
-                            <span className="text-white font-bold text-sm w-4 text-center">{r.ticketsSold || 0}</span>
-                            <button 
-                              onClick={async () => {
-                                if (r.id.startsWith('mock-')) return;
-                                try {
-                                  const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
-                                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
-                                } catch (err) { console.error(err); }
-                              }} 
-                              className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
-                            >
-                              +
-                            </button>
-                          </div>
+                        <div className="mt-4 space-y-2">
+                           <div className="flex items-center justify-between bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Cash / Manual Sales:</span>
+                             <div className="flex items-center gap-3">
+                               <button 
+                                 onClick={async () => {
+                                   if (r.id.startsWith('mock-')) return;
+                                   try {
+                                     const newVal = Math.max(0, manualSold - 1);
+                                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal });
+                                   } catch (err) { console.error(err); }
+                                 }} 
+                                 className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                               >
+                                 -
+                               </button>
+                               <span className="text-white font-bold text-sm w-4 text-center">{manualSold}</span>
+                               <button 
+                                 onClick={async () => {
+                                   if (r.id.startsWith('mock-')) return;
+                                   try {
+                                     const newVal = manualSold + 1;
+                                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal });
+                                   } catch (err) { console.error(err); }
+                                 }} 
+                                 className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                               >
+                                 +
+                               </button>
+                             </div>
+                           </div>
+                           <div className="flex items-center justify-between bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">App Reservations:</span>
+                             <span className="text-white font-bold text-sm">{totalReserved}</span>
+                           </div>
+                           <div className="flex items-center justify-between bg-zinc-900/80 p-2 rounded-lg border border-pink-500/30">
+                             <span className="text-pink-500 text-[10px] font-black uppercase tracking-[0.1em]">Total Taken:</span>
+                             <span className="text-pink-500 font-black text-sm">{totalTaken} / {r.totalTickets}</span>
+                           </div>
                         </div>
                       )}
                       
-                      {!r.isEnded && (
+                      {!r.isEnded && !r.id.startsWith('mock-') && (
                         <div className="mt-4 pt-4 border-t border-zinc-800/50">
-                          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Ticket Reservations</p>
-                          <div className="flex flex-wrap gap-2">
+                          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Manage Reservations</p>
+                          <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                              {reservedMembers.map(m => (
-                                <div key={m.id} className="flex items-center gap-2 bg-zinc-900 p-1.5 pr-3 rounded-full border border-zinc-700">
-                                   <img src={m.avatar || DEFAULT_AVATAR} className="w-5 h-5 rounded-full object-cover" />
-                                   <span className="text-[10px] text-zinc-300 font-bold">{m.name} ({reservations[m.id]})</span>
+                                <div key={m.id} className="flex items-center justify-between bg-zinc-900 p-2 rounded-lg border border-zinc-700">
+                                   <div className="flex items-center gap-2">
+                                     <img src={m.avatar || DEFAULT_AVATAR} className="w-6 h-6 rounded-full object-cover" />
+                                     <span className="text-xs text-zinc-300 font-bold truncate max-w-[100px]">{m.name}</span>
+                                   </div>
+                                   <div className="flex items-center gap-2">
+                                     <button 
+                                       onClick={() => handleUpdateReservation(r, m.id, -1)} 
+                                       className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 text-pink-500 hover:bg-zinc-700 font-black transition-colors leading-none"
+                                     >-</button>
+                                     <span className="text-white font-bold text-xs w-4 text-center">{reservations[m.id]}</span>
+                                     <button 
+                                       onClick={() => handleUpdateReservation(r, m.id, 1)} 
+                                       className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 text-pink-500 hover:bg-zinc-700 font-black transition-colors leading-none"
+                                     >+</button>
+                                   </div>
                                 </div>
                              ))}
-                             {reservedMembers.length === 0 && <span className="text-[10px] text-zinc-600 italic mb-2">No reservations yet.</span>}
+                             {reservedMembers.length === 0 && <span className="text-[10px] text-zinc-600 italic block mb-2">No reservations yet.</span>}
                           </div>
                         </div>
                       )}
@@ -2099,7 +1979,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                           onClick={async () => { 
                             if (!raffleWinners[r.id]) return;
                             try {
-                              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
+                              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] });
                             } catch (err) { console.error(err); }
                           }} 
                           disabled={!raffleWinners[r.id]}
