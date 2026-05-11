@@ -894,16 +894,7 @@ const GalleryView = ({ members, onImageClick }) => {
 };
 
 const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMemberClick, members, onImageClick }) => {
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTick(t => t + 1);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const mosaicImages = useMemo(() => {
+  const allImages = useMemo(() => {
     const imgs = [];
     members.forEach(m => {
       (m.cars || []).forEach(c => { 
@@ -913,8 +904,50 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
          });
       });
     });
-    return imgs.sort(() => 0.5 - Math.random()).slice(0, 8);
-  }, [members, tick]);
+    return imgs;
+  }, [members]);
+
+  const [mosaicSlots, setMosaicSlots] = useState(Array(8).fill({ current: null, previous: null, fadeKey: 0 }));
+
+  useEffect(() => {
+    if (allImages.length === 0) return;
+    setMosaicSlots(prev => {
+      if (prev[0].current !== null) return prev; 
+      const shuffled = [...allImages].sort(() => 0.5 - Math.random());
+      return prev.map((_, i) => ({
+        current: shuffled[i % shuffled.length],
+        previous: null,
+        fadeKey: Date.now() + i
+      }));
+    });
+  }, [allImages]);
+
+  useEffect(() => {
+    if (allImages.length <= 8) return;
+
+    const interval = setInterval(() => {
+      setMosaicSlots(prev => {
+        const newSlots = [...prev];
+        const slotToUpdate = Math.floor(Math.random() * 8);
+        const showingUrls = new Set(newSlots.map(s => s.current?.url));
+
+        const available = allImages.filter(img => !showingUrls.has(img.url));
+        const nextImg = available.length > 0
+          ? available[Math.floor(Math.random() * available.length)]
+          : allImages[Math.floor(Math.random() * allImages.length)];
+
+        newSlots[slotToUpdate] = {
+          previous: newSlots[slotToUpdate].current,
+          current: nextImg,
+          fadeKey: Date.now()
+        };
+
+        return newSlots;
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [allImages]);
 
   return (
     <div className="space-y-6">
@@ -955,12 +988,23 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
             <button onClick={() => window.location.hash = 'gallery'} className="text-pink-500 hover:text-pink-400 text-xs font-bold uppercase tracking-widest">View Full Gallery</button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {mosaicImages.map((img, i) => (
-              <div key={img.url + i + tick} onClick={() => onImageClick(img)} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all group animate-in fade-in duration-1000">
-                <img src={img.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
+            {mosaicSlots.map((slot, i) => (
+              <div key={i} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-pink-500 transition-colors group relative bg-zinc-900 shadow-inner">
+                {slot.previous && (
+                  <img src={slot.previous.url} className="absolute inset-0 w-full h-full object-cover" alt="" />
+                )}
+                {slot.current && (
+                  <div 
+                    key={slot.fadeKey} 
+                    onClick={() => onImageClick(slot.current)} 
+                    className="absolute inset-0 w-full h-full animate-in fade-in duration-[2000ms] ease-in-out z-10"
+                  >
+                    <img src={slot.current.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
+                  </div>
+                )}
               </div>
             ))}
-            {mosaicImages.length === 0 && <p className="col-span-full py-10 text-center text-zinc-600 text-sm italic">Gallery mosaic is building...</p>}
+            {allImages.length === 0 && <p className="col-span-full py-10 text-center text-zinc-600 text-sm italic">Gallery mosaic is building...</p>}
         </div>
       </div>
     </div>
