@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -148,6 +148,64 @@ const compressImage = (file, maxWidth = 1080, maxHeight = 1080, quality = 0.8) =
   });
 };
 
+const compressImageFromUrl = async (url, maxWidth = 1080, maxHeight = 1080, quality = 0.8) => {
+  try {
+    const response = await fetch(url);
+    const blobData = await response.blob();
+    const localUrl = URL.createObjectURL(blobData);
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(localUrl);
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], `compressed_${Date.now()}.webp`, {
+                type: 'image/webp',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              reject(new Error('Canvas to Blob failed'));
+            }
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = (error) => {
+        URL.revokeObjectURL(localUrl);
+        reject(error);
+      };
+      img.src = localUrl;
+    });
+  } catch (err) {
+    throw err;
+  }
+};
+
 const DEFAULT_AVATAR = "https://i.ibb.co/RTHHJ3JW/PROFILE-PIC.png";
 const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
 
@@ -291,6 +349,102 @@ const ImageUpload = ({ label, onUploadSuccess, className }) => {
     </div>
   );
 };
+
+// --- MOCK DATA ---
+const STATIC_EVENTS = [
+  {
+    id: 'static-1',
+    title: "Tunerfest South",
+    date: "Sunday, 14th June 2026",
+    time: "09:00 AM",
+    location: "Brands Hatch Circuit, Kent",
+    description: "Celebrating the UK's tuning scene with Time Attack, drifting, and massive club displays. An action-packed day out.",
+    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/615332601_1303146985173729_7017742900608760889_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=2a1932&_nc_ohc=9lMQN9k9fWwQ7kNvwEUw7bF&_nc_oc=Adrt86yG2RX2lia1fFym533-vAHlszAQe8vVA64q3g8wkzt7Jfx1KDqJcB-lJSwDnykrci9OoljCxIr8bzEGJz-K&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=2KM11XS369ylUsSZzTmGew&_nc_ss=7b2a8&oh=00_Af6PNVmhDJzfZrZCfLJXUNXvnrBMD-3wj8UQvYTlsocLqg&oe=6A067D2C",
+    link: "https://www.brandshatch.co.uk/2026/june/tunerfest-south",
+    isStatic: true
+  },
+  {
+    id: 'static-2',
+    title: "Isle of Wight Takeover",
+    date: "Saturday, 16th May 2026",
+    time: "10:00 AM",
+    location: "Isle of Wight",
+    description: "The ultimate weekend away for car enthusiasts. Join our club stand as we head over on the ferry for a massive island takeover.",
+    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/370897411_788936759904376_6556989917387874387_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=1d70fc&_nc_ohc=BAm1Zb4f-a8Q7kNvwF4HI_P&_nc_oc=AdoHjuaouRTMphGXdxORfQlSFYaOroD7I3nl0lfqQkZpAyG2i1rLmcZEMgm5HRjZLJl3rYRR_4AemK172VSwxXe1&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=EmZtuaqTOlSEllcyBAYDPA&_nc_ss=7b2a8&oh=00_Af5oVHzQmfxAuzDJ3SjQBwDnCKIR9t4QvxmZImjX9Z_j3w&oe=6A0678E0",
+    link: "https://www.iowtakeover.co.uk/",
+    isStatic: true
+  },
+  {
+    id: 'static-3',
+    title: "TRAX",
+    date: "Sunday, 16th August 2026",
+    time: "09:00 AM",
+    location: "Silverstone Circuit",
+    description: "Britain's biggest performance car show. We will have a dedicated club stand. Features live track time and professional drifting displays.",
+    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597894646_1257634839745045_372102352193919714_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=2a1932&_nc_ohc=35X4SY7dnmkQ7kNvwEwboEG&_nc_oc=Adpg8NNV3a0AdvHzh8yEsEk_Qa3DtyI9a-SuyKblDuqTTqFiV8iWIqHOWc0djpS_gQ6z0ZS327EGchEspfksXzEf&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=kofn6rvocXLB_bC8mS405w&_nc_ss=7b2a8&oh=00_Af6xgBQDE6Ks8tXI5Q5WdNok7Nw_o37QF3mqQJXef9ayuA&oe=6A069083",
+    link: "https://traxshows.co.uk/",
+    isStatic: true
+  },
+  {
+    id: 'static-4',
+    title: "Ford Fair",
+    date: "Sunday, 23rd August 2026",
+    time: "08:30 AM",
+    location: "Silverstone Circuit",
+    description: "The biggest and best Ford festival in Europe. Expect thousands of club cars, intense track action, and huge retail villages.",
+    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597864318_1331850388984316_4749659490145813671_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=2a1932&_nc_ohc=Eyzst_iXSeEQ7kNvwF165SD&_nc_oc=AdoDsCCTTBzrUNBCRp75jZ0jIv8H2XjTev23iPy3bQNpiE5djXJXpSvQo0oJpyfotxjSytru99gpgebiIDOv8cQJ&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=9XwwuzQfNhIwISHL8RR-KA&_nc_ss=7b2a8&oh=00_Af5tVKR_W4mxaLAaIVKvPgimkVJs48pQ6CJ_NztkYJQ3zw&oe=6A068DDB",
+    link: "https://fordshows.co.uk/ford-fair",
+    isStatic: true
+  },
+  {
+    id: 'static-5',
+    title: "Ford Power Live",
+    date: "Sunday, 13th September 2026",
+    time: "09:00 AM",
+    location: "Brands Hatch Circuit, Kent",
+    description: "A dedicated celebration of all things Ford, from classic RS models to the latest STs taking to the famous Indy circuit.",
+    image: "https://i.ibb.co/Nd6d6L3m/Untitled-design-9.png",
+    link: "https://www.fordpowerlive.co.uk/",
+    isStatic: true
+  },
+  {
+    id: 'static-6',
+    title: "Lancing Motor Show",
+    date: "Sunday, 27th September 2026",
+    time: "09:00 AM",
+    location: "Lancing Beach Green, West Sussex",
+    description: "600+ cars on display at Lancing Beach Green. FREE ENTRY to public, with Children's Amusements, Trade Stalls, Hot & Cold Drinks, Food refreshments and much more to see and do on the day. A display of motoring excellence.",
+    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/673478652_1411226824381514_8742350712894671620_n.png?_nc_cat=108&ccb=1-7&_nc_sid=2a1932&_nc_ohc=HIDGrimsPmAQ7kNvwHOoubY&_nc_oc=AdrAY5sMilU7z84ghmC3VwRtoff35i3jmKvEEdmM2bUFHGBX7AS-wl4iiBmxSBroVyo6SJgOSKceHXnT3-telYcb&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=ZjADEz4Aukm54gCOUIAKUw&_nc_ss=7b2a8&oh=00_Af58pi1U-_VlcuRajrZMqDu2Gk0NK83QXmn8qD7jv7Q01g&oe=6A06721B",
+    link: "https://lancingmotorshow.onlineticketseller.com/",
+    isStatic: true
+  }
+];
+
+const STATIC_CHARITY = [
+  {
+    id: 1,
+    title: "Coastguard Association 50th Anniversary",
+    description: "Daily Ride South is supporting the Coastguard for their 50th year. These dedicated volunteers look after our coastline and are on call day and night. Purchase official merchandise to support them directly.",
+    deadline: "31st December 2026",
+    image: "https://i.ibb.co/WYSqmxk/Untitled-design-10.png",
+    link: "https://coastguardassociation.sumupstore.com/"
+  }
+];
+
+const STATIC_RAFFLES = [
+  {
+    id: 'mock-past-raffle',
+    title: "Premium Prize Bundle",
+    description: "A massive thank you to everyone who entered.",
+    drawDate: "20th April 2026",
+    ticketPrice: 5,
+    totalTickets: 100,
+    ticketsSold: 100,
+    image: "https://i.ibb.co/fzbH9zQj/Whats-App-Image-2026-05-10-at-10-23-14-PM.jpg",
+    isEnded: true,
+    winner: "Steve Ronnie"
+  }
+];
 
 // --- GUIDE DATA ---
 const guideSections = [
@@ -469,236 +623,87 @@ const guideSections = [
   }
 ];
 
-// --- AUTHENTICATION SPLASH SCREEN ---
-const SplashView = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [isResetMode, setIsResetMode] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [resetMsg, setResetMsg] = useState('');
-  const [loading, setLoading] = useState(false);
+// --- VIEWS ---
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setResetMsg('');
-    setLoading(true);
-    
-    try {
-      if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
-      } else {
-        await createUserWithEmailAndPassword(auth, email, password);
-      }
-    } catch (err) {
-      console.error(err);
-      const message = err.message?.includes('auth/invalid-credential') 
-        ? 'Invalid email or password.' 
-        : err.message?.includes('auth/email-already-in-use')
-        ? 'An account with this email already exists.'
-        : err.message?.replace('Firebase: ', '') || 'An authentication error occurred.';
-      setError(message);
-    } finally {
-      setLoading(false);
+const AdminGuideView = ({ onBack }) => {
+  const [activeSection, setActiveSection] = useState(guideSections[0]);
+  const [completedSteps, setCompletedSteps] = useState([]);
+
+  const toggleStepCompletion = (stepTitle) => {
+    if (completedSteps.includes(stepTitle)) {
+      setCompletedSteps(completedSteps.filter(t => t !== stepTitle));
+    } else {
+      setCompletedSteps([...completedSteps, stepTitle]);
     }
   };
 
-  const handlePasswordReset = async (e) => {
-    e.preventDefault();
-    setError('');
-    setResetMsg('');
-    if (!email) {
-        setError('Please enter your email address first.');
-        return;
-    }
-    setLoading(true);
-    try {
-        await sendPasswordResetEmail(auth, email);
-        setResetMsg('Password reset link sent to your email.');
-    } catch(err) {
-        setError(err.message?.replace('Firebase: ', '') || 'Failed to send reset email.');
-    } finally {
-        setLoading(false);
-    }
-  };
+  const progressPercentage = Math.round(
+    (completedSteps.length / guideSections.reduce((acc, curr) => acc + curr.steps.length, 0)) * 100
+  );
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30 selection:text-pink-200">
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center opacity-20 blur-sm scale-105"></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-zinc-950/40"></div>
-
-      <div className="relative z-10 w-full max-w-md bg-black/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl shadow-pink-500/5 animate-in zoom-in-95 duration-700">
-        <div className="flex flex-col items-center mb-8">
-          <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-20 w-20 rounded-2xl object-cover border border-zinc-700 shadow-lg shadow-pink-500/20 mb-4" alt="DRS Logo" />
-          <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">Petrolhead Community</p>
+    <div className="space-y-6 animate-in fade-in duration-700">
+      <button onClick={onBack} className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group mb-4">
+        <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        Back to Admin Panel
+      </button>
+      <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-4">
+          <Shield className="w-8 h-8 text-pink-500" />
+          <div>
+            <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic">
+              Daily Ride <span className="text-pink-600 not-italic">South</span>
+            </h1>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">Interactive Admin Manual</p>
+          </div>
         </div>
-
-        {isResetMode ? (
-          <form onSubmit={handlePasswordReset} className="space-y-5">
-            <p className="text-zinc-300 text-sm text-center mb-4">Enter your email address and we will send you a link to reset your password.</p>
-            <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="enter your email" required />
-            
-            {error && (
-              <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
-                <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
-              </div>
-            )}
-            {resetMsg && (
-              <div className="bg-green-500/10 border border-green-500/50 p-3 rounded-lg">
-                <p className="text-green-500 text-xs font-bold uppercase tracking-widest text-center">{resetMsg}</p>
-              </div>
-            )}
-
-            <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
-              {loading ? 'Processing...' : 'Send Reset Link'}
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="flex-1 md:w-48 bg-black border border-zinc-800 rounded-full h-3 p-0.5">
+            <div className="bg-pink-500 h-full rounded-full transition-all duration-500" style={{ width: `${progressPercentage}%` }}></div>
+          </div>
+          <span className="text-xs font-bold text-pink-500 w-24 text-right">{progressPercentage}% Mastered</span>
+        </div>
+      </div>
+      <div className="grid lg:grid-cols-3 gap-8">
+        <aside className="space-y-2">
+          {guideSections.map(s => (
+            <button key={s.id} onClick={() => setActiveSection(s)} className={`w-full text-left p-4 rounded-2xl border transition-all ${activeSection.id === s.id ? 'bg-zinc-900 border-pink-500 shadow-lg' : 'bg-black border-zinc-800'}`}>
+              <h3 className="font-bold text-white">{s.title}</h3>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{s.steps.length} Steps</p>
             </button>
-
-            <div className="mt-6 text-center border-t border-zinc-800/50 pt-6">
-              <button type="button" onClick={() => { setIsResetMode(false); setError(''); setResetMsg(''); }} className="text-zinc-400 hover:text-white font-bold uppercase text-xs tracking-widest transition-colors">
-                Back to Login
-              </button>
-            </div>
-          </form>
-        ) : (
-          <>
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="enter your email" required />
-              <div className="space-y-1">
-                <InputField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-                {isLogin && (
-                  <div className="flex justify-end">
-                    <button type="button" onClick={() => { setIsResetMode(true); setError(''); setResetMsg(''); }} className="text-pink-500 hover:text-pink-400 text-xs font-bold uppercase tracking-widest transition-colors mt-2">
-                      Forgot Password?
+          ))}
+        </aside>
+        <section className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
+          <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-8 flex items-center gap-3">
+             <activeSection.icon className="w-8 h-8 text-pink-500" /> {activeSection.title}
+          </h2>
+          <div className="space-y-4">
+            {activeSection.steps.map((step, i) => {
+              const isCompleted = completedSteps.includes(step.title);
+              return (
+                <div key={i} className={`p-6 rounded-xl border transition-all ${isCompleted ? 'border-pink-500/30 bg-black/50' : 'border-zinc-800 bg-black'}`}>
+                  <div className="flex justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                       <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 font-black text-xs border ${isCompleted ? 'bg-pink-600 border-pink-500 text-white' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}`}>{i + 1}</div>
+                       <div>
+                         <h4 className={`font-bold ${isCompleted ? 'text-pink-500' : 'text-white'}`}>{step.title}</h4>
+                         <p className="text-zinc-400 text-sm mt-1">{step.content}</p>
+                       </div>
+                    </div>
+                    <button onClick={() => toggleStepCompletion(step.title)} className={`p-2 rounded-full ${isCompleted ? 'text-pink-500' : 'text-zinc-600'}`}>
+                       <CheckCircle2 className="w-6 h-6" />
                     </button>
                   </div>
-                )}
-              </div>
-
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
-                  <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
                 </div>
-              )}
-
-              <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
-                {loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}
-              </button>
-            </form>
-
-            <div className="mt-8 text-center border-t border-zinc-800/50 pt-6">
-              <p className="text-zinc-400 text-sm">
-                {isLogin ? "Don't have an account yet?" : "Already part of the club?"}
-              </p>
-              <button onClick={() => { setIsLogin(!isLogin); setError(''); setResetMsg(''); }} className="text-pink-500 hover:text-pink-400 font-bold uppercase text-xs tracking-widest mt-2 transition-colors">
-                {isLogin ? 'Sign up here' : 'Log in instead'}
-              </button>
-            </div>
-          </>
-        )}
+              );
+            })}
+          </div>
+        </section>
       </div>
     </div>
   );
 };
-
-// --- MOCK DATA (Static Fallbacks) ---
-const STATIC_EVENTS = [
-  {
-    id: 'static-1',
-    title: "Tunerfest South",
-    date: "Sunday, 14th June 2026",
-    time: "09:00 AM",
-    location: "Brands Hatch Circuit, Kent",
-    description: "Celebrating the UK's tuning scene with Time Attack, drifting, and massive club displays. An action-packed day out.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/615332601_1303146985173729_7017742900608760889_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=2a1932&_nc_ohc=9lMQN9k9fWwQ7kNvwEUw7bF&_nc_oc=Adrt86yG2RX2lia1fFym533-vAHlszAQe8vVA64q3g8wkzt7Jfx1KDqJcB-lJSwDnykrci9OoljCxIr8bzEGJz-K&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=2KM11XS369ylUsSZzTmGew&_nc_ss=7b2a8&oh=00_Af6PNVmhDJzfZrZCfLJXUNXvnrBMD-3wj8UQvYTlsocLqg&oe=6A067D2C",
-    link: "https://www.brandshatch.co.uk/2026/june/tunerfest-south",
-    isStatic: true
-  },
-  {
-    id: 'static-2',
-    title: "Isle of Wight Takeover",
-    date: "Saturday, 16th May 2026",
-    time: "10:00 AM",
-    location: "Isle of Wight",
-    description: "The ultimate weekend away for car enthusiasts. Join our club stand as we head over on the ferry for a massive island takeover.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/370897411_788936759904376_6556989917387874387_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=1d70fc&_nc_ohc=BAm1Zb4f-a8Q7kNvwF4HI_P&_nc_oc=AdoHjuaouRTMphGXdxORfQlSFYaOroD7I3nl0lfqQkZpAyG2i1rLmcZEMgm5HRjZLJl3rYRR_4AemK172VSwxXe1&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=EmZtuaqTOlSEllcyBAYDPA&_nc_ss=7b2a8&oh=00_Af5oVHzQmfxAuzDJ3SjQBwDnCKIR9t4QvxmZImjX9Z_j3w&oe=6A0678E0",
-    link: "https://www.iowtakeover.co.uk/",
-    isStatic: true
-  },
-  {
-    id: 'static-3',
-    title: "TRAX",
-    date: "Sunday, 16th August 2026",
-    time: "09:00 AM",
-    location: "Silverstone Circuit",
-    description: "Britain's biggest performance car show. We will have a dedicated club stand. Features live track time and professional drifting displays.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597894646_1257634839745045_372102352193919714_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=2a1932&_nc_ohc=35X4SY7dnmkQ7kNvwEwboEG&_nc_oc=Adpg8NNV3a0AdvHzh8yEsEk_Qa3DtyI9a-SuyKblDuqTTqFiV8iWIqHOWc0djpS_gQ6z0ZS327EGchEspfksXzEf&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=kofn6rvocXLB_bC8mS405w&_nc_ss=7b2a8&oh=00_Af6xgBQDE6Ks8tXI5Q5WdNok7Nw_o37QF3mqQJXef9ayuA&oe=6A069083",
-    link: "https://traxshows.co.uk/",
-    isStatic: true
-  },
-  {
-    id: 'static-4',
-    title: "Ford Fair",
-    date: "Sunday, 23rd August 2026",
-    time: "08:30 AM",
-    location: "Silverstone Circuit",
-    description: "The biggest and best Ford festival in Europe. Expect thousands of club cars, intense track action, and huge retail villages.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597864318_1331850388984316_4749659490145813671_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=2a1932&_nc_ohc=Eyzst_iXSeEQ7kNvwF165SD&_nc_oc=AdoDsCCTTBzrUNBCRp75jZ0jIv8H2XjTev23iPy3bQNpiE5djXJXpSvQo0oJpyfotxjSytru99gpgebiIDOv8cQJ&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=9XwwuzQfNhIwISHL8RR-KA&_nc_ss=7b2a8&oh=00_Af5tVKR_W4mxaLAaIVKvPgimkVJs48pQ6CJ_NztkYJQ3zw&oe=6A068DDB",
-    link: "https://fordshows.co.uk/ford-fair",
-    isStatic: true
-  },
-  {
-    id: 'static-5',
-    title: "Ford Power Live",
-    date: "Sunday, 13th September 2026",
-    time: "09:00 AM",
-    location: "Brands Hatch Circuit, Kent",
-    description: "A dedicated celebration of all things Ford, from classic RS models to the latest STs taking to the famous Indy circuit.",
-    image: "https://i.ibb.co/Nd6d6L3m/Untitled-design-9.png",
-    link: "https://www.fordpowerlive.co.uk/",
-    isStatic: true
-  },
-  {
-    id: 'static-6',
-    title: "Lancing Motor Show",
-    date: "Sunday, 27th September 2026",
-    time: "09:00 AM",
-    location: "Lancing Beach Green, West Sussex",
-    description: "600+ cars on display at Lancing Beach Green. FREE ENTRY to public, with Children's Amusements, Trade Stalls, Hot & Cold Drinks, Food refreshments and much more to see and do on the day. A display of motoring excellence.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/673478652_1411226824381514_8742350712894671620_n.png?_nc_cat=108&ccb=1-7&_nc_sid=2a1932&_nc_ohc=HIDGrimsPmAQ7kNvwHOoubY&_nc_oc=AdrAY5sMilU7z84ghmC3VwRtoff35i3jmKvEEdmM2bUFHGBX7AS-wl4iiBmxSBroVyo6SJgOSKceHXnT3-telYcb&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=ZjADEz4Aukm54gCOUIAKUw&_nc_ss=7b2a8&oh=00_Af58pi1U-_VlcuRajrZMqDu2Gk0NK83QXmn8qD7jv7Q01g&oe=6A06721B",
-    link: "https://lancingmotorshow.onlineticketseller.com/",
-    isStatic: true
-  }
-];
-
-const STATIC_CHARITY = [
-  {
-    id: 1,
-    title: "Coastguard Association 50th Anniversary",
-    description: "Daily Ride South is supporting the Coastguard for their 50th year. These dedicated volunteers look after our coastline and are on call day and night. Purchase official merchandise to support them directly.",
-    deadline: "31st December 2026",
-    image: "https://i.ibb.co/WYSqmxk/Untitled-design-10.png",
-    link: "https://coastguardassociation.sumupstore.com/"
-  }
-];
-
-const STATIC_RAFFLES = [
-  {
-    id: 'mock-past-raffle',
-    title: "Premium Prize Bundle",
-    description: "A massive thank you to everyone who entered.",
-    drawDate: "20th April 2026",
-    ticketPrice: 5,
-    totalTickets: 100,
-    ticketsSold: 100,
-    image: "https://i.ibb.co/fzbH9zQj/Whats-App-Image-2026-05-10-at-10-23-14-PM.jpg",
-    isEnded: true,
-    winner: "Steve Ronnie"
-  }
-];
-
-// --- VIEWS ---
 
 const MemberProfileModal = ({ member, onClose, onCarClick }) => {
   const cars = member.cars || [];
@@ -907,50 +912,60 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
     return imgs;
   }, [members]);
 
-  const [mosaicSlots, setMosaicSlots] = useState(Array(8).fill({ current: null, previous: null, fadeKey: 0 }));
+  const [mosaicSlots, setMosaicSlots] = useState([]);
+  const cycleRef = useRef({ slotIdx: 0, imgIdx: 8 });
 
   useEffect(() => {
     if (allImages.length === 0) return;
-    setMosaicSlots(prev => {
-      if (prev[0].current !== null) return prev; 
-      const shuffled = [...allImages].sort(() => 0.5 - Math.random());
-      return prev.map((_, i) => ({
-        current: shuffled[i % shuffled.length],
-        previous: null,
-        fadeKey: Date.now() + i
-      }));
-    });
+    const initialSlots = Array(8).fill(null).map((_, i) => ({
+      current: allImages[i % allImages.length],
+      previous: null,
+      fadeKey: i
+    }));
+    setMosaicSlots(initialSlots);
+    cycleRef.current = { slotIdx: 0, imgIdx: 8 % allImages.length };
   }, [allImages]);
 
   useEffect(() => {
-    if (allImages.length <= 8) return;
+    if (allImages.length <= 1) return;
 
     const interval = setInterval(() => {
-      setMosaicSlots(prev => {
-        const newSlots = [...prev];
-        const slotToUpdate = Math.floor(Math.random() * 8);
-        const showingUrls = new Set(newSlots.map(s => s.current?.url));
+      setMosaicSlots(prevSlots => {
+        if (prevSlots.length < 8) return prevSlots;
 
-        const available = allImages.filter(img => !showingUrls.has(img.url));
-        const nextImg = available.length > 0
-          ? available[Math.floor(Math.random() * available.length)]
-          : allImages[Math.floor(Math.random() * allImages.length)];
+        const { slotIdx, imgIdx } = cycleRef.current;
+        const newSlots = [...prevSlots];
 
-        newSlots[slotToUpdate] = {
-          previous: newSlots[slotToUpdate].current,
-          current: nextImg,
+        newSlots[slotIdx] = {
+          previous: newSlots[slotIdx].current,
+          current: allImages[imgIdx],
           fadeKey: Date.now()
+        };
+
+        cycleRef.current = {
+          slotIdx: (slotIdx + 1) % 8,
+          imgIdx: (imgIdx + 1) % allImages.length
         };
 
         return newSlots;
       });
-    }, 3000);
+    }, 4000);
 
     return () => clearInterval(interval);
   }, [allImages]);
 
   return (
     <div className="space-y-6">
+      <style>{`
+        @keyframes mosaicFade {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        .mosaic-fade-in {
+          animation: mosaicFade 1.5s ease-in-out forwards;
+        }
+      `}</style>
+      
       <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center">
         <img src="https://i.ibb.co/dwGFSkDT/Whats-App-Image-2026-05-10-at-4.jpg" alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-black/40 to-black/20"></div>
@@ -997,7 +1012,7 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
                   <div 
                     key={slot.fadeKey} 
                     onClick={() => onImageClick(slot.current)} 
-                    className="absolute inset-0 w-full h-full animate-in fade-in duration-[2000ms] ease-in-out z-10"
+                    className="absolute inset-0 w-full h-full mosaic-fade-in z-10"
                   >
                     <img src={slot.current.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
                   </div>
@@ -1512,6 +1527,10 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [editSpotlightId, setEditSpotlightId] = useState(spotlightMemberId || '');
   const [memberRoles, setMemberRoles] = useState({});
   const [memberRanks, setMemberRanks] = useState({});
+  
+  // Compression Tool State
+  const [compressing, setCompressing] = useState(false);
+  const [compressProgress, setCompressProgress] = useState({ current: 0, total: 0, status: '' });
 
   useEffect(() => {
     if (clubDescription) setEditDescription(clubDescription);
@@ -1692,6 +1711,69 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       console.error("Failed to generate PDF", err);
       alert("Failed to download PDF. Please try again.");
     }
+  };
+
+  const handleCompressAll = async () => {
+    if (!window.confirm('WARNING: This will download, compress, and re-upload all legacy uncompressed images. Please ensure you are on a fast Wi-Fi connection. Proceed?')) return;
+
+    setCompressing(true);
+    let tasks = [];
+
+    members.forEach(member => {
+      if (member.avatar && !member.avatar.includes('.webp') && member.avatar.includes('firebasestorage')) {
+        tasks.push({ type: 'avatar', memberId: member.id, url: member.avatar });
+      }
+      (member.cars || []).forEach((car, carIdx) => {
+        if (car.image && !car.image.includes('.webp') && car.image.includes('firebasestorage')) {
+          tasks.push({ type: 'main', memberId: member.id, carIdx, url: car.image });
+        }
+        (car.gallery || []).forEach((gUrl, gIdx) => {
+           if (gUrl && !gUrl.includes('.webp') && gUrl.includes('firebasestorage')) {
+             tasks.push({ type: 'gallery', memberId: member.id, carIdx, gIdx, url: gUrl });
+           }
+        });
+      });
+    });
+
+    if (tasks.length === 0) {
+       setCompressProgress({ current: 0, total: 0, status: 'All images are already compressed!' });
+       setCompressing(false);
+       return;
+    }
+
+    setCompressProgress({ current: 0, total: tasks.length, status: 'Starting compression...' });
+
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      setCompressProgress({ current: i + 1, total: tasks.length, status: `Compressing image ${i + 1} of ${tasks.length}` });
+      
+      try {
+        const compressedFile = await compressImageFromUrl(task.url, 1080, 1080, 0.8);
+        const storageRef = ref(storage, `artifacts/${appId}/users/${task.memberId}/uploads/retro_compressed_${Date.now()}_${compressedFile.name}`);
+        const uploadTask = await uploadBytesResumable(storageRef, compressedFile);
+        const newUrl = await getDownloadURL(uploadTask.ref);
+
+        const memberData = members.find(m => m.id === task.memberId);
+        if (memberData) {
+           if (task.type === 'avatar') {
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', task.memberId), { avatar: newUrl }, { merge: true });
+           } else {
+              const updatedCars = [...memberData.cars];
+              if (task.type === 'main') {
+                 updatedCars[task.carIdx].image = newUrl;
+              } else if (task.type === 'gallery') {
+                 updatedCars[task.carIdx].gallery[task.gIdx] = newUrl;
+              }
+              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', task.memberId), { cars: updatedCars }, { merge: true });
+           }
+        }
+      } catch (e) {
+        console.error("Failed to compress image:", task.url, e);
+      }
+    }
+
+    setCompressProgress({ current: tasks.length, total: tasks.length, status: 'Compression Complete!' });
+    setCompressing(false);
   };
 
   if (!isAuthenticated) return (
@@ -2072,6 +2154,36 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             ))}
           </div>
         </section>
+
+        <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
+          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><ImageIcon className="w-4 h-4 text-pink-500" /> Database Maintenance (Temporary)</h3>
+          <div className="space-y-4">
+            <p className="text-zinc-400 text-sm">
+              Run this tool to automatically scan the database, download all legacy uncompressed images, compress them to WebP format, and re-upload them. This will save significant bandwidth for your users.
+            </p>
+            
+            {compressProgress.total > 0 && (
+              <div className="bg-black border border-zinc-800 p-4 rounded-xl">
+                 <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                    <span>{compressProgress.status}</span>
+                    <span>{Math.round((compressProgress.current / compressProgress.total) * 100)}%</span>
+                 </div>
+                 <div className="w-full bg-zinc-800 rounded-full h-2 shadow-inner">
+                   <div className="bg-pink-500 h-2 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ width: `${(compressProgress.current / compressProgress.total) * 100}%` }}></div>
+                 </div>
+              </div>
+            )}
+
+            <button 
+              onClick={handleCompressAll}
+              disabled={compressing}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-pink-500 font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg border border-zinc-700 active:scale-[0.98] flex items-center justify-center gap-2"
+            >
+              {compressing ? <span className="animate-pulse">Compressing...</span> : <><Download className="w-4 h-4" /> Run Bulk Compression Tool</>}
+            </button>
+          </div>
+        </section>
+
       </div>
     </div>
   );
