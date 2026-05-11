@@ -130,6 +130,32 @@ const InputField = ({ label, value, onChange, placeholder, type = "text", requir
   </div>
 );
 
+const NavLink = ({ item, mobile = false, isActive, onClick }) => {
+  const Icon = item.icon;
+  return (
+    <button onClick={onClick} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} ${mobile ? 'w-full' : ''}`}>
+      <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-pink-500'}`} />
+      <span className="font-black uppercase tracking-widest text-xs">{item.label}</span>
+    </button>
+  );
+};
+
+const EventListTile = ({ event, onEdit }) => (
+  <div 
+    onClick={() => onEdit(event)} 
+    className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
+  >
+     <div>
+       <div className="flex justify-between items-start mb-2">
+          <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
+          {event.isStatic && <span className="bg-zinc-800 text-zinc-500 text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 ml-2">Standard</span>}
+       </div>
+       <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
+     </div>
+     <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
+  </div>
+);
+
 // --- GUIDE DATA ---
 const guideSections = [
   {
@@ -586,7 +612,6 @@ const AdminGuideView = () => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar */}
         <aside className="lg:w-1/3 shrink-0 space-y-2">
           <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 pl-4 border-l-2 border-pink-500">Modules</h2>
           {guideSections.map(section => {
@@ -616,7 +641,6 @@ const AdminGuideView = () => {
           })}
         </aside>
 
-        {/* Content Area */}
         <section className="lg:w-2/3 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
           
@@ -1439,6 +1463,18 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     return () => window.removeEventListener('popstate', handlePopState);
   }, [editingEvent, editingMember]);
 
+  const editableUpcoming = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return combinedEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date));
+  }, [combinedEvents]);
+  
+  const editablePast = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return combinedEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date));
+  }, [combinedEvents]);
+
   const handleLogin = (e) => {
     e.preventDefault();
     if (password === 'dailyride2026' || userProfile?.role === 'Admin') { 
@@ -1448,19 +1484,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         setError('Access Denied: Incorrect credentials.'); 
     }
   };
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-
-  const editableUpcoming = useMemo(() => 
-    combinedEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
-    [combinedEvents, now]
-  );
-  
-  const editablePast = useMemo(() => 
-    combinedEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
-    [combinedEvents, now]
-  );
 
   const handleDeployEvent = async () => {
     try {
@@ -1593,6 +1616,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     }
   };
 
+  // Safe early return after all Hooks are called
   if (!isAuthenticated) return (
     <div className="max-w-md mx-auto mt-20 animate-in fade-in zoom-in-95 duration-500">
       <div className="bg-zinc-900 p-10 rounded-2xl border border-zinc-800 shadow-2xl">
@@ -1607,22 +1631,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           <button type="submit" className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest">Authorize Access</button>
         </form>
       </div>
-    </div>
-  );
-
-  const EventListTile = ({ event }) => (
-    <div 
-      onClick={() => handleEditEvent(event)} 
-      className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
-    >
-       <div>
-         <div className="flex justify-between items-start mb-2">
-            <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
-            {event.isStatic && <span className="bg-zinc-800 text-zinc-500 text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 ml-2">Standard</span>}
-         </div>
-         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
-       </div>
-       <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
     </div>
   );
 
@@ -1673,7 +1681,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                   <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
                   {editingEvent.isStatic && <p className="text-zinc-500 text-[10px] mt-1 italic font-bold">Standard event: Saving will create a database copy.</p>}
                </div>
-               <button onClick={closeEditEvent} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+               <button onClick={() => { setEditingEvent(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
             <InputField label="Event Title" value={editingEvent.title || ''} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
             <InputField label="Date (e.g. Sunday, 1st Oct)" value={editingEvent.date || ''} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} />
@@ -1704,22 +1712,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <div>
                 <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-pink-500 pl-3">Upcoming Events</p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {editableUpcoming.map(event => (
-                    <div 
-                      key={event.id}
-                      onClick={() => handleEditEvent(event)} 
-                      className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
-                    >
-                       <div>
-                         <div className="flex justify-between items-start mb-2">
-                            <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
-                            {event.isStatic && <span className="bg-zinc-800 text-zinc-500 text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 ml-2">Standard</span>}
-                         </div>
-                         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
-                       </div>
-                       <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
-                    </div>
-                  ))}
+                  {editableUpcoming.map(e => <EventListTile key={e.id} event={e} onEdit={handleEditEvent} />)}
                 </div>
               </div>
             )}
@@ -1728,22 +1721,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <div>
                 <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-zinc-700 pl-3">Past Events</p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {editablePast.map(event => (
-                    <div 
-                      key={event.id}
-                      onClick={() => handleEditEvent(event)} 
-                      className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
-                    >
-                       <div>
-                         <div className="flex justify-between items-start mb-2">
-                            <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
-                            {event.isStatic && <span className="bg-zinc-800 text-zinc-500 text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 ml-2">Standard</span>}
-                         </div>
-                         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
-                       </div>
-                       <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
-                    </div>
-                  ))}
+                  {editablePast.map(e => <EventListTile key={e.id} event={e} onEdit={handleEditEvent} />)}
                 </div>
               </div>
             )}
@@ -2003,7 +1981,7 @@ export default function App() {
   const [globalSelectedMember, setGlobalSelectedMember] = useState(null);
   const [globalViewingCar, setGlobalViewingCar] = useState(null);
 
-  const sortedMembersHook = useMemo(() => {
+  const allAdminMembers = useMemo(() => {
     return [...cloudMembers].sort((a, b) => {
       const rankA = parseInt(a.rank) || 999;
       const rankB = parseInt(b.rank) || 999;
@@ -2012,29 +1990,49 @@ export default function App() {
     });
   }, [cloudMembers]);
 
-  const combinedEventsHook = useMemo(() => {
+  const sortedMembers = useMemo(() => {
+    return allAdminMembers.filter(m => !m.isHidden);
+  }, [allAdminMembers]);
+
+  const today = new Date();
+  const currentDay = today.getDate().toString();
+  const currentMonth = (today.getMonth() + 1).toString();
+
+  const birthdayMembers = useMemo(() => {
+    return cloudMembers.filter(m => !m.isHidden && m.birthdayDay === currentDay && m.birthdayMonth === currentMonth);
+  }, [cloudMembers, currentDay, currentMonth]);
+
+  const isBirthdaySpotlight = birthdayMembers.length > 0;
+
+  const spotlightMember = useMemo(() => {
+    if (birthdayMembers.length > 0) return birthdayMembers[birthdayIndex] || birthdayMembers[0];
+    const selected = cloudMembers.find(m => m.id === spotlightMemberId && !m.isHidden);
+    return selected || null;
+  }, [cloudMembers, spotlightMemberId, birthdayMembers, birthdayIndex]);
+
+  const combinedEvents = useMemo(() => {
     const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
     const visibleStatic = STATIC_EVENTS.filter(s => !cloudTitles.has(s.title.toLowerCase()));
     return [...visibleStatic, ...cloudEvents];
   }, [cloudEvents]);
 
-  const combinedRafflesHook = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
+  const combinedRaffles = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
 
-  const nowHook = useMemo(() => {
-      const n = new Date();
-      n.setHours(0,0,0,0);
-      return n;
-  }, []);
-
-  const upcomingEventsHook = useMemo(() => 
-    combinedEventsHook.filter(e => parseEventDateStr(e.date) >= nowHook).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
-    [combinedEventsHook, nowHook]
-  );
+  const upcomingEvents = useMemo(() => {
+    const n = new Date();
+    n.setHours(0, 0, 0, 0);
+    return combinedEvents.filter(e => parseEventDateStr(e.date) >= n).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date));
+  }, [combinedEvents]);
   
-  const pastEventsHook = useMemo(() => 
-    combinedEventsHook.filter(e => parseEventDateStr(e.date) < nowHook).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
-    [combinedEventsHook, nowHook]
-  );
+  const pastEvents = useMemo(() => {
+    const n = new Date();
+    n.setHours(0, 0, 0, 0);
+    return combinedEvents.filter(e => parseEventDateStr(e.date) < n).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date));
+  }, [combinedEvents]);
+
+  const currentUserProfile = useMemo(() => {
+    return cloudMembers.find(m => m.id === user?.uid) || null;
+  }, [cloudMembers, user]);
 
   const setActiveTab = (tab) => {
     window.location.hash = tab;
@@ -2062,37 +2060,6 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [globalViewingCar, globalSelectedMember]);
 
-  const handleMemberClick = (member) => {
-    window.history.pushState({ modal: 'member' }, '');
-    setGlobalSelectedMember(member);
-  };
-
-  const closeMember = () => {
-    setGlobalSelectedMember(null);
-    window.history.back();
-  };
-
-  const handleCarClick = (car) => {
-    window.history.pushState({ modal: 'car' }, '');
-    setGlobalViewingCar(car);
-  };
-
-  const closeCar = () => {
-    setGlobalViewingCar(null);
-    window.history.back();
-  };
-
-  const allAdminMembers = sortedMembersHook;
-  const sortedMembers = useMemo(() => allAdminMembers.filter(m => !m.isHidden), [allAdminMembers]);
-
-  const today = new Date();
-  const currentDay = today.getDate().toString();
-  const currentMonth = (today.getMonth() + 1).toString();
-
-  const birthdayMembers = useMemo(() => {
-    return cloudMembers.filter(m => !m.isHidden && m.birthdayDay === currentDay && m.birthdayMonth === currentMonth);
-  }, [cloudMembers, currentDay, currentMonth]);
-
   useEffect(() => {
     let interval;
     if (birthdayMembers.length > 1) {
@@ -2103,22 +2070,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [birthdayMembers.length]);
 
-  const isBirthdaySpotlight = birthdayMembers.length > 0;
-
-  const spotlightMember = useMemo(() => {
-    if (birthdayMembers.length > 0) return birthdayMembers[birthdayIndex] || birthdayMembers[0];
-    const selected = cloudMembers.find(m => m.id === spotlightMemberId && !m.isHidden);
-    return selected || null;
-  }, [cloudMembers, spotlightMemberId, birthdayMembers, birthdayIndex]);
-
-  const combinedEvents = combinedEventsHook;
-  const combinedRaffles = combinedRafflesHook;
-  const upcomingEvents = upcomingEventsHook;
-  const pastEvents = pastEventsHook;
-
-  const currentUserProfile = cloudMembers.find(m => m.id === user?.uid) || null;
-
-  // Background Sync: Ensure the current user always has their email updated in their profile doc
   useEffect(() => {
     if (user && user.email && currentUserProfile && currentUserProfile.email !== user.email) {
       const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
@@ -2171,6 +2122,26 @@ export default function App() {
 
     return () => { unsubMembers(); unsubEvents(); unsubRaffles(); unsubRsvps(); unsubInfo(); };
   }, [user]);
+
+  const handleMemberClick = (member) => {
+    window.history.pushState({ modal: 'member' }, '');
+    setGlobalSelectedMember(member);
+  };
+
+  const closeMember = () => {
+    setGlobalSelectedMember(null);
+    window.history.back();
+  };
+
+  const handleCarClick = (car) => {
+    window.history.pushState({ modal: 'car' }, '');
+    setGlobalViewingCar(car);
+  };
+
+  const closeCar = () => {
+    setGlobalViewingCar(null);
+    window.history.back();
+  };
 
   const toggleRsvp = async (eventId, isPast) => {
     if (!user) return;
@@ -2256,13 +2227,9 @@ export default function App() {
         
         <nav className="space-y-3 mb-10">
           {navItems.map(item => {
-            const Icon = item.icon;
             const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
             return (
-              <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} w-full`}>
-                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-pink-500'}`} />
-                <span className="font-black uppercase tracking-widest text-xs">{item.label}</span>
-              </button>
+              <NavLink key={item.id} item={item} mobile isActive={isActive} onClick={() => setActiveTab(item.id)} />
             );
           })}
         </nav>
