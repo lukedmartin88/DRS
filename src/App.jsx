@@ -97,6 +97,57 @@ const parseEventDateStr = (dateStr) => {
   return isNaN(parsed) ? new Date(9999, 0, 1) : new Date(parsed);
 };
 
+const compressImage = (file, maxWidth = 1080, maxHeight = 1080, quality = 0.8) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".webp"), {
+                type: 'image/webp',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              reject(new Error('Canvas to Blob failed'));
+            }
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 const DEFAULT_AVATAR = "https://i.ibb.co/RTHHJ3JW/PROFILE-PIC.png";
 const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
 
@@ -166,9 +217,10 @@ const EventListTile = ({ event, onEdit }) => (
 const ImageUpload = ({ label, onUploadSuccess, className }) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState('');
   const [errorMsg, setErrorMsg] = useState(null);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -179,29 +231,41 @@ const ImageUpload = ({ label, onUploadSuccess, className }) => {
 
     setUploading(true);
     setErrorMsg(null);
+    setProgress(0);
+    setStatusText('Compressing...');
     
-    const storageRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser.uid}/uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    try {
+      const compressedFile = await compressImage(file, 1080, 1080, 0.8);
+      setStatusText('Uploading...');
+      
+      const storageRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser.uid}/uploads/${Date.now()}_${compressedFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
+      const uploadTask = uploadBytesResumable(storageRef, compressedFile);
 
-    uploadTask.on('state_changed',
-      (snapshot) => setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
-      (error) => { 
-        console.error("Storage Error:", error); 
-        setErrorMsg("Upload denied. Ensure your account is ready for user-specific data paths.");
-        setUploading(false); 
-      },
-      async () => {
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          onUploadSuccess(downloadURL);
-          setUploading(false);
-          setProgress(0);
-        } catch (err) {
-          setErrorMsg("Failed to generate public URL for image.");
-          setUploading(false);
+      uploadTask.on('state_changed',
+        (snapshot) => setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+        (error) => { 
+          console.error("Storage Error:", error); 
+          setErrorMsg("Upload denied. Ensure your account is ready for user-specific data paths.");
+          setUploading(false); 
+        },
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            onUploadSuccess(downloadURL);
+            setUploading(false);
+            setProgress(0);
+            setStatusText('');
+          } catch (err) {
+            setErrorMsg("Failed to generate public URL for image.");
+            setUploading(false);
+          }
         }
-      }
-    );
+      );
+    } catch (err) {
+      console.error("Compression Error:", err);
+      setErrorMsg("Failed to process image.");
+      setUploading(false);
+    }
   };
 
   return (
@@ -217,7 +281,9 @@ const ImageUpload = ({ label, onUploadSuccess, className }) => {
         />
         {uploading && (
           <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center z-10 border border-pink-500">
-            <span className="text-pink-500 text-sm font-bold animate-pulse">Uploading... {Math.round(progress)}%</span>
+            <span className="text-pink-500 text-sm font-bold animate-pulse">
+              {statusText} {progress > 0 && statusText === 'Uploading...' ? `${Math.round(progress)}%` : ''}
+            </span>
           </div>
         )}
       </div>
@@ -828,13 +894,27 @@ const GalleryView = ({ members, onImageClick }) => {
 };
 
 const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMemberClick, members, onImageClick }) => {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => t + 1);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
   const mosaicImages = useMemo(() => {
     const imgs = [];
     members.forEach(m => {
-      (m.cars || []).forEach(c => { if(c.image) imgs.push({url: c.image, member: m, carName: `${c.make} ${c.model}`}); });
+      (m.cars || []).forEach(c => { 
+         if(c.image) imgs.push({url: c.image, member: m, carName: `${c.make} ${c.model}`}); 
+         (c.gallery || []).forEach(g => {
+            if(g) imgs.push({url: g, member: m, carName: `${c.make} ${c.model}`});
+         });
+      });
     });
     return imgs.sort(() => 0.5 - Math.random()).slice(0, 8);
-  }, [members]);
+  }, [members, tick]);
 
   return (
     <div className="space-y-6">
@@ -876,7 +956,7 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {mosaicImages.map((img, i) => (
-              <div key={i} onClick={() => onImageClick(img)} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all group">
+              <div key={img.url + i + tick} onClick={() => onImageClick(img)} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all group animate-in fade-in duration-1000">
                 <img src={img.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
               </div>
             ))}
@@ -1381,6 +1461,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', location: '', meetingPoint: '', meetingTime: '', w3w: '', description: '', image: '', link: '' });
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
+  const [editingRaffle, setEditingRaffle] = useState(null);
   const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
@@ -1400,10 +1481,11 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     const handlePopState = () => {
       if (editingEvent) setEditingEvent(null);
       if (editingMember) setEditingMember(null);
+      if (editingRaffle) setEditingRaffle(null);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [editingEvent, editingMember]);
+  }, [editingEvent, editingMember, editingRaffle]);
 
   const editableUpcoming = useMemo(() => {
     const now = new Date();
@@ -1483,6 +1565,16 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, ticketsSold: 0, image: '' });
     } catch (err) {
       console.error("Error saving raffle:", err);
+    }
+  };
+
+  const handleUpdateRaffle = async () => {
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', editingRaffle.id), editingRaffle, { merge: true });
+      setEditingRaffle(null);
+      window.history.back();
+    } catch (err) {
+      console.error("Error updating raffle:", err);
     }
   };
 
@@ -1673,106 +1765,141 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
         <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Ticket className="w-5 h-5 text-pink-500" /> Raffle Administration</h3>
-        <div className="grid md:grid-cols-2 gap-6">
-          <InputField label="Prize Title" value={newRaffle.title} onChange={e => setNewRaffle({...newRaffle, title: e.target.value})} />
-          <InputField label="Live Draw Date" value={newRaffle.drawDate} onChange={e => setNewRaffle({...newRaffle, drawDate: e.target.value})} />
-          <InputField label="Ticket Cost (£)" value={newRaffle.ticketPrice} onChange={e => setNewRaffle({...newRaffle, ticketPrice: e.target.value})} />
-          <InputField label="Maximum Ticket Cap" type="number" value={newRaffle.totalTickets} onChange={e => setNewRaffle({...newRaffle, totalTickets: Number(e.target.value)})} />
-          <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
-             <ImageUpload label="Upload Prize Image" onUploadSuccess={url => setNewRaffle({...newRaffle, image: url})} />
-             {newRaffle.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">Prize Photo Uploaded Successfully</p>}
-          </div>
-          <div className="md:col-span-2 space-y-1">
-             <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
-             <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
-          </div>
-          <button onClick={handlePublishRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
-        </div>
         
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
-          {raffles.map(r => (
-            <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
-              <div>
-                <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{r.title}</p>
-                {r.isEnded ? (
-                  <div className="mt-4 p-3 bg-pink-900/20 border border-pink-500/30 rounded-lg text-center">
-                    <span className="text-pink-500 font-black uppercase text-xs tracking-widest">Winner: {r.winner}</span>
+        {editingRaffle ? (
+          <div className="bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300 mt-6">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-4 mb-4">
+               <h4 className="font-bold text-white uppercase tracking-wider">Editing Raffle: {editingRaffle.title}</h4>
+               <button onClick={() => { setEditingRaffle(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              <InputField label="Prize Title" value={editingRaffle.title || ''} onChange={e => setEditingRaffle({...editingRaffle, title: e.target.value})} />
+              <InputField label="Live Draw Date" value={editingRaffle.drawDate || ''} onChange={e => setEditingRaffle({...editingRaffle, drawDate: e.target.value})} />
+              <InputField label="Ticket Cost (£)" value={editingRaffle.ticketPrice || ''} onChange={e => setEditingRaffle({...editingRaffle, ticketPrice: e.target.value})} />
+              <InputField label="Maximum Ticket Cap" type="number" value={editingRaffle.totalTickets || 100} onChange={e => setEditingRaffle({...editingRaffle, totalTickets: Number(e.target.value)})} />
+              <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
+                 <ImageUpload label="Update Prize Image" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image: url})} />
+                 {editingRaffle.image && <img src={editingRaffle.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
+              </div>
+              <div className="md:col-span-2 space-y-1">
+                 <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
+                 <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingRaffle.description || ''} onChange={e => setEditingRaffle({...editingRaffle, description: e.target.value})} rows={3} />
+              </div>
+              <button onClick={handleUpdateRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Raffle Changes</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="grid md:grid-cols-2 gap-6">
+              <InputField label="Prize Title" value={newRaffle.title} onChange={e => setNewRaffle({...newRaffle, title: e.target.value})} />
+              <InputField label="Live Draw Date" value={newRaffle.drawDate} onChange={e => setNewRaffle({...newRaffle, drawDate: e.target.value})} />
+              <InputField label="Ticket Cost (£)" value={newRaffle.ticketPrice} onChange={e => setNewRaffle({...newRaffle, ticketPrice: e.target.value})} />
+              <InputField label="Maximum Ticket Cap" type="number" value={newRaffle.totalTickets} onChange={e => setNewRaffle({...newRaffle, totalTickets: Number(e.target.value)})} />
+              <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
+                 <ImageUpload label="Upload Prize Image" onUploadSuccess={url => setNewRaffle({...newRaffle, image: url})} />
+                 {newRaffle.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">Prize Photo Uploaded Successfully</p>}
+              </div>
+              <div className="md:col-span-2 space-y-1">
+                 <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
+                 <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
+              </div>
+              <button onClick={handlePublishRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
+            </div>
+            
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
+              {raffles.map(r => (
+                <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
+                  <div>
+                    <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{r.title}</p>
+                    {r.isEnded ? (
+                      <div className="mt-4 p-3 bg-pink-900/20 border border-pink-500/30 rounded-lg text-center">
+                        <span className="text-pink-500 font-black uppercase text-xs tracking-widest">Winner: {r.winner}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between mt-4 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                        <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Tickets Sold:</span>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={async () => {
+                              if (r.id.startsWith('mock-')) return;
+                              try {
+                                const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
+                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                              } catch (err) { console.error(err); }
+                            }} 
+                            className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                          >
+                            -
+                          </button>
+                          <span className="text-white font-bold text-sm w-4 text-center">{r.ticketsSold || 0}</span>
+                          <button 
+                            onClick={async () => {
+                              if (r.id.startsWith('mock-')) return;
+                              try {
+                                const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
+                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                              } catch (err) { console.error(err); }
+                            }} 
+                            className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between mt-4 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
-                    <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Tickets Sold:</span>
-                    <div className="flex items-center gap-3">
+                  
+                  {!r.isEnded && !r.id.startsWith('mock-') && (
+                    <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-2">
+                      <input 
+                        type="text" 
+                        placeholder="Winner's Name" 
+                        value={raffleWinners[r.id] || ''} 
+                        onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
+                        className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                      />
                       <button 
-                        onClick={async () => {
-                          if (r.id.startsWith('mock-')) return;
+                        onClick={async () => { 
+                          if (!raffleWinners[r.id]) return;
                           try {
-                            const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
                           } catch (err) { console.error(err); }
                         }} 
-                        className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                        disabled={!raffleWinners[r.id]}
+                        className="w-full bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 hover:border-pink-500"
                       >
-                        -
-                      </button>
-                      <span className="text-white font-bold text-sm w-4 text-center">{r.ticketsSold || 0}</span>
-                      <button 
-                        onClick={async () => {
-                          if (r.id.startsWith('mock-')) return;
-                          try {
-                            const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
-                          } catch (err) { console.error(err); }
-                        }} 
-                        className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
-                      >
-                        +
+                        End & Announce
                       </button>
                     </div>
-                  </div>
-                )}
-              </div>
-              
-              {!r.isEnded && !r.id.startsWith('mock-') && (
-                <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-2">
-                  <input 
-                    type="text" 
-                    placeholder="Winner's Name" 
-                    value={raffleWinners[r.id] || ''} 
-                    onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
-                    className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
-                  />
-                  <button 
-                    onClick={async () => { 
-                      if (!raffleWinners[r.id]) return;
-                      try {
-                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
-                      } catch (err) { console.error(err); }
-                    }} 
-                    disabled={!raffleWinners[r.id]}
-                    className="w-full bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 hover:border-pink-500"
-                  >
-                    End & Announce
-                  </button>
-                </div>
-              )}
+                  )}
 
-              {!r.id.startsWith('mock-') && (
-                <button 
-                  onClick={async () => { 
-                    if(window.confirm('PERMANENTLY DELETE RAFFLE?')) {
-                      try {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id));
-                      } catch (err) { console.error(err); }
-                    }
-                  }} 
-                  className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] mt-4 flex items-center gap-1 transition-colors tracking-widest"
-                >
-                  <Trash2 className="w-3 h-3" /> Purge Entry
-                </button>
-              )}
+                  {!r.id.startsWith('mock-') && (
+                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-800/50">
+                      <button
+                        onClick={() => { window.history.pushState({ modal: 'editRaffle' }, ''); setEditingRaffle(r); }}
+                        className="text-pink-500 group-hover:text-pink-400 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
+                      >
+                        <Edit3 className="w-3 h-3" /> Edit
+                      </button>
+                      <button 
+                        onClick={async () => { 
+                          if(window.confirm('PERMANENTLY DELETE RAFFLE?')) {
+                            try {
+                              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id));
+                            } catch (err) { console.error(err); }
+                          }
+                        }} 
+                        className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
+                      >
+                        <Trash2 className="w-3 h-3" /> Purge
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </section>
 
       <div className="grid grid-cols-1 gap-8">
