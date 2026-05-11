@@ -1351,7 +1351,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                   <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
                   {editingEvent.isStatic && <p className="text-zinc-500 text-[10px] mt-1 italic font-bold">Standard event: Saving will create a database copy.</p>}
                </div>
-               <button onClick={() => { setEditingEvent(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+               <button onClick={closeEditEvent} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
             <InputField label="Event Title" value={editingEvent.title} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
             <InputField label="Date (e.g. Sunday, 1st Oct)" value={editingEvent.date} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} />
@@ -1589,6 +1589,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         )}
                       </div>
                       <span className="text-zinc-600 text-[9px] uppercase tracking-tighter">{m.nickname || 'NO NICKNAME'}</span>
+                      <span className="text-zinc-500 text-[9px] lowercase tracking-wider truncate max-w-[150px]">{m.email || 'no email'}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => handleEditMemberClick(m)} className="text-zinc-500 hover:text-pink-500 transition-colors p-1" title="Edit Profile"><UserCog className="w-4 h-4" /></button>
@@ -1754,6 +1755,16 @@ export default function App() {
     [combinedEvents, now]
   );
 
+  const currentUserProfile = cloudMembers.find(m => m.id === user?.uid) || null;
+
+  // Background Sync: Ensure the current user always has their email updated in their profile doc
+  useEffect(() => {
+    if (user && user.email && currentUserProfile && currentUserProfile.email !== user.email) {
+      const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
+      setDoc(profileRef, { email: user.email }, { merge: true }).catch(e => console.error("Email sync error", e));
+    }
+  }, [user, currentUserProfile]);
+
   useEffect(() => {
     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
       signInWithCustomToken(auth, __initial_auth_token).catch(console.error);
@@ -1835,8 +1846,6 @@ export default function App() {
     { id: 'raffles', label: 'Raffles', icon: Ticket },
     { id: 'charity', label: 'Charity', icon: Heart },
   ];
-
-  const currentUserProfile = cloudMembers.find(m => m.id === user?.uid) || null;
 
   const renderContent = () => {
     switch (activeTab) {
