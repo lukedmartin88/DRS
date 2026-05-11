@@ -1408,12 +1408,40 @@ const ProfileView = ({ user, userProfile }) => {
   );
 };
 
-const RafflesView = ({ raffles }) => {
-  const handleReserve = (raffle) => {
-    const recipient = "Dailyridesouth@gmail.com";
-    const subject = encodeURIComponent(`Raffle Ticket Reservation: ${raffle.title}`);
-    const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI would like to reserve a ticket for the following raffle:\n\nPrize: ${raffle.title}\nTicket Cost: £${raffle.ticketPrice}\n\nPlease let me know the payment details.\n\nThanks!`);
-    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+const RafflesView = ({ raffles, user, members }) => {
+  const [reservingRaffle, setReservingRaffle] = useState(null);
+  const [reserveQuantity, setReserveQuantity] = useState(1);
+
+  const membersById = useMemo(() => {
+    if (!members) return {};
+    return members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
+  }, [members]);
+
+  const handleReserveClick = (raffle) => {
+    setReservingRaffle(raffle);
+    setReserveQuantity(1);
+  };
+
+  const submitReservation = async () => {
+    if (!reservingRaffle || !user) return;
+    try {
+      if (!reservingRaffle.id.startsWith('mock-')) {
+         const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', reservingRaffle.id);
+         const currentReservations = reservingRaffle.reservations || {};
+         const newReservations = { ...currentReservations };
+         newReservations[user.uid] = (newReservations[user.uid] || 0) + reserveQuantity;
+         await setDoc(rRef, { reservations: newReservations }, { merge: true });
+      }
+
+      const recipient = "Dailyridesouth@gmail.com";
+      const subject = encodeURIComponent(`Raffle Ticket Reservation: ${reservingRaffle.title}`);
+      const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI would like to reserve ${reserveQuantity} ticket(s) for the following raffle:\n\nPrize: ${reservingRaffle.title}\nTicket Cost: £${reservingRaffle.ticketPrice}\nTotal Cost: £${reservingRaffle.ticketPrice * reserveQuantity}\n\nPlease let me know the payment details.\n\nThanks!`);
+      window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+
+      setReservingRaffle(null);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const activeRaffles = raffles.filter(r => !r.isEnded);
@@ -1421,6 +1449,39 @@ const RafflesView = ({ raffles }) => {
 
   return (
     <div className="space-y-12">
+      {reservingRaffle && (
+        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative">
+            <button onClick={() => setReservingRaffle(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6"/></button>
+            <div className="text-center mb-6">
+              <Ticket className="w-12 h-12 text-pink-500 mx-auto mb-4" />
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Reserve Tickets</h3>
+              <p className="text-zinc-400 text-sm mt-1">{reservingRaffle.title}</p>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 text-center mb-3">Select Quantity</label>
+                <div className="flex items-center justify-between bg-black border border-zinc-800 rounded-2xl p-2">
+                  <button onClick={() => setReserveQuantity(Math.max(1, reserveQuantity - 1))} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">-</button>
+                  <span className="text-white font-black text-3xl">{reserveQuantity}</span>
+                  <button onClick={() => setReserveQuantity(reserveQuantity + 1)} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">+</button>
+                </div>
+              </div>
+              
+              <div className="bg-black/50 p-4 rounded-xl border border-zinc-800/50 text-center">
+                 <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total Cost</p>
+                 <p className="text-pink-500 font-black text-2xl">£{reservingRaffle.ticketPrice * reserveQuantity}</p>
+              </div>
+
+              <button onClick={submitReservation} className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]">
+                Confirm & Email Admin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6">
         <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
         <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-8">
@@ -1431,18 +1492,22 @@ const RafflesView = ({ raffles }) => {
         <div className="grid gap-6 lg:grid-cols-2">
           {activeRaffles.map(raffle => {
             const progress = (raffle.ticketsSold / raffle.totalTickets) * 100;
+            const reservations = raffle.reservations || {};
+            const reservedUids = Object.keys(reservations);
+            const reservedMembers = reservedUids.map(uid => membersById[uid]).filter(Boolean);
+
             return (
               <div key={raffle.id} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col md:flex-row hover:border-pink-500 transition-colors shadow-lg">
                 <div className="md:w-2/5 h-48 md:h-auto relative">
                   <img src={raffle.image || DEFAULT_CAR} alt="" className="w-full h-full object-cover" />
                   <div className="absolute top-2 left-2 bg-pink-600 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">£{raffle.ticketPrice} / Ticket</div>
                 </div>
-                <div className="p-5 md:w-3/5 space-y-4">
+                <div className="p-5 md:w-3/5 flex flex-col">
                   <div>
                     <h3 className="text-xl font-bold text-white">{raffle.title}</h3>
                     <p className="text-zinc-400 text-sm mt-1">{raffle.description}</p>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 mt-4">
                     <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
                         <span>{raffle.ticketsSold} Tickets Taken</span>
                         <span>{Math.round(progress)}% Full</span>
@@ -1451,9 +1516,33 @@ const RafflesView = ({ raffles }) => {
                       <div className="bg-pink-500 h-2 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ width: `${progress}%` }}></div>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center text-xs text-zinc-400 pt-2">
+                  
+                  <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Members Reserving</p>
+                    <div className="flex -space-x-3 overflow-hidden p-1">
+                        {reservedMembers.slice(0, 6).map(m => (
+                          <img 
+                            key={m.id} 
+                            src={m.avatar || DEFAULT_AVATAR} 
+                            title={`${m.name} (${reservations[m.id]} tickets)`} 
+                            className="inline-block h-8 w-8 rounded-full ring-2 ring-zinc-900 object-cover relative z-10 hover:z-20 shadow-lg" 
+                            alt="avatar" 
+                          />
+                        ))}
+                        {reservedMembers.length > 6 && (
+                          <div className="flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-zinc-900 bg-zinc-800 text-[10px] font-bold text-white z-10">
+                            +{reservedMembers.length - 6}
+                          </div>
+                        )}
+                        {reservedMembers.length === 0 && (
+                          <span className="text-xs text-zinc-600 font-medium italic py-1">Be the first to reserve!</span>
+                        )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs text-zinc-400 pt-4 mt-auto">
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Draws {raffle.drawDate}</span>
-                    <button onClick={() => handleReserve(raffle)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-3 py-1 rounded border border-zinc-700 text-[10px] transition-colors uppercase tracking-widest">Reserve</button>
+                    <button onClick={() => handleReserveClick(raffle)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2 rounded-lg border border-zinc-700 text-[10px] transition-colors uppercase tracking-widest">Reserve</button>
                   </div>
                 </div>
               </div>
@@ -1633,7 +1722,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
   const handleUpdateRaffle = async () => {
     try {
-      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', editingRaffle.id), editingRaffle, { merge: true });
+      const { id, ...updateData } = editingRaffle;
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', id), updateData, { merge: true });
       setEditingRaffle(null);
       window.history.back();
     } catch (err) {
@@ -1903,6 +1993,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <InputField label="Live Draw Date" value={editingRaffle.drawDate || ''} onChange={e => setEditingRaffle({...editingRaffle, drawDate: e.target.value})} />
               <InputField label="Ticket Cost (£)" value={editingRaffle.ticketPrice || ''} onChange={e => setEditingRaffle({...editingRaffle, ticketPrice: e.target.value})} />
               <InputField label="Maximum Ticket Cap" type="number" value={editingRaffle.totalTickets || 100} onChange={e => setEditingRaffle({...editingRaffle, totalTickets: Number(e.target.value)})} />
+              <InputField label="Tickets Sold" type="number" value={editingRaffle.ticketsSold || 0} onChange={e => setEditingRaffle({...editingRaffle, ticketsSold: Number(e.target.value)})} />
               <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
                  <ImageUpload label="Update Prize Image" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image: url})} />
                  {editingRaffle.image && <img src={editingRaffle.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
@@ -1933,96 +2024,117 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             </div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
-              {raffles.map(r => (
-                <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
-                  <div>
-                    <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{r.title}</p>
-                    {r.isEnded ? (
-                      <div className="mt-4 p-3 bg-pink-900/20 border border-pink-500/30 rounded-lg text-center">
-                        <span className="text-pink-500 font-black uppercase text-xs tracking-widest">Winner: {r.winner}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between mt-4 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
-                        <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Tickets Sold:</span>
-                        <div className="flex items-center gap-3">
-                          <button 
-                            onClick={async () => {
-                              if (r.id.startsWith('mock-')) return;
-                              try {
-                                const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
-                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
-                              } catch (err) { console.error(err); }
-                            }} 
-                            className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
-                          >
-                            -
-                          </button>
-                          <span className="text-white font-bold text-sm w-4 text-center">{r.ticketsSold || 0}</span>
-                          <button 
-                            onClick={async () => {
-                              if (r.id.startsWith('mock-')) return;
-                              try {
-                                const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
-                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
-                              } catch (err) { console.error(err); }
-                            }} 
-                            className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
-                          >
-                            +
-                          </button>
+              {raffles.map(r => {
+                const reservations = r.reservations || {};
+                const reservedUids = Object.keys(reservations);
+                const reservedMembers = reservedUids.map(uid => members.find(m => m.id === uid)).filter(Boolean);
+
+                return (
+                  <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
+                    <div>
+                      <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{r.title}</p>
+                      {r.isEnded ? (
+                        <div className="mt-4 p-3 bg-pink-900/20 border border-pink-500/30 rounded-lg text-center">
+                          <span className="text-pink-500 font-black uppercase text-xs tracking-widest">Winner: {r.winner}</span>
                         </div>
+                      ) : (
+                        <div className="flex items-center justify-between mt-4 bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
+                          <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Tickets Sold:</span>
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={async () => {
+                                if (r.id.startsWith('mock-')) return;
+                                try {
+                                  const newVal = Math.max(0, (r.ticketsSold || 0) - 1);
+                                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                                } catch (err) { console.error(err); }
+                              }} 
+                              className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                            >
+                              -
+                            </button>
+                            <span className="text-white font-bold text-sm w-4 text-center">{r.ticketsSold || 0}</span>
+                            <button 
+                              onClick={async () => {
+                                if (r.id.startsWith('mock-')) return;
+                                try {
+                                  const newVal = Math.min(r.totalTickets, (r.ticketsSold || 0) + 1);
+                                  await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal }, { merge: true });
+                                } catch (err) { console.error(err); }
+                              }} 
+                              className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {!r.isEnded && (
+                        <div className="mt-4 pt-4 border-t border-zinc-800/50">
+                          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Ticket Reservations</p>
+                          <div className="flex flex-wrap gap-2">
+                             {reservedMembers.map(m => (
+                                <div key={m.id} className="flex items-center gap-2 bg-zinc-900 p-1.5 pr-3 rounded-full border border-zinc-700">
+                                   <img src={m.avatar || DEFAULT_AVATAR} className="w-5 h-5 rounded-full object-cover" />
+                                   <span className="text-[10px] text-zinc-300 font-bold">{m.name} ({reservations[m.id]})</span>
+                                </div>
+                             ))}
+                             {reservedMembers.length === 0 && <span className="text-[10px] text-zinc-600 italic mb-2">No reservations yet.</span>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {!r.isEnded && !r.id.startsWith('mock-') && (
+                      <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-2">
+                        <input 
+                          type="text" 
+                          placeholder="Winner's Name" 
+                          value={raffleWinners[r.id] || ''} 
+                          onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
+                          className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                        />
+                        <button 
+                          onClick={async () => { 
+                            if (!raffleWinners[r.id]) return;
+                            try {
+                              await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
+                            } catch (err) { console.error(err); }
+                          }} 
+                          disabled={!raffleWinners[r.id]}
+                          className="w-full bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 hover:border-pink-500"
+                        >
+                          End & Announce
+                        </button>
+                      </div>
+                    )}
+
+                    {!r.id.startsWith('mock-') && (
+                      <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-800/50">
+                        <button
+                          onClick={() => { window.history.pushState({ modal: 'editRaffle' }, ''); setEditingRaffle(r); }}
+                          className="text-pink-500 group-hover:text-pink-400 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
+                        >
+                          <Edit3 className="w-3 h-3" /> Edit
+                        </button>
+                        <button 
+                          onClick={async () => { 
+                            if(window.confirm('PERMANENTLY DELETE RAFFLE?')) {
+                              try {
+                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id));
+                              } catch (err) { console.error(err); }
+                            }
+                          }} 
+                          className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
+                        >
+                          <Trash2 className="w-3 h-3" /> Purge
+                        </button>
                       </div>
                     )}
                   </div>
-                  
-                  {!r.isEnded && !r.id.startsWith('mock-') && (
-                    <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-2">
-                      <input 
-                        type="text" 
-                        placeholder="Winner's Name" 
-                        value={raffleWinners[r.id] || ''} 
-                        onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
-                        className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
-                      />
-                      <button 
-                        onClick={async () => { 
-                          if (!raffleWinners[r.id]) return;
-                          try {
-                            await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
-                          } catch (err) { console.error(err); }
-                        }} 
-                        disabled={!raffleWinners[r.id]}
-                        className="w-full bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 hover:border-pink-500"
-                      >
-                        End & Announce
-                      </button>
-                    </div>
-                  )}
-
-                  {!r.id.startsWith('mock-') && (
-                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-800/50">
-                      <button
-                        onClick={() => { window.history.pushState({ modal: 'editRaffle' }, ''); setEditingRaffle(r); }}
-                        className="text-pink-500 group-hover:text-pink-400 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
-                      >
-                        <Edit3 className="w-3 h-3" /> Edit
-                      </button>
-                      <button 
-                        onClick={async () => { 
-                          if(window.confirm('PERMANENTLY DELETE RAFFLE?')) {
-                            try {
-                              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id));
-                            } catch (err) { console.error(err); }
-                          }
-                        }} 
-                        className="text-red-900 group-hover:text-red-500 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
-                      >
-                        <Trash2 className="w-3 h-3" /> Purge
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
@@ -2357,7 +2469,7 @@ export default function App() {
       case 'gallery': return <GalleryView members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
       case 'members': return <MembersView members={sortedMembers} onMemberClick={handleMemberModal} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
-      case 'raffles': return <RafflesView raffles={combinedRaffles} />;
+      case 'raffles': return <RafflesView raffles={combinedRaffles} user={user} members={cloudMembers} />;
       case 'charity': return <CharityView />;
       case 'admin': return <AdminView members={allAdminMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
       case 'admin_guide': return <AdminGuideView onBack={() => window.location.hash = 'admin'} />;
