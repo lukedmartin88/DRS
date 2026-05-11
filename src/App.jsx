@@ -7,7 +7,8 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  signInAnonymously
 } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -40,7 +41,8 @@ import {
   UserCog,
   Download,
   ChevronRight,
-  CheckCircle2
+  CheckCircle2,
+  Grid
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
@@ -80,10 +82,7 @@ const formatDate = (date) => {
 
 const parseEventDateStr = (dateStr) => {
   if (!dateStr) return new Date(9999, 0, 1);
-  
-  let cleanStr = dateStr.replace(/^[A-Za-z]+,\s*/, '');
-  cleanStr = cleanStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
-  
+  let cleanStr = dateStr.replace(/^[A-Za-z]+,\s*/, '').replace(/(\d+)(st|nd|rd|th)/, '$1');
   if (cleanStr.includes('/')) {
     const parts = cleanStr.split('/');
     if (parts.length === 3) {
@@ -94,13 +93,11 @@ const parseEventDateStr = (dateStr) => {
       if (!isNaN(dateObj.getTime())) return dateObj;
     }
   }
-
   const parsed = Date.parse(cleanStr);
-  if (isNaN(parsed)) return new Date(9999, 0, 1);
-  return new Date(parsed);
+  return isNaN(parsed) ? new Date(9999, 0, 1) : new Date(parsed);
 };
 
-const DEFAULT_AVATAR = "https://images.unsplash.com/photo-1633332755192-727a05c4013d?auto=format&fit=crop&q=80&w=200";
+const DEFAULT_AVATAR = "https://i.ibb.co/RTHHJ3JW/PROFILE-PIC.png";
 const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
 
 // --- SHARED COMPONENTS ---
@@ -130,6 +127,16 @@ const InputField = ({ label, value, onChange, placeholder, type = "text", requir
   </div>
 );
 
+const navItems = [
+  { id: 'home', label: 'Home', icon: Home },
+  { id: 'events', label: 'Events', icon: Calendar },
+  { id: 'gallery', label: 'Gallery', icon: Grid },
+  { id: 'members', label: 'Members', icon: Users },
+  { id: 'profile', label: 'My Profile', icon: UserCircle },
+  { id: 'raffles', label: 'Raffles', icon: Ticket },
+  { id: 'charity', label: 'Charity', icon: Heart },
+];
+
 const NavLink = ({ item, mobile = false, isActive, onClick }) => {
   const Icon = item.icon;
   return (
@@ -155,6 +162,69 @@ const EventListTile = ({ event, onEdit }) => (
      <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
   </div>
 );
+
+const ImageUpload = ({ label, onUploadSuccess, className }) => {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!auth.currentUser) {
+        setErrorMsg("Please wait for authentication...");
+        return;
+    }
+
+    setUploading(true);
+    setErrorMsg(null);
+    
+    const storageRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser.uid}/uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
+    uploadTask.on('state_changed',
+      (snapshot) => setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+      (error) => { 
+        console.error("Storage Error:", error); 
+        setErrorMsg("Upload denied. Ensure your account is ready for user-specific data paths.");
+        setUploading(false); 
+      },
+      async () => {
+        try {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          onUploadSuccess(downloadURL);
+          setUploading(false);
+          setProgress(0);
+        } catch (err) {
+          setErrorMsg("Failed to generate public URL for image.");
+          setUploading(false);
+        }
+      }
+    );
+  };
+
+  return (
+    <div className={`flex flex-col gap-2 ${className || ''}`}>
+      <label className="block text-sm font-medium text-zinc-400">{label}</label>
+      <div className="relative">
+        <input 
+          type="file" 
+          accept="image/*" 
+          onChange={handleFileChange} 
+          disabled={uploading} 
+          className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-600 file:text-white hover:file:bg-pink-700 bg-black border border-zinc-800 rounded-lg p-1 cursor-pointer" 
+        />
+        {uploading && (
+          <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center z-10 border border-pink-500">
+            <span className="text-pink-500 text-sm font-bold animate-pulse">Uploading... {Math.round(progress)}%</span>
+          </div>
+        )}
+      </div>
+      {errorMsg && <p className="text-red-500 text-[10px] mt-1 font-bold uppercase tracking-widest">{errorMsg}</p>}
+    </div>
+  );
+};
 
 // --- GUIDE DATA ---
 const guideSections = [
@@ -562,143 +632,7 @@ const STATIC_RAFFLES = [
   }
 ];
 
-// --- COMPONENTS ---
-
-const AdminGuideView = () => {
-  const [activeSection, setActiveSection] = useState(guideSections[0]);
-  const [completedSteps, setCompletedSteps] = useState([]);
-
-  const toggleStepCompletion = (stepTitle) => {
-    if (completedSteps.includes(stepTitle)) {
-      setCompletedSteps(completedSteps.filter(t => t !== stepTitle));
-    } else {
-      setCompletedSteps([...completedSteps, stepTitle]);
-    }
-  };
-
-  const progressPercentage = Math.round(
-    (completedSteps.length / guideSections.reduce((acc, curr) => acc + curr.steps.length, 0)) * 100
-  );
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-700">
-      <button 
-        onClick={() => window.location.hash = 'admin'}
-        className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group mb-4"
-      >
-        <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-        Back to Admin Panel
-      </button>
-
-      <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-        <div className="flex items-center gap-4">
-          <Shield className="w-8 h-8 text-pink-500" />
-          <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic">
-              Daily Ride <span className="text-pink-600 not-italic">South</span>
-            </h1>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">Interactive Admin Manual</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="flex-1 md:w-48 bg-black border border-zinc-800 rounded-full h-3 p-0.5">
-            <div 
-              className="bg-pink-500 h-full rounded-full transition-all duration-500" 
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
-          <span className="text-xs font-bold text-pink-500 w-24 text-right">{progressPercentage}% Mastered</span>
-        </div>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-8">
-        <aside className="lg:w-1/3 shrink-0 space-y-2">
-          <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 pl-4 border-l-2 border-pink-500">Modules</h2>
-          {guideSections.map(section => {
-            const Icon = section.icon;
-            const isActive = activeSection.id === section.id;
-            return (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section)}
-                className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group
-                  ${isActive 
-                    ? 'bg-zinc-900 border-pink-500 shadow-lg shadow-pink-500/10' 
-                    : 'bg-black border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-lg ${isActive ? 'bg-pink-600 text-white' : 'bg-zinc-800 text-zinc-400 group-hover:text-pink-500'}`}>
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className={`font-bold ${isActive ? 'text-white' : 'text-zinc-300'}`}>{section.title}</h3>
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{section.steps.length} Steps</p>
-                  </div>
-                </div>
-                <ChevronRight className={`w-5 h-5 transition-transform ${isActive ? 'text-pink-500 translate-x-1' : 'text-zinc-700'}`} />
-              </button>
-            )
-          })}
-        </aside>
-
-        <section className="lg:w-2/3 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
-          
-          <div className="mb-8 border-b border-zinc-800 pb-6">
-            <h2 className="text-3xl font-black text-white uppercase tracking-tighter flex items-center gap-3">
-              <activeSection.icon className="w-8 h-8 text-pink-500" /> 
-              {activeSection.title}
-            </h2>
-            <p className="text-zinc-400 mt-2">{activeSection.description}</p>
-          </div>
-
-          <div className="space-y-6">
-            {activeSection.steps.map((step, index) => {
-              const isCompleted = completedSteps.includes(step.title);
-              return (
-                <div 
-                  key={index} 
-                  className={`border rounded-2xl transition-all duration-300
-                    ${isCompleted ? 'border-pink-500/30 bg-black/50' : 'border-zinc-800 bg-black hover:border-zinc-700'}
-                  `}
-                >
-                  <div className="p-6">
-                    <div className="flex justify-between items-start gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 font-black text-xs border
-                          ${isCompleted ? 'bg-pink-600 border-pink-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}
-                        `}>
-                          {index + 1}
-                        </div>
-                        <div>
-                          <h3 className={`text-lg font-bold ${isCompleted ? 'text-pink-400' : 'text-white'}`}>{step.title}</h3>
-                          <p className="text-zinc-400 text-sm mt-2 leading-relaxed">{step.content}</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => toggleStepCompletion(step.title)}
-                        className={`shrink-0 p-2 rounded-full transition-colors ${isCompleted ? 'text-pink-500 hover:text-zinc-400' : 'text-zinc-600 hover:text-pink-500'}`}
-                        title={isCompleted ? "Mark as unread" : "Mark as understood"}
-                      >
-                        <CheckCircle2 className={`w-6 h-6 ${isCompleted ? 'fill-pink-500/20' : ''}`} />
-                      </button>
-                    </div>
-
-                    {step.mockup && (
-                      <div className={`mt-6 ml-12 transition-opacity duration-500 ${isCompleted ? 'opacity-50 grayscale' : 'opacity-100'}`}>
-                        {step.mockup}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-};
+// --- VIEWS ---
 
 const MemberProfileModal = ({ member, onClose, onCarClick }) => {
   const cars = member.cars || [];
@@ -822,62 +756,133 @@ const CarGalleryModal = ({ viewingCar, onClose }) => {
   );
 };
 
-const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMemberClick }) => {
+const EnlargedImageModal = ({ imageObj, onClose, onMemberClick }) => {
+  if (!imageObj) return null;
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
+      <button onClick={onClose} className="fixed top-6 right-6 bg-zinc-800 hover:bg-pink-600 text-white p-3 rounded-full transition-all z-[120] shadow-lg">
+        <X className="w-6 h-6" />
+      </button>
+      <div className="relative max-w-full max-h-full flex flex-col items-center">
+        <div className="relative group overflow-hidden rounded-2xl border border-zinc-800 shadow-2xl">
+          <img src={imageObj.url} alt={imageObj.carName} className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
+          
+          <div 
+            onClick={() => { onClose(); onMemberClick(imageObj.member); }}
+            className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-pink-600 transition-all cursor-pointer group/member z-[130] shadow-2xl"
+          >
+            <img src={imageObj.member.avatar || DEFAULT_AVATAR} className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
+            <div className="flex flex-col">
+              <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member.name}</span>
+              <span className="text-white/60 group-hover/member:text-white/80 text-[8px] uppercase font-bold tracking-widest mt-1">View Garage</span>
+            </div>
+          </div>
+
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-6 pointer-events-none">
+             <p className="text-white font-black text-xl md:text-2xl uppercase italic tracking-tighter">{imageObj.carName}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const GalleryView = ({ members, onImageClick }) => {
+  const allImages = useMemo(() => {
+    const images = [];
+    members.forEach(member => {
+      (member.cars || []).forEach(car => {
+        if (car.image) images.push({ url: car.image, member, carName: `${car.make} ${car.model}` });
+        (car.gallery || []).forEach(url => {
+          if (url) images.push({ url, member, carName: `${car.make} ${car.model}` });
+        });
+      });
+    });
+    return images;
+  }, [members]);
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700">
+      <div className="border-b border-zinc-800 pb-4">
+        <h2 className="text-3xl font-bold text-white">Club Garage Gallery</h2>
+        <p className="text-zinc-500 text-sm mt-1 uppercase tracking-widest font-bold">Every vehicle, every angle. Click to enlarge.</p>
+      </div>
+      <div className="columns-2 md:col-span-3 lg:columns-4 gap-4 space-y-4">
+        {allImages.map((img, i) => (
+          <div 
+            key={i} 
+            onClick={() => onImageClick(img)}
+            className="relative group rounded-2xl overflow-hidden cursor-pointer border border-zinc-800 hover:border-pink-500 transition-all shadow-lg inline-block w-full"
+          >
+            <img src={img.url} alt="" className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 block" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
+               <p className="text-white font-black text-xs uppercase tracking-tighter">{img.carName}</p>
+               <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest">{img.member.name}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      {allImages.length === 0 && <p className="text-center py-20 text-zinc-600 italic">No garage images found yet.</p>}
+    </div>
+  );
+};
+
+const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMemberClick, members, onImageClick }) => {
+  const mosaicImages = useMemo(() => {
+    const imgs = [];
+    members.forEach(m => {
+      (m.cars || []).forEach(c => { if(c.image) imgs.push({url: c.image, member: m, carName: `${c.make} ${c.model}`}); });
+    });
+    return imgs.sort(() => 0.5 - Math.random()).slice(0, 8);
+  }, [members]);
+
   return (
     <div className="space-y-6">
       <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center">
-        <img 
-          src="https://i.ibb.co/dwGFSkDT/Whats-App-Image-2026-05-10-at-4.jpg" 
-          alt="Daily Ride South Welcome" 
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
-        />
+        <img src="https://i.ibb.co/dwGFSkDT/Whats-App-Image-2026-05-10-at-4.jpg" alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-black/40 to-black/20"></div>
-        <img 
-          src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" 
-          alt="Daily Ride South Logo" 
-          className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-[0_0_40px_rgba(236,72,153,0.3)] animate-in zoom-in duration-700" 
-        />
+        <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-2xl" alt="" />
       </div>
 
       <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-10">
-        <p className="text-zinc-300 text-sm md:text-base leading-relaxed mb-4 italic whitespace-pre-wrap">
-          {clubDescription}
-        </p>
+        <p className="text-zinc-300 text-sm md:text-base leading-relaxed mb-4 italic whitespace-pre-wrap">{clubDescription}</p>
         <div className="flex flex-wrap items-center gap-6 mt-6 pt-6 border-t border-zinc-800/50">
-          <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
-            <FacebookIcon className="w-5 h-5" /> Facebook
-          </a>
-          <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
-            <InstagramIcon className="w-5 h-5" /> Instagram
-          </a>
-          <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
-            <TikTokIcon className="w-5 h-5" /> TikTok
-          </a>
+          <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest"><FacebookIcon className="w-5 h-5" /> Facebook</a>
+          <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest"><InstagramIcon className="w-5 h-5" /> Instagram</a>
+          <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest"><TikTokIcon className="w-5 h-5" /> TikTok</a>
         </div>
       </div>
 
       {spotlightMember && (
         <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => onMemberClick(spotlightMember)}>
-          <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Spotlight Car" />
+          <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt="" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
-          <div className="absolute top-4 right-4 bg-pink-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">
-            {isBirthdaySpotlight ? '🎉 Happy Birthday! 🎉' : 'Member Spotlight'}
-          </div>
+          <div className="absolute top-4 right-4 bg-pink-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">{isBirthdaySpotlight ? '🎉 Happy Birthday! 🎉' : 'Member Spotlight'}</div>
           <div className="absolute bottom-6 left-6 flex items-center gap-4">
-             <div className="relative">
-               <img src={spotlightMember.avatar || DEFAULT_AVATAR} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" alt={spotlightMember.name} />
-             </div>
+             <img src={spotlightMember.avatar || DEFAULT_AVATAR} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" alt="" />
              <div>
-                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">
-                  {spotlightMember.name} {isBirthdaySpotlight && '🎂'}
-                </h3>
-                {spotlightMember.nickname && <p className="text-pink-500 italic text-lg md:text-xl font-medium leading-none mt-1">"{spotlightMember.nickname}"</p>}
+                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name} {isBirthdaySpotlight && '🎂'}</h3>
+                {spotlightMember.nickname && <p className="text-pink-500 italic text-lg md:text-xl font-medium mt-1">"{spotlightMember.nickname}"</p>}
                 <p className="text-zinc-300 font-bold text-xs uppercase tracking-widest mt-2">{spotlightMember.role || 'Member'}</p>
-                {(spotlightMember.cars && spotlightMember.cars[0]) && <p className="text-zinc-400 text-xs mt-1">{spotlightMember.cars[0].make} {spotlightMember.cars[0].model}</p>}
              </div>
           </div>
         </div>
       )}
+
+      <div className="mt-12 space-y-4">
+        <div className="flex justify-between items-center">
+            <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2"><Grid className="w-5 h-5 text-pink-500" /> Live Club Mosaic</h3>
+            <button onClick={() => window.location.hash = 'gallery'} className="text-pink-500 hover:text-pink-400 text-xs font-bold uppercase tracking-widest">View Full Gallery</button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {mosaicImages.map((img, i) => (
+              <div key={i} onClick={() => onImageClick(img)} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all group">
+                <img src={img.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
+              </div>
+            ))}
+            {mosaicImages.length === 0 && <p className="col-span-full py-10 text-center text-zinc-600 text-sm italic">Gallery mosaic is building...</p>}
+        </div>
+      </div>
     </div>
   );
 };
@@ -1119,69 +1124,6 @@ const MembersView = ({ members, onMemberClick }) => {
         ))}
         {members.length === 0 && <div className="col-span-full py-12 text-center text-zinc-500">No members found.</div>}
       </div>
-    </div>
-  );
-};
-
-const ImageUpload = ({ label, onUploadSuccess, className }) => {
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [errorMsg, setErrorMsg] = useState(null);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!auth.currentUser) {
-        setErrorMsg("Please wait for authentication...");
-        return;
-    }
-
-    setUploading(true);
-    setErrorMsg(null);
-    
-    const storageRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser.uid}/uploads/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
-    const uploadTask = uploadBytesResumable(storageRef, file);
-
-    uploadTask.on('state_changed',
-      (snapshot) => setProgress((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
-      (error) => { 
-        console.error("Storage Error:", error); 
-        setErrorMsg("Upload denied. Ensure your account is ready for user-specific data paths.");
-        setUploading(false); 
-      },
-      async () => {
-        try {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          onUploadSuccess(downloadURL);
-          setUploading(false);
-          setProgress(0);
-        } catch (err) {
-          setErrorMsg("Failed to generate public URL for image.");
-          setUploading(false);
-        }
-      }
-    );
-  };
-
-  return (
-    <div className={`flex flex-col gap-2 ${className}`}>
-      <label className="block text-sm font-medium text-zinc-400">{label}</label>
-      <div className="relative">
-        <input 
-          type="file" 
-          accept="image/*" 
-          onChange={handleFileChange} 
-          disabled={uploading} 
-          className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-600 file:text-white hover:file:bg-pink-700 bg-black border border-zinc-800 rounded-lg p-1 cursor-pointer" 
-        />
-        {uploading && (
-          <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center z-10 border border-pink-500">
-            <span className="text-pink-500 text-sm font-bold animate-pulse">Uploading... {Math.round(progress)}%</span>
-          </div>
-        )}
-      </div>
-      {errorMsg && <p className="text-red-500 text-[10px] mt-1 font-bold uppercase tracking-widest">{errorMsg}</p>}
     </div>
   );
 };
@@ -1616,7 +1558,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     }
   };
 
-  // Safe early return after all Hooks are called
   if (!isAuthenticated) return (
     <div className="max-w-md mx-auto mt-20 animate-in fade-in zoom-in-95 duration-500">
       <div className="bg-zinc-900 p-10 rounded-2xl border border-zinc-800 shadow-2xl">
@@ -1965,7 +1906,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   );
 };
 
-// --- MAIN APP ---
 export default function App() {
   const [activeTab, setActiveTabState] = useState(() => window.location.hash.replace('#', '') || 'home');
   const [user, setUser] = useState(null);
@@ -1975,74 +1915,20 @@ export default function App() {
   const [cloudRaffles, setCloudRaffles] = useState([]);
   const [cloudRsvps, setCloudRsvps] = useState({});
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.\n\nToday? We have blossomed into a chaotic, dysfunctional family of high-revving enthusiasts, a collection of soot-belching dirty diesels, and one highly optimistic weirdo who thinks they can finish a 300-mile road trip in a glorified, battery-powered toaster. We are united by the smell of unburnt hydrocarbons (mostly) and a mutual inability to leave anything stock.");
+  const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.");
   const [spotlightMemberId, setSpotlightMemberId] = useState(null);
   const [birthdayIndex, setBirthdayIndex] = useState(0);
   const [globalSelectedMember, setGlobalSelectedMember] = useState(null);
   const [globalViewingCar, setGlobalViewingCar] = useState(null);
-
-  const allAdminMembers = useMemo(() => {
-    return [...cloudMembers].sort((a, b) => {
-      const rankA = parseInt(a.rank) || 999;
-      const rankB = parseInt(b.rank) || 999;
-      if (rankA !== rankB) return rankA - rankB;
-      return (a.name || '').localeCompare(b.name || '');
-    });
-  }, [cloudMembers]);
-
-  const sortedMembers = useMemo(() => {
-    return allAdminMembers.filter(m => !m.isHidden);
-  }, [allAdminMembers]);
-
-  const today = new Date();
-  const currentDay = today.getDate().toString();
-  const currentMonth = (today.getMonth() + 1).toString();
-
-  const birthdayMembers = useMemo(() => {
-    return cloudMembers.filter(m => !m.isHidden && m.birthdayDay === currentDay && m.birthdayMonth === currentMonth);
-  }, [cloudMembers, currentDay, currentMonth]);
-
-  const isBirthdaySpotlight = birthdayMembers.length > 0;
-
-  const spotlightMember = useMemo(() => {
-    if (birthdayMembers.length > 0) return birthdayMembers[birthdayIndex] || birthdayMembers[0];
-    const selected = cloudMembers.find(m => m.id === spotlightMemberId && !m.isHidden);
-    return selected || null;
-  }, [cloudMembers, spotlightMemberId, birthdayMembers, birthdayIndex]);
-
-  const combinedEvents = useMemo(() => {
-    const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
-    const visibleStatic = STATIC_EVENTS.filter(s => !cloudTitles.has(s.title.toLowerCase()));
-    return [...visibleStatic, ...cloudEvents];
-  }, [cloudEvents]);
-
-  const combinedRaffles = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
-
-  const upcomingEvents = useMemo(() => {
-    const n = new Date();
-    n.setHours(0, 0, 0, 0);
-    return combinedEvents.filter(e => parseEventDateStr(e.date) >= n).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date));
-  }, [combinedEvents]);
-  
-  const pastEvents = useMemo(() => {
-    const n = new Date();
-    n.setHours(0, 0, 0, 0);
-    return combinedEvents.filter(e => parseEventDateStr(e.date) < n).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date));
-  }, [combinedEvents]);
-
-  const currentUserProfile = useMemo(() => {
-    return cloudMembers.find(m => m.id === user?.uid) || null;
-  }, [cloudMembers, user]);
-
-  const setActiveTab = (tab) => {
-    window.location.hash = tab;
-  };
+  const [enlargedImage, setEnlargedImage] = useState(null);
 
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
       setActiveTabState(hash || 'home');
       setIsMenuOpen(false); 
+      setGlobalSelectedMember(null);
+      setEnlargedImage(null);
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -2050,67 +1936,50 @@ export default function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      if (globalViewingCar) {
-        setGlobalViewingCar(null);
-      } else if (globalSelectedMember) {
-        setGlobalSelectedMember(null);
-      }
+      if (enlargedImage) setEnlargedImage(null);
+      else if (globalViewingCar) setGlobalViewingCar(null);
+      else if (globalSelectedMember) setGlobalSelectedMember(null);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [globalViewingCar, globalSelectedMember]);
+  }, [globalViewingCar, globalSelectedMember, enlargedImage]);
 
   useEffect(() => {
-    let interval;
-    if (birthdayMembers.length > 1) {
-      interval = setInterval(() => {
-        setBirthdayIndex(prev => (prev + 1) % birthdayMembers.length);
-      }, 5000); 
-    }
-    return () => clearInterval(interval);
-  }, [birthdayMembers.length]);
-
-  useEffect(() => {
-    if (user && user.email && currentUserProfile && currentUserProfile.email !== user.email) {
-      const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
-      setDoc(profileRef, { email: user.email }, { merge: true }).catch(e => console.error("Email sync error", e));
-    }
-  }, [user, currentUserProfile]);
-
-  useEffect(() => {
-    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-      signInWithCustomToken(auth, __initial_auth_token).catch(console.error);
-    }
-    
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) { console.error("Auth error:", err); }
       setIsLoadingAuth(false);
-    });
-    
-    return () => unsubscribe();
+    };
+    initAuth();
+    return onAuthStateChanged(auth, (u) => setUser(u));
   }, []);
 
   useEffect(() => {
     if (!user) return;
     const membersRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
-    const unsubMembers = onSnapshot(membersRef, snapshot => {
-      const f = []; snapshot.forEach(d => f.push({ id: d.id, ...d.data() })); setCloudMembers(f);
-    }, (err) => console.error("Members error:", err));
+    const unsubMembers = onSnapshot(membersRef, s => {
+      const f = []; s.forEach(d => f.push({ id: d.id, ...d.data() })); setCloudMembers(f);
+    }, e => console.error(e));
 
     const eventsRef = collection(db, 'artifacts', appId, 'public', 'data', 'events');
-    const unsubEvents = onSnapshot(eventsRef, snapshot => {
-      const f = []; snapshot.forEach(d => f.push({ id: d.id, ...d.data() })); setCloudEvents(f);
-    }, (err) => console.error("Events error:", err));
+    const unsubEvents = onSnapshot(eventsRef, s => {
+      const f = []; s.forEach(d => f.push({ id: d.id, ...d.data() })); setCloudEvents(f);
+    }, e => console.error(e));
 
     const rafflesRef = collection(db, 'artifacts', appId, 'public', 'data', 'raffles');
-    const unsubRaffles = onSnapshot(rafflesRef, snapshot => {
-      const f = []; snapshot.forEach(d => f.push({ id: d.id, ...d.data() })); setCloudRaffles(f);
-    }, (err) => console.error("Raffles error:", err));
+    const unsubRaffles = onSnapshot(rafflesRef, s => {
+      const f = []; s.forEach(d => f.push({ id: d.id, ...d.data() })); setCloudRaffles(f);
+    }, e => console.error(e));
 
     const rsvpsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rsvps');
-    const unsubRsvps = onSnapshot(rsvpsRef, snapshot => {
-      const f = {}; snapshot.forEach(d => f[d.id] = d.data()); setCloudRsvps(f);
-    }, (err) => console.error("RSVPs error:", err));
+    const unsubRsvps = onSnapshot(rsvpsRef, s => {
+      const f = {}; s.forEach(d => f[d.id] = d.data()); setCloudRsvps(f);
+    }, e => console.error(e));
     
     const infoRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo');
     const unsubInfo = onSnapshot(infoRef, d => {
@@ -2123,77 +1992,93 @@ export default function App() {
     return () => { unsubMembers(); unsubEvents(); unsubRaffles(); unsubRsvps(); unsubInfo(); };
   }, [user]);
 
-  const handleMemberClick = (member) => {
-    window.history.pushState({ modal: 'member' }, '');
-    setGlobalSelectedMember(member);
-  };
+  const allAdminMembers = useMemo(() => {
+    return [...cloudMembers].sort((a, b) => (parseInt(a.rank) || 999) - (parseInt(b.rank) || 999));
+  }, [cloudMembers]);
 
-  const closeMember = () => {
-    setGlobalSelectedMember(null);
-    window.history.back();
-  };
+  const sortedMembers = useMemo(() => allAdminMembers.filter(m => !m.isHidden), [allAdminMembers]);
 
-  const handleCarClick = (car) => {
-    window.history.pushState({ modal: 'car' }, '');
-    setGlobalViewingCar(car);
-  };
+  const birthdayMembers = useMemo(() => {
+    const today = new Date();
+    const d = today.getDate().toString();
+    const m = (today.getMonth() + 1).toString();
+    return cloudMembers.filter(mb => !mb.isHidden && mb.birthdayDay === d && mb.birthdayMonth === m);
+  }, [cloudMembers]);
 
-  const closeCar = () => {
-    setGlobalViewingCar(null);
-    window.history.back();
-  };
+  useEffect(() => {
+    if (birthdayMembers.length > 1) {
+      const interval = setInterval(() => setBirthdayIndex(prev => (prev + 1) % birthdayMembers.length), 5000);
+      return () => clearInterval(interval);
+    }
+  }, [birthdayMembers.length]);
+
+  const isBirthdaySpotlight = birthdayMembers.length > 0;
+
+  const spotlightMember = useMemo(() => {
+    if (birthdayMembers.length > 0) return birthdayMembers[birthdayIndex] || birthdayMembers[0];
+    return cloudMembers.find(m => m.id === spotlightMemberId && !m.isHidden) || null;
+  }, [cloudMembers, spotlightMemberId, birthdayMembers, birthdayIndex]);
+
+  const combinedEvents = useMemo(() => {
+    const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
+    const visibleStatic = STATIC_EVENTS.filter(s => !cloudTitles.has(s.title.toLowerCase()));
+    return [...visibleStatic, ...cloudEvents];
+  }, [cloudEvents]);
+
+  const combinedRaffles = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
+
+  const upcomingEvents = useMemo(() => {
+    const n = new Date(); n.setHours(0,0,0,0);
+    return combinedEvents.filter(e => parseEventDateStr(e.date) >= n).sort((a,b) => parseEventDateStr(a.date) - parseEventDateStr(b.date));
+  }, [combinedEvents]);
+  
+  const pastEvents = useMemo(() => {
+    const n = new Date(); n.setHours(0,0,0,0);
+    return combinedEvents.filter(e => parseEventDateStr(e.date) < n).sort((a,b) => parseEventDateStr(b.date) - parseEventDateStr(a.date));
+  }, [combinedEvents]);
+
+  const currentUserProfile = useMemo(() => cloudMembers.find(m => m.id === user?.uid) || null, [cloudMembers, user]);
+
+  useEffect(() => {
+    if (user && user.email && currentUserProfile && currentUserProfile.email !== user.email) {
+      const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
+      setDoc(profileRef, { email: user.email }, { merge: true }).catch(e => console.error("Email sync error", e));
+    }
+  }, [user, currentUserProfile]);
 
   const toggleRsvp = async (eventId, isPast) => {
     if (!user) return;
     try {
       const rsvpDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rsvps', String(eventId));
-      const currentEventRsvps = cloudRsvps[eventId] || { attending: [], attended: [] };
+      const current = cloudRsvps[eventId] || { attending: [], attended: [] };
       const field = isPast ? 'attended' : 'attending';
-      const list = currentEventRsvps[field] || [];
-      const isMarked = list.includes(user.uid);
-      
-      const newList = isMarked ? list.filter(id => id !== user.uid) : [...list, user.uid];
-      
-      await setDoc(rsvpDocRef, {
-        [field]: newList
-      }, { merge: true });
-    } catch (err) {
-      console.error("Error saving RSVP:", err);
-    }
+      const list = current[field] || [];
+      const newList = list.includes(user.uid) ? list.filter(id => id !== user.uid) : [...list, user.uid];
+      await setDoc(rsvpDocRef, { [field]: newList }, { merge: true });
+    } catch (err) { console.error(err); }
   };
 
-  if (isLoadingAuth) {
-    return <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">Initialising Framework...</div>;
-  }
+  const handleMemberModal = (m) => {
+    window.history.pushState({modal:'member'}, '');
+    setGlobalSelectedMember(m);
+  };
 
-  if (!user) {
-    return <SplashView />;
-  }
-
-  const navItems = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'events', label: 'Events', icon: Calendar },
-    { id: 'members', label: 'Members', icon: Users },
-    { id: 'profile', label: 'My Profile', icon: UserCircle },
-    { id: 'raffles', label: 'Raffles', icon: Ticket },
-    { id: 'charity', label: 'Charity', icon: Heart },
-  ];
+  if (isLoadingAuth) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">Establishing Secure Hub...</div>;
+  if (!user) return <SplashView />;
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': 
-        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberClick} />;
-      case 'events': 
-        return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={false} onMemberClick={handleMemberClick} />;
-      case 'past_events': 
-        return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={true} onMemberClick={handleMemberClick} />;
-      case 'members': return <MembersView members={sortedMembers} onMemberClick={handleMemberClick} />;
+      case 'home': return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberModal} members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
+      case 'events': return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={false} onMemberClick={handleMemberModal} />;
+      case 'past_events': return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={true} onMemberClick={handleMemberModal} />;
+      case 'gallery': return <GalleryView members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
+      case 'members': return <MembersView members={sortedMembers} onMemberClick={handleMemberModal} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
       case 'admin': return <AdminView members={allAdminMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
-      case 'admin_guide': return <AdminGuideView />;
-      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberClick} />;
+      case 'admin_guide': return <AdminGuideView onBack={() => window.location.hash = 'admin'} />;
+      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberModal} members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
     }
   };
 
@@ -2201,120 +2086,76 @@ export default function App() {
     <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-pink-500/30 selection:text-pink-200 relative">
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 h-full flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('home')}>
-            <div className="relative">
-                <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 transition-all group-hover:border-pink-500 shadow-lg shadow-pink-500/5" alt="" />
-                <div className="absolute inset-0 bg-pink-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            </div>
-            <h1 className="text-xl font-black text-white uppercase tracking-tighter italic h-fit">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.hash = 'home'}>
+            <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 shadow-lg" alt="" />
+            <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
           </div>
-          <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-pink-500 hover:text-white hover:bg-pink-600 transition-all shadow-xl active:scale-95">
+          <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-pink-500 hover:text-white transition-all active:scale-95 shadow-xl">
             <Menu className="w-6 h-6" />
           </button>
         </div>
       </header>
 
-      {/* Sidebar Navigation */}
       {isMenuOpen && <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] animate-in fade-in duration-300" onClick={() => setIsMenuOpen(false)} />}
-      <div className={`fixed top-0 right-0 h-full w-80 bg-zinc-950 z-[70] border-l border-zinc-800 transform transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) p-8 shadow-[0_0_50px_rgba(0,0,0,1)] ${isMenuOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} overflow-y-auto`}>
+      <div className={`fixed top-0 right-0 h-full w-80 bg-zinc-950 z-[70] border-l border-zinc-800 transform transition-all duration-500 p-8 shadow-[0_0_50px_rgba(0,0,0,1)] ${isMenuOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} overflow-y-auto`}>
         <div className="flex justify-between items-center mb-10">
-          <div className="flex flex-col">
-              <span className="text-white font-black uppercase text-xl tracking-tighter">DRS <span className="text-pink-600 italic">Menu</span></span>
-              <span className="text-zinc-600 font-bold uppercase text-[10px] tracking-[0.3em]">Navigation Board</span>
-          </div>
+          <span className="text-white font-black uppercase text-xl tracking-tighter">DRS <span className="text-pink-600 italic">Menu</span></span>
           <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
-        
         <nav className="space-y-3 mb-10">
-          {navItems.map(item => {
-            const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
-            return (
-              <NavLink key={item.id} item={item} mobile isActive={isActive} onClick={() => setActiveTab(item.id)} />
-            );
-          })}
+          {navItems.map(item => (
+            <NavLink key={item.id} item={item} mobile isActive={activeTab === item.id || (activeTab === 'past_events' && item.id === 'events')} onClick={() => { window.location.hash = item.id; setIsMenuOpen(false); }} />
+          ))}
         </nav>
-        
         <div className="pt-8 border-t border-zinc-900 space-y-4">
           <div className="flex justify-center gap-6 mb-2">
-            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
-              <FacebookIcon className="w-6 h-6" />
-            </a>
-            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
-              <InstagramIcon className="w-6 h-6" />
-            </a>
-            <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors">
-              <TikTokIcon className="w-6 h-6" />
-            </a>
+            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors"><FacebookIcon className="w-6 h-6" /></a>
+            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors"><InstagramIcon className="w-6 h-6" /></a>
+            <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-pink-500 transition-colors"><TikTokIcon className="w-6 h-6" /></a>
           </div>
-          <button onClick={() => signOut(auth)} className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-900 transition-colors uppercase tracking-widest text-xs font-bold">
-            <LogOut className="w-4 h-4" /> Sign Out
-          </button>
-          <div className="p-6 bg-zinc-900/50 rounded-2xl border border-zinc-800/50 text-center mt-6">
-              <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2">Member Since 2026</p>
-              <p className="text-white text-xs font-bold">Stay Tuned. Drive Hard.</p>
-          </div>
+          <button onClick={() => signOut(auth)} className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white transition-colors uppercase tracking-widest text-xs font-bold"><LogOut className="w-4 h-4" /> Sign Out</button>
           <div className="flex justify-center pt-4">
-            <button onClick={() => { setActiveTab('admin'); setIsMenuOpen(false); window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
+            <button onClick={() => { window.location.hash = 'admin'; setIsMenuOpen(false); window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
               <Lock className="w-3 h-3" /> Staff Entry
             </button>
           </div>
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 pt-10 relative">
+      <main className="max-w-6xl mx-auto px-4 pt-10">
         {globalSelectedMember ? (
-          <MemberProfileModal member={globalSelectedMember} onClose={closeMember} onCarClick={handleCarClick} />
-        ) : (
-          renderContent()
-        )}
+          <MemberProfileModal member={globalSelectedMember} onClose={() => { setGlobalSelectedMember(null); window.history.back(); }} onCarClick={c => { window.history.pushState({modal:'car'}, ''); setGlobalViewingCar(c); }} />
+        ) : renderContent()}
       </main>
 
-      {globalViewingCar && <CarGalleryModal viewingCar={globalViewingCar} onClose={closeCar} />}
+      {globalViewingCar && <CarGalleryModal viewingCar={globalViewingCar} onClose={() => { setGlobalViewingCar(null); window.history.back(); }} />}
+      {enlargedImage && <EnlargedImageModal imageObj={enlargedImage} onClose={() => { setEnlargedImage(null); window.history.back(); }} onMemberClick={m => { setEnlargedImage(null); handleMemberModal(m); }} />}
 
       <footer className="mt-32 border-t border-zinc-900 py-16 bg-black/40">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col items-center gap-8 text-center">
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => setActiveTab('home')}>
-            <div className="flex items-center gap-3 grayscale group-hover:grayscale-0 transition-all opacity-40 group-hover:opacity-100">
-               <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-8 w-8 rounded-lg shadow-2xl" alt="" />
-               <span className="text-zinc-400 font-black text-lg uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span> 2026</span>
-            </div>
-            <span className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em] mt-2 group-hover:text-pink-500 transition-colors">Dailyridesouth@gmail.com</span>
+        <div className="max-w-6xl mx-auto px-4 flex flex-col items-center gap-8 text-center text-zinc-600">
+          <p className="text-[10px] font-black uppercase tracking-[0.5em]">Webapp Created by Luke Martin</p>
+          <div className="flex gap-6">
+            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="hover:text-pink-500 transition-colors"><FacebookIcon className="w-5 h-5" /></a>
+            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="hover:text-pink-500 transition-colors"><InstagramIcon className="w-5 h-5" /></a>
+            <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="hover:text-pink-500 transition-colors"><TikTokIcon className="w-5 h-5" /></a>
           </div>
-          <div className="flex flex-col gap-2">
-            <p className="text-zinc-700 text-[10px] font-black uppercase tracking-[0.5em]">Webapp Created by Luke Martin</p>
-            <div className="h-px w-12 bg-zinc-800 mx-auto"></div>
-          </div>
-          <div className="flex gap-6 mt-2">
-            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
-              <FacebookIcon className="w-5 h-5" />
-            </a>
-            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
-              <InstagramIcon className="w-5 h-5" />
-            </a>
-            <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="text-zinc-600 hover:text-pink-500 transition-colors">
-              <TikTokIcon className="w-5 h-5" />
-            </a>
-          </div>
-          <div className="flex gap-4 pt-4">
-            <button onClick={() => { setActiveTab('admin'); window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
-              <Lock className="w-3 h-3" /> Staff Entry
-            </button>
-          </div>
+          <button onClick={() => { window.location.hash = 'admin'; window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
+            <Lock className="w-3 h-3" /> Staff Entry
+          </button>
         </div>
       </footer>
 
-      {/* Bottom Nav Bar (Mobile View) */}
-      <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800/50 h-16 z-50 flex items-center justify-around px-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+      <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800/50 h-16 z-50 flex items-center justify-around px-4 rounded-2xl shadow-2xl">
          {navItems.slice(0, 4).map(item => {
            const Icon = item.icon;
            const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
            return (
-             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center transition-all ${isActive ? 'text-pink-500 scale-110' : 'text-zinc-600'}`}>
-               <Icon className={`w-5 h-5 ${isActive ? 'fill-pink-500/20' : ''}`} />
+             <button key={item.id} onClick={() => window.location.hash = item.id} className={`flex flex-col items-center transition-all ${isActive ? 'text-pink-500 scale-110' : 'text-zinc-600'}`}>
+               <Icon className="w-5 h-5" />
              </button>
-           )
+           );
          })}
-         <button onClick={() => setIsMenuOpen(true)} className="flex flex-col items-center text-zinc-600 hover:text-pink-500 transition-colors">
+         <button onClick={() => setIsMenuOpen(true)} className="flex flex-col items-center text-zinc-600">
            <Menu className="w-5 h-5" />
          </button>
       </nav>
