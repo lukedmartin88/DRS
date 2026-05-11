@@ -38,7 +38,9 @@ import {
   Eye,
   EyeOff,
   UserCog,
-  Download
+  Download,
+  ChevronRight,
+  CheckCircle2
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
@@ -127,6 +129,183 @@ const InputField = ({ label, value, onChange, placeholder, type = "text", requir
     />
   </div>
 );
+
+// --- GUIDE DATA ---
+const guideSections = [
+  {
+    id: 'events',
+    title: 'Events Centre',
+    icon: Calendar,
+    description: 'Deploy new events, manage existing ones, and download guest lists.',
+    steps: [
+      {
+        title: 'Deploy a New Event',
+        content: 'Fill in the details for a new meetup or show. You can add titles, ordinal dates (e.g. Sunday, 14th June), times, and exact meeting points including What3Words links. Upload a poster image, then click "Publish to Public Board".',
+        mockup: (
+          <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl mt-4 text-xs space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-black border border-zinc-800 p-2 rounded text-zinc-400">Tunerfest South 2026</div>
+              <div className="bg-black border border-zinc-800 p-2 rounded text-zinc-400">Sunday, 14th June</div>
+              <div className="bg-black border border-zinc-800 p-2 rounded text-zinc-400 col-span-2">///engine.revs.loudly</div>
+            </div>
+            <div className="bg-pink-600 text-white text-center p-2 rounded font-bold uppercase tracking-widest">Publish to Public Board</div>
+          </div>
+        )
+      },
+      {
+        title: 'Manage & Edit Events',
+        content: 'Click on any existing event tile to open the editor. Here you can update information or replace the poster. If you edit a "Standard" (built-in) event, saving it will create a fresh database copy. Custom events can be permanently deleted using the red "Delete Event" button.',
+        mockup: (
+          <div className="flex gap-2 mt-4">
+            <div className="flex-1 bg-pink-600 text-white p-2 rounded text-center text-[10px] font-bold uppercase">Save Changes</div>
+            <div className="flex-1 bg-red-900/50 text-white p-2 rounded text-center text-[10px] font-bold uppercase">Delete Event</div>
+          </div>
+        )
+      },
+      {
+        title: 'Download Guest Lists',
+        content: 'For any event you have deployed, open the event details on the public Events page. As an admin, you will see a special "Download Guest List" button. Clicking this generates a PDF roster of all members who have RSVP\'d.',
+        mockup: (
+          <div className="bg-zinc-950 border border-pink-500/50 text-pink-500 p-3 rounded-xl flex items-center justify-center gap-2 text-xs font-bold uppercase mt-4">
+            <Download className="w-4 h-4" /> Download Guest List
+          </div>
+        )
+      }
+    ]
+  },
+  {
+    id: 'raffles',
+    title: 'Raffle Administration',
+    icon: Ticket,
+    description: 'Set up club prizes, track ticket sales, and announce winners.',
+    steps: [
+      {
+        title: 'Create a Live Raffle',
+        content: 'Under "Raffle Administration", enter the prize name, the draw date (e.g. 21st October), the cost per ticket, and the total number of tickets available. Upload an appealing photo of the prize and click "Go Live with Raffle".',
+        mockup: (
+          <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Ticket className="w-4 h-4 text-pink-500" />
+              <span className="text-white text-sm font-bold">Premium Detailing Kit</span>
+            </div>
+            <div className="bg-black p-2 rounded text-zinc-400 text-xs mb-2">£5 per ticket | 100 Tickets max</div>
+          </div>
+        )
+      },
+      {
+        title: 'Track Ticket Sales',
+        content: 'Once a raffle is live, use the "+" and "-" buttons on the admin card to manually adjust the number of tickets sold as members pay for their reservations via WhatsApp.',
+        mockup: (
+          <div className="flex justify-between items-center bg-zinc-800 p-2 rounded mt-4 max-w-xs">
+            <span className="text-zinc-400 text-[10px] uppercase font-bold">Tickets Sold:</span>
+            <div className="flex items-center gap-4">
+              <span className="text-pink-500 font-black text-lg">-</span>
+              <span className="text-white font-bold">45</span>
+              <span className="text-pink-500 font-black text-lg">+</span>
+            </div>
+          </div>
+        )
+      },
+      {
+        title: 'End Raffle & Declare Winner',
+        content: 'When all tickets are sold or the draw date arrives, type the winner\'s name into the text box and click "End & Announce". The raffle will move to the "Past Winners" gallery. To remove it entirely, click "Purge Entry".'
+      }
+    ]
+  },
+  {
+    id: 'homepage',
+    title: 'Homepage Customisation',
+    icon: Edit3,
+    description: 'Update the welcome message and highlight specific members.',
+    steps: [
+      {
+        title: 'Update Club Description',
+        content: 'Edit the main welcome text displayed on the club\'s homepage. You can use this space to highlight club rules, history, or upcoming news.',
+        mockup: (
+          <div className="bg-black border border-zinc-800 p-3 rounded-xl mt-4 text-zinc-400 text-xs italic">
+            "It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel..."
+          </div>
+        )
+      },
+      {
+        title: 'Select a Spotlight Member',
+        content: 'Use the dropdown menu to select a member to feature on the homepage. Their car and profile will be highlighted. Note: If it is a member\'s birthday, the system will automatically spotlight the birthday member instead.',
+        mockup: (
+          <div className="bg-black border border-zinc-800 p-3 rounded-xl mt-4 text-white text-xs flex justify-between items-center">
+            <span>Select Member...</span>
+            <ChevronRight className="w-4 h-4 rotate-90 text-pink-500" />
+          </div>
+        )
+      }
+    ]
+  },
+  {
+    id: 'members',
+    title: 'Member Moderation',
+    icon: Users,
+    description: 'Manage the club roster, assign ranks, and handle disciplinary actions.',
+    steps: [
+      {
+        title: 'Edit Member Details',
+        content: 'Click the "Edit Profile" (cog icon) next to any member to open their profile editor. Here you can moderate and update their name, nickname, location, Instagram link, and personal bio. Click "Save Profile Changes" when finished.',
+        mockup: (
+          <div className="bg-black/50 border border-pink-500/50 p-4 rounded-xl mt-4 max-w-md">
+            <div className="flex items-center gap-2 mb-4 border-b border-zinc-800 pb-2">
+              <UserCog className="w-4 h-4 text-pink-500" />
+              <span className="text-white text-xs font-bold uppercase">Editing Profile: Speedy</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10px]">
+               <div className="bg-zinc-900 border border-zinc-800 p-2 rounded text-zinc-400">Name: John Doe</div>
+               <div className="bg-zinc-900 border border-zinc-800 p-2 rounded text-zinc-400">Nickname: Speedy</div>
+               <div className="bg-zinc-900 border border-zinc-800 p-2 rounded text-zinc-400 col-span-2">Bio: Loves fast cars...</div>
+            </div>
+            <div className="bg-pink-600 text-white text-center p-2 rounded font-bold uppercase tracking-widest mt-2 text-[10px]">Save Profile Changes</div>
+          </div>
+        )
+      },
+      {
+        title: 'Assign Roles',
+        content: 'In the main list, you can type a custom title (e.g., "Club President" or "Admin") in the role box and click "Update Status & Rank".',
+        mockup: (
+          <div className="flex gap-2 mt-4 max-w-sm">
+            <input type="text" value="Club President" readOnly className="bg-black border border-zinc-800 text-pink-500 p-2 rounded w-full text-xs font-bold" />
+            <button className="bg-zinc-800 text-white px-3 py-2 rounded text-[10px] font-bold uppercase">Update</button>
+          </div>
+        )
+      },
+      {
+        title: 'Ranking Members',
+        content: 'To ensure specific staff members appear at the top of the member directory, enter a number from 1 to 5 in the small "#" box next to their role, then save. Lower numbers appear first.',
+        mockup: (
+          <div className="flex items-center gap-2 mt-4">
+            <div className="bg-black border border-zinc-800 text-pink-500 w-10 text-center p-2 rounded text-xs font-bold">1</div>
+            <span className="text-zinc-400 text-xs">Appears at the very top of the directory.</span>
+          </div>
+        )
+      },
+      {
+        title: 'Banning and Expelling',
+        content: 'To temporarily hide a member from the public directory without deleting their data, click the "Ban/Hide" (eye) icon. Their card will turn red. To permanently delete their account and garage, click the "Delete" (trash) icon.',
+        mockup: (
+          <div className="bg-red-900/10 border border-red-900/50 p-3 rounded-xl mt-4 flex justify-between items-center max-w-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-white text-xs font-bold">Rule Breaker</span>
+              <span className="bg-red-600/20 text-red-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-500/30">BANNED</span>
+            </div>
+            <div className="flex gap-2">
+              <EyeOff className="w-4 h-4 text-red-500" />
+              <Trash2 className="w-4 h-4 text-zinc-500" />
+            </div>
+          </div>
+        )
+      },
+      {
+        title: 'Download Roster',
+        content: 'Click the "Download Roster PDF" button at the top of the moderation hub to export a clean document of all current club members, including their statuses and contact details.',
+      }
+    ]
+  }
+];
 
 // --- AUTHENTICATION SPLASH SCREEN ---
 const SplashView = () => {
@@ -358,6 +537,144 @@ const STATIC_RAFFLES = [
 ];
 
 // --- COMPONENTS ---
+
+const AdminGuideView = () => {
+  const [activeSection, setActiveSection] = useState(guideSections[0]);
+  const [completedSteps, setCompletedSteps] = useState([]);
+
+  const toggleStepCompletion = (stepTitle) => {
+    if (completedSteps.includes(stepTitle)) {
+      setCompletedSteps(completedSteps.filter(t => t !== stepTitle));
+    } else {
+      setCompletedSteps([...completedSteps, stepTitle]);
+    }
+  };
+
+  const progressPercentage = Math.round(
+    (completedSteps.length / guideSections.reduce((acc, curr) => acc + curr.steps.length, 0)) * 100
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-700">
+      <button 
+        onClick={() => window.location.hash = 'admin'}
+        className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group mb-4"
+      >
+        <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        Back to Admin Panel
+      </button>
+
+      <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-4">
+          <Shield className="w-8 h-8 text-pink-500" />
+          <div>
+            <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic">
+              Daily Ride <span className="text-pink-600 not-italic">South</span>
+            </h1>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">Interactive Admin Manual</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="flex-1 md:w-48 bg-black border border-zinc-800 rounded-full h-3 p-0.5">
+            <div 
+              className="bg-pink-500 h-full rounded-full transition-all duration-500" 
+              style={{ width: `${progressPercentage}%` }}
+            ></div>
+          </div>
+          <span className="text-xs font-bold text-pink-500 w-24 text-right">{progressPercentage}% Mastered</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar */}
+        <aside className="lg:w-1/3 shrink-0 space-y-2">
+          <h2 className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 pl-4 border-l-2 border-pink-500">Modules</h2>
+          {guideSections.map(section => {
+            const Icon = section.icon;
+            const isActive = activeSection.id === section.id;
+            return (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section)}
+                className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group
+                  ${isActive 
+                    ? 'bg-zinc-900 border-pink-500 shadow-lg shadow-pink-500/10' 
+                    : 'bg-black border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50'}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-lg ${isActive ? 'bg-pink-600 text-white' : 'bg-zinc-800 text-zinc-400 group-hover:text-pink-500'}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className={`font-bold ${isActive ? 'text-white' : 'text-zinc-300'}`}>{section.title}</h3>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{section.steps.length} Steps</p>
+                  </div>
+                </div>
+                <ChevronRight className={`w-5 h-5 transition-transform ${isActive ? 'text-pink-500 translate-x-1' : 'text-zinc-700'}`} />
+              </button>
+            )
+          })}
+        </aside>
+
+        {/* Content Area */}
+        <section className="lg:w-2/3 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
+          
+          <div className="mb-8 border-b border-zinc-800 pb-6">
+            <h2 className="text-3xl font-black text-white uppercase tracking-tighter flex items-center gap-3">
+              <activeSection.icon className="w-8 h-8 text-pink-500" /> 
+              {activeSection.title}
+            </h2>
+            <p className="text-zinc-400 mt-2">{activeSection.description}</p>
+          </div>
+
+          <div className="space-y-6">
+            {activeSection.steps.map((step, index) => {
+              const isCompleted = completedSteps.includes(step.title);
+              return (
+                <div 
+                  key={index} 
+                  className={`border rounded-2xl transition-all duration-300
+                    ${isCompleted ? 'border-pink-500/30 bg-black/50' : 'border-zinc-800 bg-black hover:border-zinc-700'}
+                  `}
+                >
+                  <div className="p-6">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 font-black text-xs border
+                          ${isCompleted ? 'bg-pink-600 border-pink-500 text-white shadow-[0_0_15px_rgba(236,72,153,0.5)]' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}
+                        `}>
+                          {index + 1}
+                        </div>
+                        <div>
+                          <h3 className={`text-lg font-bold ${isCompleted ? 'text-pink-400' : 'text-white'}`}>{step.title}</h3>
+                          <p className="text-zinc-400 text-sm mt-2 leading-relaxed">{step.content}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => toggleStepCompletion(step.title)}
+                        className={`shrink-0 p-2 rounded-full transition-colors ${isCompleted ? 'text-pink-500 hover:text-zinc-400' : 'text-zinc-600 hover:text-pink-500'}`}
+                        title={isCompleted ? "Mark as unread" : "Mark as understood"}
+                      >
+                        <CheckCircle2 className={`w-6 h-6 ${isCompleted ? 'fill-pink-500/20' : ''}`} />
+                      </button>
+                    </div>
+
+                    {step.mockup && (
+                      <div className={`mt-6 ml-12 transition-opacity duration-500 ${isCompleted ? 'opacity-50 grayscale' : 'opacity-100'}`}>
+                        {step.mockup}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+};
 
 const MemberProfileModal = ({ member, onClose, onCarClick }) => {
   const cars = member.cars || [];
@@ -1311,9 +1628,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
   return (
     <div className="space-y-12 max-w-5xl mx-auto pb-24 animate-in fade-in duration-700">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 pb-6 gap-4">
         <h2 className="text-3xl font-black text-white flex items-center gap-3 uppercase tracking-tighter"><Shield className="w-8 h-8 text-pink-500" /> Club Control Panel</h2>
-        <span className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase">Verified Admin</span>
+        <div className="flex items-center gap-3">
+          <button onClick={() => window.location.hash = 'admin_guide'} className="bg-pink-600/10 hover:bg-pink-600/20 text-pink-500 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2 border border-pink-500/30">
+            <CheckCircle2 className="w-4 h-4" /> Admin Guide
+          </button>
+          <span className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase hidden sm:block">Verified Admin</span>
+        </div>
       </div>
       
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
@@ -1651,6 +1973,39 @@ export default function App() {
   const [globalSelectedMember, setGlobalSelectedMember] = useState(null);
   const [globalViewingCar, setGlobalViewingCar] = useState(null);
 
+  const sortedMembersHook = useMemo(() => {
+    return [...cloudMembers].sort((a, b) => {
+      const rankA = parseInt(a.rank) || 999;
+      const rankB = parseInt(b.rank) || 999;
+      if (rankA !== rankB) return rankA - rankB;
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [cloudMembers]);
+
+  const combinedEventsHook = useMemo(() => {
+    const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
+    const visibleStatic = STATIC_EVENTS.filter(s => !cloudTitles.has(s.title.toLowerCase()));
+    return [...visibleStatic, ...cloudEvents];
+  }, [cloudEvents]);
+
+  const combinedRafflesHook = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
+
+  const nowHook = useMemo(() => {
+      const n = new Date();
+      n.setHours(0,0,0,0);
+      return n;
+  }, []);
+
+  const upcomingEventsHook = useMemo(() => 
+    combinedEventsHook.filter(e => parseEventDateStr(e.date) >= nowHook).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
+    [combinedEventsHook, nowHook]
+  );
+  
+  const pastEventsHook = useMemo(() => 
+    combinedEventsHook.filter(e => parseEventDateStr(e.date) < nowHook).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
+    [combinedEventsHook, nowHook]
+  );
+
   const setActiveTab = (tab) => {
     window.location.hash = tab;
   };
@@ -1697,18 +2052,8 @@ export default function App() {
     window.history.back();
   };
 
-  const allAdminMembers = useMemo(() => {
-    return [...cloudMembers].sort((a, b) => {
-      const rankA = parseInt(a.rank) || 999;
-      const rankB = parseInt(b.rank) || 999;
-      if (rankA !== rankB) return rankA - rankB;
-      return (a.name || '').localeCompare(b.name || '');
-    });
-  }, [cloudMembers]);
-
-  const sortedMembers = useMemo(() => {
-    return allAdminMembers.filter(m => !m.isHidden);
-  }, [allAdminMembers]);
+  const allAdminMembers = sortedMembersHook;
+  const sortedMembers = useMemo(() => allAdminMembers.filter(m => !m.isHidden), [allAdminMembers]);
 
   const today = new Date();
   const currentDay = today.getDate().toString();
@@ -1736,24 +2081,10 @@ export default function App() {
     return selected || null;
   }, [cloudMembers, spotlightMemberId, birthdayMembers, birthdayIndex]);
 
-  const combinedEvents = useMemo(() => {
-    const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
-    const visibleStatic = STATIC_EVENTS.filter(s => !cloudTitles.has(s.title.toLowerCase()));
-    return [...visibleStatic, ...cloudEvents];
-  }, [cloudEvents]);
-
-  const combinedRaffles = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0); 
-  const upcomingEvents = useMemo(() => 
-    combinedEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
-    [combinedEvents, now]
-  );
-  const pastEvents = useMemo(() => 
-    combinedEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
-    [combinedEvents, now]
-  );
+  const combinedEvents = combinedEventsHook;
+  const combinedRaffles = combinedRafflesHook;
+  const upcomingEvents = upcomingEventsHook;
+  const pastEvents = pastEventsHook;
 
   const currentUserProfile = cloudMembers.find(m => m.id === user?.uid) || null;
 
@@ -1860,6 +2191,7 @@ export default function App() {
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
       case 'admin': return <AdminView members={allAdminMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
+      case 'admin_guide': return <AdminGuideView />;
       default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberClick} />;
     }
   };
