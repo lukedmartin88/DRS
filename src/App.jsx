@@ -1675,10 +1675,10 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                </div>
                <button onClick={closeEditEvent} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
-            <InputField label="Event Title" value={editingEvent.title} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
-            <InputField label="Date (e.g. Sunday, 1st Oct)" value={editingEvent.date} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} />
-            <InputField label="Event Start Time" value={editingEvent.time} onChange={e => setEditingEvent({...editingEvent, time: e.target.value})} />
-            <InputField label="Location / Venue" value={editingEvent.location} onChange={e => setEditingEvent({...editingEvent, location: e.target.value})} />
+            <InputField label="Event Title" value={editingEvent.title || ''} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
+            <InputField label="Date (e.g. Sunday, 1st Oct)" value={editingEvent.date || ''} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} />
+            <InputField label="Event Start Time" value={editingEvent.time || ''} onChange={e => setEditingEvent({...editingEvent, time: e.target.value})} />
+            <InputField label="Location / Venue" value={editingEvent.location || ''} onChange={e => setEditingEvent({...editingEvent, location: e.target.value})} />
             <InputField label="Meeting Point" value={editingEvent.meetingPoint || ''} onChange={e => setEditingEvent({...editingEvent, meetingPoint: e.target.value})} />
             <InputField label="Meeting Time" value={editingEvent.meetingTime || ''} onChange={e => setEditingEvent({...editingEvent, meetingTime: e.target.value})} />
             <InputField label="What3Words Location" value={editingEvent.w3w || ''} onChange={e => setEditingEvent({...editingEvent, w3w: e.target.value})} />
@@ -1689,7 +1689,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             </div>
             <div className="md:col-span-2 space-y-1">
                <label className="block text-sm font-medium text-zinc-400">Event Description</label>
-               <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingEvent.description} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} rows={3} />
+               <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingEvent.description || ''} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} rows={3} />
             </div>
             <div className="md:col-span-2 flex gap-4 mt-2">
               <button onClick={handleUpdateEvent} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Changes</button>
@@ -1704,7 +1704,22 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <div>
                 <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-pink-500 pl-3">Upcoming Events</p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {editableUpcoming.map(e => <EventListTile key={e.id} event={e} />)}
+                  {editableUpcoming.map(event => (
+                    <div 
+                      key={event.id}
+                      onClick={() => handleEditEvent(event)} 
+                      className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
+                    >
+                       <div>
+                         <div className="flex justify-between items-start mb-2">
+                            <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
+                            {event.isStatic && <span className="bg-zinc-800 text-zinc-500 text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 ml-2">Standard</span>}
+                         </div>
+                         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
+                       </div>
+                       <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -1713,7 +1728,22 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <div>
                 <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-zinc-700 pl-3">Past Events</p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {editablePast.map(e => <EventListTile key={e.id} event={e} />)}
+                  {editablePast.map(event => (
+                    <div 
+                      key={event.id}
+                      onClick={() => handleEditEvent(event)} 
+                      className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
+                    >
+                       <div>
+                         <div className="flex justify-between items-start mb-2">
+                            <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
+                            {event.isStatic && <span className="bg-zinc-800 text-zinc-500 text-[8px] px-1.5 py-0.5 rounded border border-zinc-700 ml-2">Standard</span>}
+                         </div>
+                         <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
+                       </div>
+                       <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -2196,17 +2226,6 @@ export default function App() {
     }
   };
 
-  const NavLink = ({ item, mobile = false }) => {
-    const Icon = item.icon;
-    const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
-    return (
-      <button onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} ${mobile ? 'w-full' : ''}`}>
-        <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-pink-500'}`} />
-        <span className="font-black uppercase tracking-widest text-xs">{item.label}</span>
-      </button>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-pink-500/30 selection:text-pink-200 relative">
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
@@ -2236,7 +2255,16 @@ export default function App() {
         </div>
         
         <nav className="space-y-3 mb-10">
-          {navItems.map(item => <NavLink key={item.id} item={item} mobile />)}
+          {navItems.map(item => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
+            return (
+              <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} w-full`}>
+                <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-pink-500'}`} />
+                <span className="font-black uppercase tracking-widest text-xs">{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
         
         <div className="pt-8 border-t border-zinc-900 space-y-4">
