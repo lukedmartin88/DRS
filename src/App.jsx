@@ -331,7 +331,7 @@ const STATIC_CHARITY = [
     title: "Coastguard Association 50th Anniversary",
     description: "Daily Ride South is supporting the Coastguard for their 50th year. These dedicated volunteers look after our coastline and are on call day and night. Purchase official merchandise to support them directly.",
     deadline: "31st December 2026",
-    image: "https://images.unsplash.com/photo-1468276311594-df7cb65d8df6?auto=format&fit=crop&q=80&w=800",
+    image: "https://i.ibb.co/WYSqmxk/Untitled-design-10.png",
     link: "https://coastguardassociation.sumupstore.com/"
   }
 ];
@@ -353,24 +353,38 @@ const STATIC_RAFFLES = [
 
 // --- COMPONENTS ---
 
-const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp, isPast, showHero, clubDescription, spotlightMember }) => {
-  const handleRSVP = (event) => {
-    const recipient = "Dailyridesouth@gmail.com";
-    const subject = encodeURIComponent(`Questions about ${event.title}`);
-    const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI have a question regarding the following event:\n\nEvent: ${event.title}\nDate: ${event.date}\nLocation: ${event.location}\n\nThanks!`);
-    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
-  };
-
-  const membersById = useMemo(() => {
-    return cloudMembers.reduce((acc, member) => {
-      acc[member.id] = member;
-      return acc;
-    }, {});
-  }, [cloudMembers]);
-
+const HomeView = ({ clubDescription, spotlightMember }) => {
   return (
     <div className="space-y-6">
-      {showHero && spotlightMember && (
+      <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center">
+        <img 
+          src="https://i.ibb.co/dwGFSkDT/Whats-App-Image-2026-05-10-at-4.jpg" 
+          alt="Daily Ride South Welcome" 
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-black/40 to-black/20"></div>
+        <img 
+          src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" 
+          alt="Daily Ride South Logo" 
+          className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-[0_0_40px_rgba(236,72,153,0.3)] animate-in zoom-in duration-700" 
+        />
+      </div>
+
+      <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-10">
+        <p className="text-zinc-300 text-sm md:text-base leading-relaxed mb-4 italic whitespace-pre-wrap">
+          {clubDescription}
+        </p>
+        <div className="flex flex-wrap items-center gap-6 mt-6 pt-6 border-t border-zinc-800/50">
+          <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
+            <FacebookIcon className="w-5 h-5" /> Facebook
+          </a>
+          <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
+            <InstagramIcon className="w-5 h-5" /> Instagram
+          </a>
+        </div>
+      </div>
+
+      {spotlightMember && (
         <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => window.location.hash = 'members'}>
           <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Spotlight Car" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
@@ -388,24 +402,36 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
           </div>
         </div>
       )}
+    </div>
+  );
+};
 
-      {showHero && (
-        <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-10">
-          <p className="text-zinc-300 text-sm md:text-base leading-relaxed mb-4 italic whitespace-pre-wrap">
-            {clubDescription}
-          </p>
-          <div className="flex flex-wrap items-center gap-6 mt-6 pt-6 border-t border-zinc-800/50">
-            <a href="https://www.facebook.com/daily.ride.south" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
-              <FacebookIcon className="w-5 h-5" /> Facebook
-            </a>
-            <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-pink-500 transition-colors flex items-center gap-2 font-bold text-xs uppercase tracking-widest">
-              <InstagramIcon className="w-5 h-5" /> Instagram
-            </a>
-          </div>
-        </div>
-      )}
+const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp, isPast }) => {
+  const handleRSVP = (event) => {
+    const recipient = "Dailyridesouth@gmail.com";
+    const subject = encodeURIComponent(`Questions about ${event.title}`);
+    const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI have a question regarding the following event:\n\nEvent: ${event.title}\nDate: ${event.date}\nLocation: ${event.location}\n\nThanks!`);
+    window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+  };
 
-      <h2 className="text-3xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">{title}</h2>
+  const membersById = useMemo(() => {
+    return cloudMembers.reduce((acc, member) => {
+      acc[member.id] = member;
+      return acc;
+    }, {});
+  }, [cloudMembers]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-zinc-800 pb-2">
+        <h2 className="text-3xl font-bold text-white">{title}</h2>
+        <button 
+          onClick={() => window.location.hash = isPast ? 'events' : 'past_events'}
+          className="text-pink-500 hover:text-pink-400 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors"
+        >
+          {isPast ? <><Calendar className="w-4 h-4" /> View Upcoming Events</> : <><History className="w-4 h-4" /> View Past Events Gallery</>}
+        </button>
+      </div>
       
       {events.length === 0 && (
         <p className="text-zinc-500 text-center py-12 italic border border-dashed border-zinc-800 rounded-3xl">
@@ -572,7 +598,7 @@ const MembersView = ({ members }) => {
             </h2>
             <p className="text-pink-500 font-medium text-lg">{selectedMember.role || 'Member'}</p>
             <p className="text-zinc-400 mt-2 max-w-2xl">{selectedMember.bio || 'No bio provided.'}</p>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mt-4 flex-wrap">
               <p className="text-zinc-500 text-sm flex items-center gap-2">
                 <Calendar className="w-4 h-4" /> Member since {selectedMember.joinDate}
               </p>
@@ -580,6 +606,11 @@ const MembersView = ({ members }) => {
                 <p className="text-zinc-500 text-sm flex items-center gap-2">
                   <MapPin className="w-4 h-4" /> {selectedMember.location}
                 </p>
+              )}
+              {selectedMember.instagram && (
+                <a href={selectedMember.instagram} target="_blank" rel="noopener noreferrer" className="text-pink-500 hover:text-pink-400 text-sm flex items-center gap-2 transition-colors font-bold uppercase tracking-widest">
+                  <InstagramIcon className="w-4 h-4" /> Instagram Profile
+                </a>
               )}
             </div>
           </div>
@@ -757,6 +788,7 @@ const ProfileView = ({ user, userProfile }) => {
   const [nickname, setNickname] = useState('');
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
+  const [instagram, setInstagram] = useState('');
   const [avatar, setAvatar] = useState('');
   const [cars, setCars] = useState([]);
   const [saved, setSaved] = useState(false);
@@ -767,6 +799,7 @@ const ProfileView = ({ user, userProfile }) => {
       setNickname(userProfile.nickname || '');
       setBio(userProfile.bio || '');
       setLocation(userProfile.location || '');
+      setInstagram(userProfile.instagram || '');
       setAvatar(userProfile.avatar || '');
       setCars(userProfile.cars || []);
     }
@@ -777,7 +810,7 @@ const ProfileView = ({ user, userProfile }) => {
     try {
       const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
       await setDoc(profileRef, {
-        name, nickname, bio, location, avatar, cars,
+        name, nickname, bio, location, instagram, avatar, cars,
         role: userProfile?.role || 'Member',
         joinDate: userProfile?.joinDate || formatDate(new Date())
       }, { merge: true });
@@ -802,8 +835,9 @@ const ProfileView = ({ user, userProfile }) => {
           <div className="flex-grow grid sm:grid-cols-2 gap-4 h-fit">
             <InputField label="Full Name" value={name} onChange={e => setName(e.target.value)} />
             <InputField label="Nickname" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="E.g. Speedy" />
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
                 <InputField label="Town / City" value={location} onChange={e => setLocation(e.target.value)} />
+                <InputField label="Instagram Profile Link" value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="https://instagram.com/username" />
             </div>
           </div>
         </div>
@@ -1428,7 +1462,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
 // --- MAIN APP ---
 export default function App() {
-  const [activeTab, setActiveTabState] = useState(() => window.location.hash.replace('#', '') || 'events');
+  const [activeTab, setActiveTabState] = useState(() => window.location.hash.replace('#', '') || 'home');
   const [user, setUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [cloudMembers, setCloudMembers] = useState([]);
@@ -1446,7 +1480,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
-      setActiveTabState(hash || 'events');
+      setActiveTabState(hash || 'home');
       setIsMenuOpen(false); 
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -1559,8 +1593,8 @@ export default function App() {
   }
 
   const navItems = [
-    { id: 'events', label: 'Home', icon: Home },
-    { id: 'past_events', label: 'Past Events', icon: History },
+    { id: 'home', label: 'Home', icon: Home },
+    { id: 'events', label: 'Events', icon: Calendar },
     { id: 'members', label: 'Members', icon: Users },
     { id: 'profile', label: 'My Profile', icon: UserCircle },
     { id: 'raffles', label: 'Raffles', icon: Ticket },
@@ -1571,22 +1605,24 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'home': 
+        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} />;
       case 'events': 
-        return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} spotlightMember={spotlightMember} />;
+        return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} />;
       case 'past_events': 
-        return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={true} showHero={false} clubDescription={clubDescription} />;
+        return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={true} />;
       case 'members': return <MembersView members={sortedMembers} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
       case 'raffles': return <RafflesView raffles={combinedRaffles} />;
       case 'charity': return <CharityView />;
       case 'admin': return <AdminView members={sortedMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
-      default: return <EventsView title="Home" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} toggleRsvp={toggleRsvp} isPast={false} showHero={true} clubDescription={clubDescription} spotlightMember={spotlightMember} />;
+      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} />;
     }
   };
 
   const NavLink = ({ item, mobile = false }) => {
     const Icon = item.icon;
-    const isActive = activeTab === item.id;
+    const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
     return (
       <button onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} ${mobile ? 'w-full' : ''}`}>
         <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-pink-500'}`} />
@@ -1599,7 +1635,7 @@ export default function App() {
     <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-pink-500/30 selection:text-pink-200">
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 h-full flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('events')}>
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('home')}>
             <div className="relative">
                 <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 transition-all group-hover:border-pink-500 shadow-lg shadow-pink-500/5" alt="" />
                 <div className="absolute inset-0 bg-pink-500/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -1643,6 +1679,11 @@ export default function App() {
               <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-2">Member Since 2026</p>
               <p className="text-white text-xs font-bold">Stay Tuned. Drive Hard.</p>
           </div>
+          <div className="flex justify-center pt-4">
+            <button onClick={() => { setActiveTab('admin'); setIsMenuOpen(false); window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
+              <Lock className="w-3 h-3" /> Staff Entry
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1652,7 +1693,7 @@ export default function App() {
 
       <footer className="mt-32 border-t border-zinc-900 py-16 bg-black/40">
         <div className="max-w-6xl mx-auto px-4 flex flex-col items-center gap-8 text-center">
-          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => setActiveTab('events')}>
+          <div className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => setActiveTab('home')}>
             <div className="flex items-center gap-3 grayscale group-hover:grayscale-0 transition-all opacity-40 group-hover:opacity-100">
                <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-8 w-8 rounded-lg shadow-2xl" alt="" />
                <span className="text-zinc-400 font-black text-lg uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span> 2026</span>
@@ -1683,7 +1724,7 @@ export default function App() {
       <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800/50 h-16 z-50 flex items-center justify-around px-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
          {navItems.slice(0, 4).map(item => {
            const Icon = item.icon;
-           const isActive = activeTab === item.id;
+           const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
            return (
              <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center transition-all ${isActive ? 'text-pink-500 scale-110' : 'text-zinc-600'}`}>
                <Icon className={`w-5 h-5 ${isActive ? 'fill-pink-500/20' : ''}`} />
