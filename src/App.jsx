@@ -361,8 +361,6 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, toggleRsvp,
     window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
   };
 
-  // Performance Optimization: Memoize the member dictionary so we don't scan the array 
-  // repeatedly inside the event render loops!
   const membersById = useMemo(() => {
     return cloudMembers.reduce((acc, member) => {
       acc[member.id] = member;
@@ -495,13 +493,45 @@ const MembersView = ({ members }) => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [viewingCar, setViewingCar] = useState(null);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      if (viewingCar) {
+        setViewingCar(null);
+      } else if (selectedMember) {
+        setSelectedMember(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [viewingCar, selectedMember]);
+
+  const handleMemberClick = (member) => {
+    window.history.pushState({ modal: 'member' }, '');
+    setSelectedMember(member);
+  };
+
+  const closeMember = () => {
+    setSelectedMember(null);
+    window.history.back();
+  };
+
+  const handleCarClick = (car) => {
+    window.history.pushState({ modal: 'car' }, '');
+    setViewingCar(car);
+  };
+
+  const closeCar = () => {
+    setViewingCar(null);
+    window.history.back();
+  };
+
   if (selectedMember) {
     const cars = selectedMember.cars || [];
     
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <button 
-          onClick={() => setSelectedMember(null)}
+          onClick={closeMember}
           className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group"
         >
           <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -544,7 +574,7 @@ const MembersView = ({ members }) => {
           {cars.map((car, idx) => (
             <div 
               key={idx} 
-              onClick={() => setViewingCar(car)} 
+              onClick={() => handleCarClick(car)} 
               className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all transform hover:-translate-y-1 group"
             >
               <div className="h-64 overflow-hidden relative">
@@ -581,7 +611,7 @@ const MembersView = ({ members }) => {
         {viewingCar && (
           <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col p-4 md:p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-300">
             <button 
-                onClick={() => setViewingCar(null)} 
+                onClick={closeCar} 
                 className="fixed top-6 right-6 bg-zinc-800 hover:bg-pink-600 text-white p-3 rounded-full transition-all z-[110] shadow-lg"
             >
                 <X className="w-6 h-6"/>
@@ -621,7 +651,7 @@ const MembersView = ({ members }) => {
         {members.map(member => (
           <div 
             key={member.id} 
-            onClick={() => setSelectedMember(member)}
+            onClick={() => handleMemberClick(member)}
             className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 hover:border-pink-500 hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-4"
           >
             <img src={member.avatar || DEFAULT_AVATAR} alt={member.name} className="w-16 h-16 rounded-full object-cover" />
@@ -943,6 +973,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     if (clubDescription) setEditDescription(clubDescription);
   }, [clubDescription]);
 
+  useEffect(() => {
+    const handlePopState = () => {
+      if (editingEvent) setEditingEvent(null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [editingEvent]);
+
   const handleLogin = (e) => {
     e.preventDefault();
     if (password === 'dailyride2026' || userProfile?.role === 'Admin') { 
@@ -956,15 +994,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  // In the Admin View, we want to allow editing of BOTH static and cloud events.
   const editableUpcoming = useMemo(() => 
     combinedEvents.filter(e => parseEventDateStr(e.date) >= now).sort((a, b) => parseEventDateStr(a.date) - parseEventDateStr(b.date)), 
-    [combinedEvents]
+    [combinedEvents, now]
   );
   
   const editablePast = useMemo(() => 
     combinedEvents.filter(e => parseEventDateStr(e.date) < now).sort((a, b) => parseEventDateStr(b.date) - parseEventDateStr(a.date)), 
-    [combinedEvents]
+    [combinedEvents, now]
   );
 
   const handleDeployEvent = async () => {
@@ -976,10 +1013,18 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     }
   };
 
+  const handleEditEvent = (event) => {
+    window.history.pushState({ modal: 'editEvent' }, '');
+    setEditingEvent(event);
+  };
+
+  const closeEditEvent = () => {
+    setEditingEvent(null);
+    window.history.back();
+  };
+
   const handleUpdateEvent = async () => {
     try {
-      // If it was a static event, we "addDoc" to promote it to cloud. 
-      // If it already had a database ID, we "setDoc" to update it.
       if (editingEvent.isStatic) {
         const { isStatic, id, ...cleanEvent } = editingEvent;
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), cleanEvent);
@@ -987,6 +1032,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id), editingEvent, { merge: true });
       }
       setEditingEvent(null);
+      window.history.back();
     } catch (err) {
       console.error("Error updating event:", err);
     }
@@ -995,12 +1041,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const handleDeleteEvent = async () => {
     if (editingEvent.isStatic) {
         setEditingEvent(null);
-        return; // Can't delete hardcoded ones from DB
+        window.history.back();
+        return;
     }
     if(!window.confirm('Delete this event from the database?')) return;
     try {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', editingEvent.id));
       setEditingEvent(null);
+      window.history.back();
     } catch (err) {
       console.error("Error deleting event:", err);
     }
@@ -1064,7 +1112,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
   const EventListTile = ({ event }) => (
     <div 
-      onClick={() => setEditingEvent(event)} 
+      onClick={() => handleEditEvent(event)} 
       className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg"
     >
        <div>
@@ -1117,7 +1165,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                   <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
                   {editingEvent.isStatic && <p className="text-zinc-500 text-[10px] mt-1 italic font-bold">Standard event: Saving will create a database copy.</p>}
                </div>
-               <button onClick={() => setEditingEvent(null)} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+               <button onClick={closeEditEvent} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
             <InputField label="Event Title" value={editingEvent.title} onChange={e => setEditingEvent({...editingEvent, title: e.target.value})} />
             <InputField label="Date (e.g. Sunday, 1st Oct)" value={editingEvent.date} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} />
@@ -1343,7 +1391,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
 // --- MAIN APP ---
 export default function App() {
-  const [activeTab, setActiveTab] = useState('events');
+  const [activeTab, setActiveTabState] = useState(() => window.location.hash.replace('#', '') || 'events');
   const [user, setUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [cloudMembers, setCloudMembers] = useState([]);
@@ -1353,7 +1401,20 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.\n\nToday? We have blossomed into a chaotic, dysfunctional family of high-revving enthusiasts, a collection of soot-belching dirty diesels, and one highly optimistic weirdo who thinks they can finish a 300-mile road trip in a glorified, battery-powered toaster. We are united by the smell of unburnt hydrocarbons (mostly) and a mutual inability to leave anything stock.");
 
-  // Correct Hook Order: Define all useMemo hooks at the top, before any return statements
+  const setActiveTab = (tab) => {
+    window.location.hash = tab;
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      setActiveTabState(hash || 'events');
+      setIsMenuOpen(false); 
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const sortedMembers = useMemo(() => {
     return [...cloudMembers].sort((a, b) => {
       const rankA = parseInt(a.rank) || 999;
@@ -1363,7 +1424,6 @@ export default function App() {
     });
   }, [cloudMembers]);
 
-  // Combined Events Logic: Moved to the top to fix Rules of Hooks error
   const combinedEvents = useMemo(() => {
     const cloudTitles = new Set(cloudEvents.map(e => e.title.toLowerCase()));
     const visibleStatic = STATIC_EVENTS.filter(s => !cloudTitles.has(s.title.toLowerCase()));
@@ -1372,7 +1432,6 @@ export default function App() {
 
   const combinedRaffles = useMemo(() => [...STATIC_RAFFLES, ...cloudRaffles], [cloudRaffles]);
 
-  // Event sorting logic moved to top
   const now = new Date();
   now.setHours(0, 0, 0, 0); 
   const upcomingEvents = useMemo(() => 
@@ -1484,7 +1543,7 @@ export default function App() {
     const Icon = item.icon;
     const isActive = activeTab === item.id;
     return (
-      <button onClick={() => { setActiveTab(item.id); setIsMenuOpen(false); }} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} ${mobile ? 'w-full' : ''}`}>
+      <button onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} ${mobile ? 'w-full' : ''}`}>
         <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-pink-500'}`} />
         <span className="font-black uppercase tracking-widest text-xs">{item.label}</span>
       </button>
