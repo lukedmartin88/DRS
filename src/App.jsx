@@ -2181,7 +2181,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   );
 };
 
-export default function App() {
+const MainApp = () => {
   const [activeTab, setActiveTabState] = useState(() => window.location.hash.replace('#', '') || 'home');
   const [user, setUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -2435,5 +2435,50 @@ export default function App() {
          </button>
       </nav>
     </div>
+  );
+};
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("DRS App Crash:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center text-white">
+          <Shield className="w-16 h-16 text-pink-500 mb-6" />
+          <h1 className="text-3xl font-black uppercase tracking-tighter italic mb-2">Pit Stop <span className="text-pink-600 not-italic">Required</span></h1>
+          <p className="text-zinc-400 text-sm max-w-md mx-auto mb-8">
+            Your device is struggling to load the latest club update. This usually happens when an old version of the app is stuck in your browser's cache.
+          </p>
+          <div className="bg-black border border-zinc-800 p-4 rounded-xl text-left w-full max-w-md overflow-auto mb-8">
+             <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest mb-2">Error Log for Admin:</p>
+             <code className="text-zinc-500 text-xs break-words">{this.state.error?.toString()}</code>
+          </div>
+          <button onClick={() => window.location.reload(true)} className="bg-pink-600 hover:bg-pink-700 text-white font-black py-4 px-8 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg active:scale-[0.98]">
+            Force Refresh App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
   );
 }
