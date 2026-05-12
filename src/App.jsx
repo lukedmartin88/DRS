@@ -449,6 +449,138 @@ const STATIC_RAFFLES = [
 
 // --- VIEWS ---
 
+const SplashView = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [resetMsg, setResetMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMsg('');
+    setLoading(true);
+    
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err) {
+      console.error(err);
+      const message = err.message?.includes('auth/invalid-credential') 
+        ? 'Invalid email or password.' 
+        : err.message?.includes('auth/email-already-in-use')
+        ? 'An account with this email already exists.'
+        : err.message?.replace('Firebase: ', '') || 'An authentication error occurred.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setError('');
+    setResetMsg('');
+    if (!email) {
+        setError('Please enter your email address first.');
+        return;
+    }
+    setLoading(true);
+    try {
+        await sendPasswordResetEmail(auth, email);
+        setResetMsg('Password reset link sent to your email.');
+    } catch(err) {
+        setError(err.message?.replace('Firebase: ', '') || 'Failed to send reset email.');
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30 selection:text-pink-200">
+      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center opacity-20 blur-sm scale-105"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-zinc-950/40"></div>
+
+      <div className="relative z-10 w-full max-w-md bg-black/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl shadow-pink-500/5 animate-in zoom-in-95 duration-700">
+        <div className="flex flex-col items-center mb-8">
+          <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-20 w-20 rounded-2xl object-cover border border-zinc-700 shadow-lg shadow-pink-500/20 mb-4" alt="DRS Logo" />
+          <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
+          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">Petrolhead Community</p>
+        </div>
+
+        {isResetMode ? (
+          <form onSubmit={handlePasswordReset} className="space-y-5">
+            <p className="text-zinc-300 text-sm text-center mb-4">Enter your email address and we will send you a link to reset your password.</p>
+            <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="enter your email" required />
+            
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
+                <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
+              </div>
+            )}
+            {resetMsg && (
+              <div className="bg-green-500/10 border border-green-500/50 p-3 rounded-lg">
+                <p className="text-green-500 text-xs font-bold uppercase tracking-widest text-center">{resetMsg}</p>
+              </div>
+            )}
+
+            <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
+              {loading ? 'Processing...' : 'Send Reset Link'}
+            </button>
+
+            <div className="mt-6 text-center border-t border-zinc-800/50 pt-6">
+              <button type="button" onClick={() => { setIsResetMode(false); setError(''); setResetMsg(''); }} className="text-zinc-400 hover:text-white font-bold uppercase text-xs tracking-widest transition-colors">
+                Back to Login
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="enter your email" required />
+              <div className="space-y-1">
+                <InputField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
+                {isLogin && (
+                  <div className="flex justify-end">
+                    <button type="button" onClick={() => { setIsResetMode(true); setError(''); setResetMsg(''); }} className="text-pink-500 hover:text-pink-400 text-xs font-bold uppercase tracking-widest transition-colors mt-2">
+                      Forgot Password?
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500/50 p-3 rounded-lg">
+                  <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
+                </div>
+              )}
+
+              <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
+                {loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}
+              </button>
+            </form>
+
+            <div className="mt-8 text-center border-t border-zinc-800/50 pt-6">
+              <p className="text-zinc-400 text-sm">
+                {isLogin ? "Don't have an account yet?" : "Already part of the club?"}
+              </p>
+              <button onClick={() => { setIsLogin(!isLogin); setError(''); setResetMsg(''); }} className="text-pink-500 hover:text-pink-400 font-bold uppercase text-xs tracking-widest mt-2 transition-colors">
+                {isLogin ? 'Sign up here' : 'Log in instead'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const AdminGuideView = ({ onBack }) => {
   const [activeSection, setActiveSection] = useState(guideSections[0]);
   const [completedSteps, setCompletedSteps] = useState([]);
