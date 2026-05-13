@@ -42,7 +42,8 @@ import {
   Download,
   ChevronRight,
   CheckCircle2,
-  Grid
+  Grid,
+  Trophy
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
@@ -1515,7 +1516,7 @@ const RafflesView = ({ raffles, user, members }) => {
             });
 
             const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-            const manualSold = raffle.ticketsSold || 0; // Legacy fallback
+            const manualSold = raffle.ticketsSold || 0; 
             const totalTaken = totalReserved + manualSold;
             const progress = (totalTaken / raffle.totalTickets) * 100;
 
@@ -1625,6 +1626,107 @@ const CharityView = () => (
   </div>
 );
 
+const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
+  const [pool, setPool] = useState([]);
+  const [currentName, setCurrentName] = useState('READY TO SPIN');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [winner, setWinner] = useState(null);
+
+  useEffect(() => {
+    const newPool = [];
+    const appRes = raffle.reservations || {};
+    const offRes = raffle.offlineReservations || {};
+
+    const membersById = members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
+
+    Object.keys(appRes).forEach(uid => {
+      const m = membersById[uid] || { name: 'Guest (In-App Browser)' };
+      for (let i=0; i<appRes[uid]; i++) newPool.push(m.name);
+    });
+
+    Object.keys(offRes).forEach(gid => {
+      for (let i=0; i<offRes[gid].count; i++) newPool.push(offRes[gid].name);
+    });
+
+    setPool(newPool.sort(() => 0.5 - Math.random()));
+  }, [raffle, members]);
+
+  const startDraw = () => {
+    if (pool.length === 0) {
+      setCurrentName('NO TICKETS SOLD');
+      return;
+    }
+    setIsDrawing(true);
+    setWinner(null);
+    
+    const chosenWinner = pool[Math.floor(Math.random() * pool.length)];
+    
+    let speed = 30;
+    let ticks = 0;
+    const maxTicks = 50; 
+    
+    const spin = () => {
+      ticks++;
+      if (ticks < maxTicks) {
+         const randomIndex = Math.floor(Math.random() * pool.length);
+         setCurrentName(pool[randomIndex]);
+         speed += Math.floor(ticks / 3); 
+         setTimeout(spin, speed);
+      } else {
+         setCurrentName(chosenWinner);
+         setWinner(chosenWinner);
+         setIsDrawing(false);
+      }
+    };
+    
+    spin();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-zinc-950 flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-500 overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-900/20 via-zinc-950 to-zinc-950"></div>
+      
+      <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors disabled:opacity-0 z-20"><X className="w-8 h-8" /></button>
+      
+      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center text-center">
+        <Trophy className={`w-20 h-20 mx-auto mb-8 transition-all duration-1000 ${winner ? 'text-yellow-500 scale-125 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)]' : 'text-pink-600'}`} />
+        
+        <p className="text-pink-500 font-bold uppercase tracking-[0.3em] mb-4">{raffle.title} - Official Draw</p>
+        
+        <div className={`w-full py-16 px-4 rounded-3xl border ${winner ? 'bg-zinc-900/80 border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.2)]' : 'bg-black/50 border-zinc-800'} mb-12 transition-all duration-700`}>
+           <h2 className={`text-4xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter italic break-words ${winner ? 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'text-zinc-300'}`}>
+             {currentName}
+           </h2>
+           {winner && <p className="text-yellow-500 font-black text-xl md:text-2xl uppercase tracking-[0.4em] mt-8 animate-pulse">Winner Winner!</p>}
+        </div>
+
+        <div className="flex flex-col gap-4 w-full max-w-md">
+          {!winner && (
+            <button 
+              onClick={startDraw} 
+              disabled={isDrawing || pool.length === 0} 
+              className="w-full bg-pink-600 hover:bg-pink-500 disabled:opacity-50 disabled:bg-zinc-800 text-white font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-lg shadow-[0_0_30px_rgba(219,39,119,0.3)] hover:shadow-[0_0_50px_rgba(219,39,119,0.5)] active:scale-95"
+            >
+              {isDrawing ? 'Drawing...' : 'Spin The Wheel'}
+            </button>
+          )}
+          
+          {winner && (
+            <button 
+              onClick={() => onSetWinner(winner)} 
+              className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-lg shadow-[0_0_30px_rgba(22,163,74,0.3)] active:scale-95"
+            >
+              Approve & End Raffle
+            </button>
+          )}
+        </div>
+        
+        <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest mt-8">Total Tickets in Drum: {pool.length}</p>
+      </div>
+    </div>
+  );
+};
+
 const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile, spotlightMemberId }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
   const [password, setPassword] = useState('');
@@ -1633,6 +1735,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [editingRaffle, setEditingRaffle] = useState(null);
+  const [drawingRaffle, setDrawingRaffle] = useState(null);
   const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '' });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
@@ -1657,10 +1760,11 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       if (editingEvent) setEditingEvent(null);
       if (editingMember) setEditingMember(null);
       if (editingRaffle) setEditingRaffle(null);
+      if (drawingRaffle) setDrawingRaffle(null);
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [editingEvent, editingMember, editingRaffle]);
+  }, [editingEvent, editingMember, editingRaffle, drawingRaffle]);
 
   const editableUpcoming = useMemo(() => {
     const now = new Date();
@@ -1982,6 +2086,21 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
   return (
     <div className="space-y-12 max-w-5xl mx-auto pb-24 animate-in fade-in duration-700">
+      
+      {drawingRaffle && (
+        <RaffleDrawModal 
+          raffle={drawingRaffle} 
+          members={members} 
+          onClose={() => { window.history.back(); }} 
+          onSetWinner={async (winnerName) => {
+             try {
+               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName });
+               window.history.back();
+             } catch (err) { console.error(err); }
+          }}
+        />
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 pb-6 gap-4">
         <h2 className="text-3xl font-black text-white flex items-center gap-3 uppercase tracking-tighter"><Shield className="w-8 h-8 text-pink-500" /> Club Control Panel</h2>
         <div className="flex items-center gap-3">
@@ -2140,7 +2259,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 });
 
                 const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-                const manualSold = r.ticketsSold || 0; // Legacy
+                const manualSold = r.ticketsSold || 0; 
                 const totalTaken = totalReserved + manualSold;
                 
                 const form = offlineForms[r.id] || { selected: '', guestName: '', qty: 1 };
@@ -2169,7 +2288,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                              {allReservedList.map(m => (
                                 <div key={m.id} className="flex items-center justify-between bg-zinc-900 p-2 rounded-lg border border-zinc-700">
                                    <div className="flex items-center gap-2">
-                                     <img src={m.avatar || DEFAULT_AVATAR} className="w-6 h-6 rounded-full object-cover" />
+                                     <img src={m.avatar || DEFAULT_AVATAR} className="w-6 h-6 rounded-full object-cover" alt="" />
                                      <span className="text-xs text-zinc-300 font-bold truncate max-w-[100px]">{m.name}</span>
                                    </div>
                                    <div className="flex items-center gap-2">
@@ -2234,26 +2353,35 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                     </div>
                     
                     {!r.isEnded && !r.id.startsWith('mock-') && (
-                      <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-2">
-                        <input 
-                          type="text" 
-                          placeholder="Winner's Name" 
-                          value={raffleWinners[r.id] || ''} 
-                          onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
-                          className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
-                        />
+                      <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-4">
                         <button 
-                          onClick={async () => { 
-                            if (!raffleWinners[r.id]) return;
-                            try {
-                              await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] });
-                            } catch (err) { console.error(err); }
-                          }} 
-                          disabled={!raffleWinners[r.id]}
-                          className="w-full bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 hover:border-pink-500"
+                          onClick={() => { window.history.pushState({ modal: 'drawRaffle' }, ''); setDrawingRaffle(r); }}
+                          className="w-full bg-pink-600 hover:bg-pink-500 text-white font-black py-3 rounded-lg text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(219,39,119,0.3)]"
                         >
-                          End & Announce
+                          <Trophy className="w-4 h-4" /> Launch Draw Machine
                         </button>
+
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Or manual winner name..." 
+                            value={raffleWinners[r.id] || ''} 
+                            onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
+                            className="flex-grow bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                          />
+                          <button 
+                            onClick={async () => { 
+                              if (!raffleWinners[r.id]) return;
+                              try {
+                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] });
+                              } catch (err) { console.error(err); }
+                            }} 
+                            disabled={!raffleWinners[r.id]}
+                            className="px-4 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700"
+                          >
+                            End
+                          </button>
+                        </div>
                       </div>
                     )}
 
