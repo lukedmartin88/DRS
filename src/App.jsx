@@ -1367,6 +1367,9 @@ const ProfileView = ({ user, userProfile }) => {
 const RafflesView = ({ raffles, user, members }) => {
   const [reservingRaffle, setReservingRaffle] = useState(null);
   const [reserveQuantity, setReserveQuantity] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [loginPrompt, setLoginPrompt] = useState(false);
 
   const membersById = useMemo(() => {
     if (!members) return {};
@@ -1374,12 +1377,19 @@ const RafflesView = ({ raffles, user, members }) => {
   }, [members]);
 
   const handleReserveClick = (raffle) => {
+    if (!user || user.isAnonymous || !membersById[user.uid] || !membersById[user.uid].name) {
+      setLoginPrompt(true);
+      return;
+    }
     setReservingRaffle(raffle);
     setReserveQuantity(1);
+    setSubmitError('');
   };
 
   const submitReservation = async () => {
     if (!reservingRaffle || !user) return;
+    setIsSubmitting(true);
+    setSubmitError('');
     try {
       if (!reservingRaffle.id.startsWith('mock-')) {
          const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', reservingRaffle.id);
@@ -1395,11 +1405,18 @@ const RafflesView = ({ raffles, user, members }) => {
       const recipient = "Dailyridesouth@gmail.com";
       const subject = encodeURIComponent(`Raffle Ticket Reservation: ${reservingRaffle.title}`);
       const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI would like to reserve ${reserveQuantity} ticket(s) for the following raffle:\n\nPrize: ${reservingRaffle.title}\nTicket Cost: £${reservingRaffle.ticketPrice}\nTotal Cost: £${reservingRaffle.ticketPrice * reserveQuantity}\n\nPlease let me know the payment details.\n\nThanks!`);
-      window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
-
-      setReservingRaffle(null);
+      
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+        a.click();
+        setReservingRaffle(null);
+        setIsSubmitting(false);
+      }, 600);
     } catch (e) {
       console.error(e);
+      setSubmitError('Connection failed. Please try again.');
+      setIsSubmitting(false);
     }
   };
 
@@ -1408,6 +1425,35 @@ const RafflesView = ({ raffles, user, members }) => {
 
   return (
     <div className="space-y-12">
+      {loginPrompt && (
+        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative text-center">
+            <button onClick={() => setLoginPrompt(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6"/></button>
+            <UserCircle className="w-12 h-12 text-pink-500 mx-auto mb-4" />
+            <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Member Access Required</h3>
+            <p className="text-zinc-400 text-sm mb-6">
+              You must be logged into your registered club account to reserve tickets. 
+              <br/><br/>
+              If you opened this from WhatsApp or Instagram, please open the link in Chrome/Safari, or tap below to sign in.
+            </p>
+            <div className="space-y-3">
+              <button 
+                onClick={() => { setLoginPrompt(false); signOut(auth); }} 
+                className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
+              >
+                Sign In / Register
+              </button>
+              <button 
+                onClick={() => setLoginPrompt(false)} 
+                className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg active:scale-[0.98]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {reservingRaffle && (
         <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative">
@@ -1433,9 +1479,10 @@ const RafflesView = ({ raffles, user, members }) => {
                  <p className="text-pink-500 font-black text-2xl">£{reservingRaffle.ticketPrice * reserveQuantity}</p>
               </div>
 
-              <button onClick={submitReservation} className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]">
-                Confirm & Email Admin
+              <button onClick={submitReservation} disabled={isSubmitting} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]">
+                {isSubmitting ? 'Syncing Data...' : 'Confirm & Email Admin'}
               </button>
+              {submitError && <p className="text-red-500 text-[10px] font-bold text-center uppercase tracking-widest mt-2">{submitError}</p>}
             </div>
           </div>
         </div>
@@ -1452,7 +1499,7 @@ const RafflesView = ({ raffles, user, members }) => {
           {activeRaffles.map(raffle => {
             const reservations = raffle.reservations || {};
             const reservedUids = Object.keys(reservations);
-            const reservedMembers = reservedUids.map(uid => membersById[uid]).filter(Boolean);
+            const reservedMembers = reservedUids.map(uid => membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR });
             const totalReserved = reservedUids.reduce((sum, uid) => sum + reservations[uid], 0);
             const manualSold = raffle.ticketsSold || 0;
             const totalTaken = totalReserved + manualSold;
@@ -1579,7 +1626,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [memberRoles, setMemberRoles] = useState({});
   const [memberRanks, setMemberRanks] = useState({});
   
-  // Compression Tool State
   const [compressing, setCompressing] = useState(false);
   const [compressProgress, setCompressProgress] = useState({ current: 0, total: 0, status: '' });
 
@@ -2013,7 +2059,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               {raffles.map(r => {
                 const reservations = r.reservations || {};
                 const reservedUids = Object.keys(reservations);
-                const reservedMembers = reservedUids.map(uid => members.find(m => m.id === uid)).filter(Boolean);
+                const reservedMembers = reservedUids.map(uid => members.find(m => m.id === uid) || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR });
                 const totalReserved = reservedUids.reduce((sum, uid) => sum + reservations[uid], 0);
                 const manualSold = r.ticketsSold || 0;
                 const totalTaken = totalReserved + manualSold;
