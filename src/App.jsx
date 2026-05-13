@@ -1497,11 +1497,25 @@ const RafflesView = ({ raffles, user, members }) => {
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
           {activeRaffles.map(raffle => {
-            const reservations = raffle.reservations || {};
-            const reservedUids = Object.keys(reservations);
-            const reservedMembers = reservedUids.map(uid => membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR });
-            const totalReserved = reservedUids.reduce((sum, uid) => sum + reservations[uid], 0);
-            const manualSold = raffle.ticketsSold || 0;
+            const appRes = raffle.reservations || {};
+            const offRes = raffle.offlineReservations || {};
+            
+            let allReservedList = [];
+            Object.keys(appRes).forEach(uid => {
+              const m = membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR };
+              allReservedList.push({ ...m, ticketCount: appRes[uid] });
+            });
+            Object.keys(offRes).forEach(gid => {
+              allReservedList.push({
+                id: gid,
+                name: offRes[gid].name,
+                avatar: DEFAULT_AVATAR,
+                ticketCount: offRes[gid].count
+              });
+            });
+
+            const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
+            const manualSold = raffle.ticketsSold || 0; // Legacy fallback
             const totalTaken = totalReserved + manualSold;
             const progress = (totalTaken / raffle.totalTickets) * 100;
 
@@ -1529,21 +1543,21 @@ const RafflesView = ({ raffles, user, members }) => {
                   <div className="mt-4 pt-4 border-t border-zinc-800/50">
                     <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Members Reserving</p>
                     <div className="flex -space-x-3 overflow-hidden p-1">
-                        {reservedMembers.slice(0, 6).map(m => (
+                        {allReservedList.slice(0, 6).map(m => (
                           <img 
                             key={m.id} 
                             src={m.avatar || DEFAULT_AVATAR} 
-                            title={`${m.name} (${reservations[m.id]} tickets)`} 
+                            title={`${m.name} (${m.ticketCount} tickets)`} 
                             className="inline-block h-8 w-8 rounded-full ring-2 ring-zinc-900 object-cover relative z-10 hover:z-20 shadow-lg" 
                             alt="avatar" 
                           />
                         ))}
-                        {reservedMembers.length > 6 && (
+                        {allReservedList.length > 6 && (
                           <div className="flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-zinc-900 bg-zinc-800 text-[10px] font-bold text-white z-10">
-                            +{reservedMembers.length - 6}
+                            +{allReservedList.length - 6}
                           </div>
                         )}
-                        {reservedMembers.length === 0 && (
+                        {allReservedList.length === 0 && (
                           <span className="text-xs text-zinc-600 font-medium italic py-1">Be the first to reserve!</span>
                         )}
                     </div>
@@ -1628,6 +1642,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   
   const [compressing, setCompressing] = useState(false);
   const [compressProgress, setCompressProgress] = useState({ current: 0, total: 0, status: '' });
+  const [offlineForms, setOfflineForms] = useState({});
 
   useEffect(() => {
     if (clubDescription) setEditDescription(clubDescription);
@@ -1761,6 +1776,55 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       }
     } catch (err) {
       console.error("Error updating reservation:", err);
+    }
+  };
+
+  const handleUpdateOfflineReservation = async (raffle, guestId, delta) => {
+    if (raffle.id.startsWith('mock-')) return;
+    try {
+      const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
+      const currentCount = raffle.offlineReservations[guestId].count;
+      const newVal = currentCount + delta;
+
+      if (newVal <= 0) {
+        await updateDoc(rRef, {
+          [`offlineReservations.${guestId}`]: deleteField()
+        });
+      } else {
+        await updateDoc(rRef, {
+          [`offlineReservations.${guestId}.count`]: newVal
+        });
+      }
+    } catch (err) {
+      console.error("Error updating offline reservation:", err);
+    }
+  };
+
+  const updateOfflineForm = (id, updates) => {
+    setOfflineForms(prev => ({ ...prev, [id]: { ...(prev[id] || { selected: '', guestName: '', qty: 1 }), ...updates } }));
+  };
+
+  const handleAddOffline = async (raffleId) => {
+    const r = raffles.find(x => x.id === raffleId);
+    const f = offlineForms[raffleId];
+    if (!r || !f || !f.selected) return;
+    
+    try {
+      if (f.selected === 'guest') {
+        const newId = `guest_${Date.now()}`;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), {
+          [`offlineReservations.${newId}`]: { name: f.guestName.trim(), count: f.qty }
+        }, { merge: true });
+      } else {
+        const currentReservations = r.reservations || {};
+        const currentVal = currentReservations[f.selected] || 0;
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), {
+          [`reservations.${f.selected}`]: currentVal + f.qty
+        }, { merge: true });
+      }
+      updateOfflineForm(raffleId, { selected: '', guestName: '', qty: 1 });
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -2057,12 +2121,29 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
               {raffles.map(r => {
-                const reservations = r.reservations || {};
-                const reservedUids = Object.keys(reservations);
-                const reservedMembers = reservedUids.map(uid => members.find(m => m.id === uid) || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR });
-                const totalReserved = reservedUids.reduce((sum, uid) => sum + reservations[uid], 0);
-                const manualSold = r.ticketsSold || 0;
+                const appRes = r.reservations || {};
+                const offRes = r.offlineReservations || {};
+                
+                let allReservedList = [];
+                Object.keys(appRes).forEach(uid => {
+                  const m = members.find(x => x.id === uid) || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR };
+                  allReservedList.push({ ...m, ticketCount: appRes[uid], type: 'app' });
+                });
+                Object.keys(offRes).forEach(gid => {
+                  allReservedList.push({
+                    id: gid,
+                    name: offRes[gid].name,
+                    avatar: DEFAULT_AVATAR,
+                    ticketCount: offRes[gid].count,
+                    type: 'offline'
+                  });
+                });
+
+                const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
+                const manualSold = r.ticketsSold || 0; // Legacy
                 const totalTaken = totalReserved + manualSold;
+                
+                const form = offlineForms[r.id] || { selected: '', guestName: '', qty: 1 };
 
                 return (
                   <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
@@ -2074,40 +2155,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         </div>
                       ) : (
                         <div className="mt-4 space-y-2">
-                           <div className="flex items-center justify-between bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
-                             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">Cash / Manual Sales:</span>
-                             <div className="flex items-center gap-3">
-                               <button 
-                                 onClick={async () => {
-                                   if (r.id.startsWith('mock-')) return;
-                                   try {
-                                     const newVal = Math.max(0, manualSold - 1);
-                                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal });
-                                   } catch (err) { console.error(err); }
-                                 }} 
-                                 className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
-                               >
-                                 -
-                               </button>
-                               <span className="text-white font-bold text-sm w-4 text-center">{manualSold}</span>
-                               <button 
-                                 onClick={async () => {
-                                   if (r.id.startsWith('mock-')) return;
-                                   try {
-                                     const newVal = manualSold + 1;
-                                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { ticketsSold: newVal });
-                                   } catch (err) { console.error(err); }
-                                 }} 
-                                 className="text-zinc-400 hover:text-pink-500 font-black px-2 transition-colors text-lg leading-none"
-                               >
-                                 +
-                               </button>
-                             </div>
-                           </div>
-                           <div className="flex items-center justify-between bg-zinc-900/50 p-2 rounded-lg border border-zinc-800/50">
-                             <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] italic">App Reservations:</span>
-                             <span className="text-white font-bold text-sm">{totalReserved}</span>
-                           </div>
                            <div className="flex items-center justify-between bg-zinc-900/80 p-2 rounded-lg border border-pink-500/30">
                              <span className="text-pink-500 text-[10px] font-black uppercase tracking-[0.1em]">Total Taken:</span>
                              <span className="text-pink-500 font-black text-sm">{totalTaken} / {r.totalTickets}</span>
@@ -2119,7 +2166,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         <div className="mt-4 pt-4 border-t border-zinc-800/50">
                           <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Manage Reservations</p>
                           <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-                             {reservedMembers.map(m => (
+                             {allReservedList.map(m => (
                                 <div key={m.id} className="flex items-center justify-between bg-zinc-900 p-2 rounded-lg border border-zinc-700">
                                    <div className="flex items-center gap-2">
                                      <img src={m.avatar || DEFAULT_AVATAR} className="w-6 h-6 rounded-full object-cover" />
@@ -2127,18 +2174,60 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                                    </div>
                                    <div className="flex items-center gap-2">
                                      <button 
-                                       onClick={() => handleUpdateReservation(r, m.id, -1)} 
+                                       onClick={() => m.type === 'offline' ? handleUpdateOfflineReservation(r, m.id, -1) : handleUpdateReservation(r, m.id, -1)} 
                                        className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 text-pink-500 hover:bg-zinc-700 font-black transition-colors leading-none"
                                      >-</button>
-                                     <span className="text-white font-bold text-xs w-4 text-center">{reservations[m.id]}</span>
+                                     <span className="text-white font-bold text-xs w-4 text-center">{m.ticketCount}</span>
                                      <button 
-                                       onClick={() => handleUpdateReservation(r, m.id, 1)} 
+                                       onClick={() => m.type === 'offline' ? handleUpdateOfflineReservation(r, m.id, 1) : handleUpdateReservation(r, m.id, 1)} 
                                        className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 text-pink-500 hover:bg-zinc-700 font-black transition-colors leading-none"
                                      >+</button>
                                    </div>
                                 </div>
                              ))}
-                             {reservedMembers.length === 0 && <span className="text-[10px] text-zinc-600 italic block mb-2">No reservations yet.</span>}
+                             {allReservedList.length === 0 && <span className="text-[10px] text-zinc-600 italic block mb-2">No reservations yet.</span>}
+                          </div>
+                          
+                          <div className="mt-4 p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50 space-y-3">
+                             <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest">Add Manual Reservation</p>
+                             <div className="flex flex-col gap-2">
+                               <select 
+                                  value={form.selected} 
+                                  onChange={e => updateOfflineForm(r.id, { selected: e.target.value })}
+                                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-pink-500"
+                               >
+                                  <option value="">-- Select Member --</option>
+                                  <option value="guest">Not Registered (Manual Entry)</option>
+                                  {members.map(m => <option key={m.id} value={m.id}>{m.name || 'Anonymous'}</option>)}
+                               </select>
+                               
+                               {form.selected === 'guest' && (
+                                 <input 
+                                   type="text" 
+                                   placeholder="Guest Full Name" 
+                                   value={form.guestName}
+                                   onChange={e => updateOfflineForm(r.id, { guestName: e.target.value })}
+                                   className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-pink-500"
+                                 />
+                               )}
+                               
+                               <div className="flex gap-2">
+                                 <input 
+                                   type="number" 
+                                   min="1" 
+                                   value={form.qty} 
+                                   onChange={e => updateOfflineForm(r.id, { qty: parseInt(e.target.value) || 1 })}
+                                   className="w-20 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-pink-500"
+                                 />
+                                 <button 
+                                   onClick={() => handleAddOffline(r.id)}
+                                   disabled={!form.selected || (form.selected === 'guest' && !form.guestName.trim())}
+                                   className="flex-grow bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 text-white font-bold rounded-lg text-[10px] uppercase tracking-widest transition-colors"
+                                 >
+                                   Add Tickets
+                                 </button>
+                               </div>
+                             </div>
                           </div>
                         </div>
                       )}
