@@ -1703,7 +1703,7 @@ const RafflesView = ({ raffles, user, members }) => {
       });
 
       if (!secureResponse.ok) {
-         throw new Error('Cloud function error');
+         throw new Error(`Server returned ${secureResponse.status}`);
       }
 
       const { checkoutId } = await secureResponse.json();
@@ -1715,7 +1715,7 @@ const RafflesView = ({ raffles, user, members }) => {
       }
     } catch (e) {
       console.error(e);
-      setSubmitError('Secure connection failed. Please try again later.');
+      setSubmitError(e.message === 'Failed to fetch' ? 'Connection Blocked: Check Cloud Function URL & Logs.' : `Error: ${e.message}`);
       setIsSubmitting(false);
     }
   };
