@@ -43,7 +43,8 @@ import {
   ChevronRight,
   CheckCircle2,
   Grid,
-  Trophy
+  Trophy,
+  Video
 } from 'lucide-react';
 
 // --- FIREBASE SETUP ---
@@ -448,6 +449,37 @@ const STATIC_RAFFLES = [
   }
 ];
 
+const guideSections = [
+  {
+    id: '1',
+    title: 'Managing Members',
+    icon: Users,
+    steps: [
+      { title: 'View Profiles', content: 'Click on any member in the moderation hub to edit their profile details or update their status.' },
+      { title: 'Ban/Hide', content: 'Use the eye icon to hide a member from the public directory. They will not know they are hidden.' },
+      { title: 'Member Roles', content: 'Type a custom role (e.g. "Club President") and a rank (1-5) to pin them to the top of the directory.' }
+    ]
+  },
+  {
+    id: '2',
+    title: 'Event Operations',
+    icon: Calendar,
+    steps: [
+      { title: 'Deploy Events', content: 'Fill out the new event form. Include a what3words link for precise meeting points.' },
+      { title: 'Guest Lists', content: 'Download a PDF roster of all attendees directly from the event card.' }
+    ]
+  },
+  {
+    id: '3',
+    title: 'Raffle System',
+    icon: Trophy,
+    steps: [
+      { title: 'Offline Tickets', content: 'If someone pays you in cash, use the "Add Manual Reservation" tool to insert their name into the drum.' },
+      { title: 'The Draw Machine', content: 'Click "Launch Draw Machine" to record the winner selection. The system automatically weights the odds based on tickets held.' }
+    ]
+  }
+];
+
 // --- VIEWS ---
 
 const SplashView = () => {
@@ -469,7 +501,14 @@ const SplashView = () => {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', res.user.uid), {
+          email: res.user.email,
+          name: '',
+          joinDate: formatDate(new Date()),
+          role: 'Member',
+          isHidden: false
+        });
       }
     } catch (err) {
       console.error(err);
@@ -682,7 +721,7 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
         />
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-            {member.name}
+            {member.name || 'Pending Setup'}
             {member.nickname && <span className="text-zinc-500 text-xl font-normal italic">"{member.nickname}"</span>}
             {member.role === "Admin" && <Shield className="w-6 h-6 text-pink-500" />}
             {member.role === "Club President" && <Award className="w-6 h-6 text-yellow-500" />}
@@ -801,7 +840,7 @@ const EnlargedImageModal = ({ imageObj, onClose, onMemberClick }) => {
           >
             <img src={imageObj.member.avatar || DEFAULT_AVATAR} className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
             <div className="flex flex-col">
-              <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member.name}</span>
+              <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member.name || 'Pending Setup'}</span>
               <span className="text-white/60 group-hover/member:text-white/80 text-[8px] uppercase font-bold tracking-widest mt-1">View Garage</span>
             </div>
           </div>
@@ -845,7 +884,7 @@ const GalleryView = ({ members, onImageClick }) => {
             <img src={img.url} alt="" className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 block" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
                <p className="text-white font-black text-xs uppercase tracking-tighter">{img.carName}</p>
-               <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest">{img.member.name}</p>
+               <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest">{img.member.name || 'Pending Setup'}</p>
             </div>
           </div>
         ))}
@@ -938,6 +977,22 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
         </div>
       </div>
 
+      <div 
+        onClick={() => window.location.hash = 'raffles'}
+        className="bg-gradient-to-r from-pink-600 to-pink-900 rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-pink-500/20 mb-10 group border border-pink-500/50"
+      >
+        <div className="flex items-center gap-4 md:gap-6">
+          <div className="bg-white/20 p-3 md:p-4 rounded-full shadow-inner">
+            <Ticket className="w-8 h-8 md:w-10 md:h-10 text-white" />
+          </div>
+          <div>
+            <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter">Live Club Raffles</h3>
+            <p className="text-pink-200 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Win premium prizes & support the club</p>
+          </div>
+        </div>
+        <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-white group-hover:translate-x-2 transition-transform shrink-0" />
+      </div>
+
       {spotlightMember && (
         <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => onMemberClick(spotlightMember)}>
           <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt="" />
@@ -946,7 +1001,7 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
           <div className="absolute bottom-6 left-6 flex items-center gap-4">
              <img src={spotlightMember.avatar || DEFAULT_AVATAR} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" alt="" />
              <div>
-                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name} {isBirthdaySpotlight && '🎂'}</h3>
+                <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name || 'Pending Setup'} {isBirthdaySpotlight && '🎂'}</h3>
                 {spotlightMember.nickname && <p className="text-pink-500 italic text-lg md:text-xl font-medium mt-1">"{spotlightMember.nickname}"</p>}
                 <p className="text-zinc-300 font-bold text-xs uppercase tracking-widest mt-2">{spotlightMember.role || 'Member'}</p>
              </div>
@@ -1017,7 +1072,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
         head: [['#', 'Name', 'Nickname', 'Vehicle']],
         body: attendees.map((m, i) => [
           i + 1,
-          m.name || 'Unknown',
+          m.name || 'Pending Setup',
           m.nickname || '-',
           m.cars && m.cars[0] ? `${m.cars[0].make} ${m.cars[0].model}` : '-'
         ])
@@ -1056,7 +1111,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
           const isMarked = user && rsvpList.includes(user.uid);
           
           const attendeeMembers = rsvpList.map(uid => 
-            membersById[uid] || { id: uid, name: 'Member', avatar: DEFAULT_AVATAR }
+            membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR }
           );
 
           return (
@@ -1132,7 +1187,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                           <img 
                             key={m.id} 
                             src={m.avatar || DEFAULT_AVATAR} 
-                            title={m.name} 
+                            title={m.name || 'Pending Setup'} 
                             onClick={(e) => { e.stopPropagation(); onMemberClick(m); }}
                             className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover cursor-pointer hover:scale-110 transition-transform relative z-10 hover:z-20 shadow-lg" 
                             alt="avatar" 
@@ -1211,7 +1266,7 @@ const MembersView = ({ members, onMemberClick }) => {
             <img src={member.avatar || DEFAULT_AVATAR} alt={member.name} className="w-16 h-16 rounded-full object-cover" />
             <div>
               <h3 className="text-lg font-bold text-white leading-tight">
-                {member.name || 'Anonymous Clubber'}
+                {member.name || 'Pending Setup'}
               </h3>
               {member.nickname && <p className="text-zinc-500 text-xs italic">"{member.nickname}"</p>}
               <p className="text-pink-500 text-xs font-semibold uppercase tracking-wider mt-1">{member.role || 'Member'}</p>
@@ -1224,7 +1279,7 @@ const MembersView = ({ members, onMemberClick }) => {
   );
 };
 
-const ProfileView = ({ user, userProfile }) => {
+const ProfileView = ({ user, userProfile, isForcedSetup }) => {
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [bio, setBio] = useState('');
@@ -1271,6 +1326,17 @@ const ProfileView = ({ user, userProfile }) => {
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto animate-in fade-in duration-700">
+      
+      {isForcedSetup && (
+        <div className="bg-orange-500/20 border border-orange-500/50 p-6 rounded-2xl mb-8 flex items-center gap-4">
+          <Lock className="w-8 h-8 text-orange-500 shrink-0" />
+          <div>
+            <h3 className="text-orange-500 font-black uppercase tracking-widest">Club Access Locked</h3>
+            <p className="text-zinc-300 text-sm mt-1">Welcome to Daily Ride South! Please complete your profile details below (at least your Full Name) and save to unlock the rest of the application.</p>
+          </div>
+        </div>
+      )}
+
       <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-4">My Profile</h2>
       <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6 shadow-xl">
         <div className="flex flex-col md:flex-row gap-6">
@@ -1279,7 +1345,7 @@ const ProfileView = ({ user, userProfile }) => {
              <ImageUpload label="Change Avatar" onUploadSuccess={setAvatar} />
           </div>
           <div className="flex-grow grid sm:grid-cols-2 gap-4 h-fit">
-            <InputField label="Full Name" value={name} onChange={e => setName(e.target.value)} />
+            <InputField label="Full Name (Required)" value={name} onChange={e => setName(e.target.value)} required={true} />
             <InputField label="Nickname" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="E.g. Speedy" />
             <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
                 <InputField label="Town / City" value={location} onChange={e => setLocation(e.target.value)} />
@@ -1358,9 +1424,228 @@ const ProfileView = ({ user, userProfile }) => {
         {cars.length === 0 && <div className="text-center py-10 text-zinc-600 italic">Your garage is currently empty.</div>}
       </div>
 
-      <button onClick={handleSave} className={`w-full font-black py-4 rounded-xl flex items-center justify-center gap-2 text-lg shadow-lg transition-all transform active:scale-[0.98] ${saved ? 'bg-green-600' : 'bg-pink-600 hover:bg-pink-700 shadow-pink-500/20'}`}>
+      <button onClick={handleSave} disabled={!name.trim()} className={`w-full font-black py-4 rounded-xl flex items-center justify-center gap-2 text-lg shadow-lg transition-all transform active:scale-[0.98] ${saved ? 'bg-green-600' : 'bg-pink-600 hover:bg-pink-700 shadow-pink-500/20'} disabled:opacity-50 disabled:hover:bg-pink-600`}>
         <Save className="w-6 h-6" /> {saved ? "Changes Saved Successfully!" : "Save Profile & Garage"}
       </button>
+    </div>
+  );
+};
+
+const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
+  const [pool, setPool] = useState([]);
+  const [currentName, setCurrentName] = useState('READY TO SPIN');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const canvasRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const currentNameRef = useRef('READY TO SPIN');
+  const isWinnerRef = useRef(false);
+
+  useEffect(() => {
+    const newPool = [];
+    const appRes = raffle.reservations || {};
+    const offRes = raffle.offlineReservations || {};
+
+    const membersById = members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
+
+    Object.keys(appRes).forEach(uid => {
+      const m = membersById[uid] || { name: 'Guest (In-App Browser)' };
+      for (let i=0; i<appRes[uid]; i++) newPool.push(m.name);
+    });
+
+    Object.keys(offRes).forEach(gid => {
+      for (let i=0; i<offRes[gid].count; i++) newPool.push(offRes[gid].name);
+    });
+
+    setPool(newPool.sort(() => 0.5 - Math.random()));
+  }, [raffle, members]);
+
+  const drawFrame = (name, isWinnerStatus) => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    const w = 800;
+    const h = 600;
+
+    // Background
+    ctx.fillStyle = '#09090b'; 
+    ctx.fillRect(0, 0, w, h);
+
+    // Main Headers
+    ctx.fillStyle = '#ec4899';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('DAILY RIDE SOUTH OFFICIAL DRAW', w / 2, 100);
+
+    ctx.fillStyle = '#a1a1aa';
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(raffle.title.toUpperCase(), w / 2, 150);
+
+    // Box Background
+    ctx.fillStyle = isWinnerStatus ? '#422006' : '#18181b';
+    ctx.fillRect(50, 220, 700, 160);
+    
+    // Box Border (with Glow)
+    ctx.shadowColor = isWinnerStatus ? '#eab308' : '#ec4899';
+    ctx.shadowBlur = isWinnerStatus ? 30 : 10;
+    ctx.strokeStyle = isWinnerStatus ? '#eab308' : '#27272a';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(50, 220, 700, 160);
+    ctx.shadowBlur = 0; // Reset blur for text
+
+    // Name Text
+    ctx.fillStyle = isWinnerStatus ? '#ffffff' : '#d4d4d8';
+    ctx.font = 'bold 50px sans-serif';
+    ctx.fillText(name.toUpperCase(), w / 2, 320);
+
+    // Winner Banner
+    if (isWinnerStatus) {
+      ctx.fillStyle = '#eab308';
+      ctx.font = 'bold 40px sans-serif';
+      ctx.shadowColor = '#eab308';
+      ctx.shadowBlur = 20;
+      ctx.fillText('WINNER WINNER!', w / 2, 460);
+      ctx.shadowBlur = 0;
+    }
+  };
+
+  const startDraw = () => {
+    if (pool.length === 0) {
+      setCurrentName('NO TICKETS SOLD');
+      return;
+    }
+    
+    setIsDrawing(true);
+    setWinner(null);
+    setVideoUrl(null);
+    isWinnerRef.current = false;
+    chunksRef.current = [];
+
+    // Attempt to start Video Recording via hidden canvas
+    try {
+      const stream = canvasRef.current.captureStream(30); // 30 FPS
+      let options = {};
+      if (MediaRecorder.isTypeSupported('video/mp4')) {
+        options = { mimeType: 'video/mp4' };
+      } else if (MediaRecorder.isTypeSupported('video/webm')) {
+        options = { mimeType: 'video/webm' };
+      }
+      
+      const recorder = new MediaRecorder(stream, options);
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: options.mimeType || 'video/webm' });
+        setVideoUrl(URL.createObjectURL(blob));
+      };
+
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+    } catch (err) {
+      console.warn('Video Recording not supported on this browser', err);
+    }
+
+    let animationFrameId;
+    const renderLoop = () => {
+       drawFrame(currentNameRef.current, isWinnerRef.current);
+       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          animationFrameId = requestAnimationFrame(renderLoop);
+       }
+    };
+    renderLoop();
+
+    const chosenWinner = pool[Math.floor(Math.random() * pool.length)];
+    let speed = 30;
+    let ticks = 0;
+    const maxTicks = 50; 
+    
+    const spin = () => {
+      ticks++;
+      if (ticks < maxTicks) {
+         const randomIndex = Math.floor(Math.random() * pool.length);
+         const name = pool[randomIndex];
+         setCurrentName(name);
+         currentNameRef.current = name;
+         speed += Math.floor(ticks / 3); 
+         setTimeout(spin, speed);
+      } else {
+         setCurrentName(chosenWinner);
+         currentNameRef.current = chosenWinner;
+         setWinner(chosenWinner);
+         isWinnerRef.current = true;
+         
+         // Record the final winner frame for 2.5 seconds
+         setTimeout(() => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+               mediaRecorderRef.current.stop();
+               cancelAnimationFrame(animationFrameId);
+            }
+            setIsDrawing(false);
+         }, 2500);
+      }
+    };
+    
+    spin();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-zinc-950 flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-500 overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-900/20 via-zinc-950 to-zinc-950"></div>
+      
+      <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors disabled:opacity-0 z-20"><X className="w-8 h-8" /></button>
+      
+      <canvas ref={canvasRef} width="800" height="600" className="hidden" />
+
+      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center text-center">
+        <Trophy className={`w-20 h-20 mx-auto mb-8 transition-all duration-1000 ${winner ? 'text-yellow-500 scale-125 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)]' : 'text-pink-600'}`} />
+        
+        <p className="text-pink-500 font-bold uppercase tracking-[0.3em] mb-4">{raffle.title} - Official Draw</p>
+        
+        <div className={`w-full py-16 px-4 rounded-3xl border ${winner ? 'bg-zinc-900/80 border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.2)]' : 'bg-black/50 border-zinc-800'} mb-12 transition-all duration-700`}>
+           <h2 className={`text-4xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter italic break-words ${winner ? 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'text-zinc-300'}`}>
+             {currentName}
+           </h2>
+           {winner && <p className="text-yellow-500 font-black text-xl md:text-2xl uppercase tracking-[0.4em] mt-8 animate-pulse">Winner Winner!</p>}
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4 w-full max-w-2xl justify-center">
+          {!winner && (
+            <button 
+              onClick={startDraw} 
+              disabled={isDrawing || pool.length === 0} 
+              className="w-full max-w-md mx-auto bg-pink-600 hover:bg-pink-500 disabled:opacity-50 disabled:bg-zinc-800 text-white font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-lg shadow-[0_0_30px_rgba(219,39,119,0.3)] hover:shadow-[0_0_50px_rgba(219,39,119,0.5)] active:scale-95"
+            >
+              {isDrawing ? 'Drawing & Recording...' : 'Spin The Wheel'}
+            </button>
+          )}
+          
+          {winner && (
+            <>
+              {videoUrl && (
+                <a 
+                  href={videoUrl} 
+                  download={`DRS_Draw_${raffle.title.replace(/\s+/g, '_')}_${Date.now()}`}
+                  className="flex-1 bg-zinc-800 hover:bg-pink-600 text-white font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-xs md:text-sm active:scale-95 flex items-center justify-center gap-2 border border-zinc-700 hover:border-pink-500"
+                >
+                  <Video className="w-5 h-5" /> Download Draw Video
+                </a>
+              )}
+              <button 
+                onClick={() => onSetWinner(winner)} 
+                className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-xs md:text-sm shadow-[0_0_30px_rgba(22,163,74,0.3)] active:scale-95"
+              >
+                Approve & End Raffle
+              </button>
+            </>
+          )}
+        </div>
+        
+        <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest mt-8">Total Tickets in Drum: {pool.length}</p>
+      </div>
     </div>
   );
 };
@@ -1403,20 +1688,36 @@ const RafflesView = ({ raffles, user, members }) => {
          }, { merge: true });
       }
 
-      const recipient = "Dailyridesouth@gmail.com";
-      const subject = encodeURIComponent(`Raffle Ticket Reservation: ${reservingRaffle.title}`);
-      const body = encodeURIComponent(`Hi Daily Ride South team,\n\nI would like to reserve ${reserveQuantity} ticket(s) for the following raffle:\n\nPrize: ${reservingRaffle.title}\nTicket Cost: £${reservingRaffle.ticketPrice}\nTotal Cost: £${reservingRaffle.ticketPrice * reserveQuantity}\n\nPlease let me know the payment details.\n\nThanks!`);
+      const amount = reservingRaffle.ticketPrice * reserveQuantity;
       
-      setTimeout(() => {
-        const a = document.createElement('a');
-        a.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
-        a.click();
-        setReservingRaffle(null);
-        setIsSubmitting(false);
-      }, 600);
+      // IMPORTANT: Replace 'YOUR_REGION' and 'YOUR_PROJECT_ID' with your actual Firebase Cloud Function URL once deployed!
+      const cloudFunctionUrl = `https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/createSumUpCheckout`;
+
+      // Call our secure middleman instead of SumUp
+      const secureResponse = await fetch(cloudFunctionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: `drs_${user.uid}_${Date.now()}`,
+          amount: amount,
+          description: `DRS Raffle: ${reservingRaffle.title} (x${reserveQuantity})`
+        })
+      });
+
+      if (!secureResponse.ok) {
+         throw new Error('Cloud function error');
+      }
+
+      const { checkoutId } = await secureResponse.json();
+
+      if (checkoutId) {
+        window.location.href = `https://checkout.sumup.com/pay/${checkoutId}`;
+      } else {
+        throw new Error('Failed to generate checkout link');
+      }
     } catch (e) {
       console.error(e);
-      setSubmitError('Connection failed. Please try again.');
+      setSubmitError('Secure connection failed. Please try again later.');
       setIsSubmitting(false);
     }
   };
@@ -1481,7 +1782,7 @@ const RafflesView = ({ raffles, user, members }) => {
               </div>
 
               <button onClick={submitReservation} disabled={isSubmitting} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]">
-                {isSubmitting ? 'Syncing Data...' : 'Confirm & Email Admin'}
+                {isSubmitting ? 'Connecting to SumUp...' : 'Confirm & Pay via SumUp'}
               </button>
               {submitError && <p className="text-red-500 text-[10px] font-bold text-center uppercase tracking-widest mt-2">{submitError}</p>}
             </div>
@@ -1493,7 +1794,7 @@ const RafflesView = ({ raffles, user, members }) => {
         <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
         <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-8">
           <p className="text-zinc-300 text-sm md:text-base leading-relaxed italic">
-            Try your luck and win some incredible club prizes whilst raising funds to keep the club going. Once you have reserved your tickets, check the raffle whatsapp group for payment instructions.
+            Try your luck and win some incredible club prizes whilst raising funds to keep the club going. Secure your tickets below and checkout securely via SumUp.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -1503,8 +1804,8 @@ const RafflesView = ({ raffles, user, members }) => {
             
             let allReservedList = [];
             Object.keys(appRes).forEach(uid => {
-              const m = membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR };
-              allReservedList.push({ ...m, ticketCount: appRes[uid] });
+              const m = membersById[uid] || { name: 'Pending Setup', avatar: DEFAULT_AVATAR };
+              allReservedList.push({ ...m, id: uid, ticketCount: appRes[uid] });
             });
             Object.keys(offRes).forEach(gid => {
               allReservedList.push({
@@ -1625,107 +1926,6 @@ const CharityView = () => (
     </div>
   </div>
 );
-
-const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
-  const [pool, setPool] = useState([]);
-  const [currentName, setCurrentName] = useState('READY TO SPIN');
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [winner, setWinner] = useState(null);
-
-  useEffect(() => {
-    const newPool = [];
-    const appRes = raffle.reservations || {};
-    const offRes = raffle.offlineReservations || {};
-
-    const membersById = members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
-
-    Object.keys(appRes).forEach(uid => {
-      const m = membersById[uid] || { name: 'Guest (In-App Browser)' };
-      for (let i=0; i<appRes[uid]; i++) newPool.push(m.name);
-    });
-
-    Object.keys(offRes).forEach(gid => {
-      for (let i=0; i<offRes[gid].count; i++) newPool.push(offRes[gid].name);
-    });
-
-    setPool(newPool.sort(() => 0.5 - Math.random()));
-  }, [raffle, members]);
-
-  const startDraw = () => {
-    if (pool.length === 0) {
-      setCurrentName('NO TICKETS SOLD');
-      return;
-    }
-    setIsDrawing(true);
-    setWinner(null);
-    
-    const chosenWinner = pool[Math.floor(Math.random() * pool.length)];
-    
-    let speed = 30;
-    let ticks = 0;
-    const maxTicks = 50; 
-    
-    const spin = () => {
-      ticks++;
-      if (ticks < maxTicks) {
-         const randomIndex = Math.floor(Math.random() * pool.length);
-         setCurrentName(pool[randomIndex]);
-         speed += Math.floor(ticks / 3); 
-         setTimeout(spin, speed);
-      } else {
-         setCurrentName(chosenWinner);
-         setWinner(chosenWinner);
-         setIsDrawing(false);
-      }
-    };
-    
-    spin();
-  };
-
-  return (
-    <div className="fixed inset-0 z-[150] bg-zinc-950 flex flex-col items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-500 overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-900/20 via-zinc-950 to-zinc-950"></div>
-      
-      <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors disabled:opacity-0 z-20"><X className="w-8 h-8" /></button>
-      
-      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center text-center">
-        <Trophy className={`w-20 h-20 mx-auto mb-8 transition-all duration-1000 ${winner ? 'text-yellow-500 scale-125 drop-shadow-[0_0_30px_rgba(234,179,8,0.5)]' : 'text-pink-600'}`} />
-        
-        <p className="text-pink-500 font-bold uppercase tracking-[0.3em] mb-4">{raffle.title} - Official Draw</p>
-        
-        <div className={`w-full py-16 px-4 rounded-3xl border ${winner ? 'bg-zinc-900/80 border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.2)]' : 'bg-black/50 border-zinc-800'} mb-12 transition-all duration-700`}>
-           <h2 className={`text-4xl md:text-6xl lg:text-7xl font-black uppercase tracking-tighter italic break-words ${winner ? 'text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'text-zinc-300'}`}>
-             {currentName}
-           </h2>
-           {winner && <p className="text-yellow-500 font-black text-xl md:text-2xl uppercase tracking-[0.4em] mt-8 animate-pulse">Winner Winner!</p>}
-        </div>
-
-        <div className="flex flex-col gap-4 w-full max-w-md">
-          {!winner && (
-            <button 
-              onClick={startDraw} 
-              disabled={isDrawing || pool.length === 0} 
-              className="w-full bg-pink-600 hover:bg-pink-500 disabled:opacity-50 disabled:bg-zinc-800 text-white font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-lg shadow-[0_0_30px_rgba(219,39,119,0.3)] hover:shadow-[0_0_50px_rgba(219,39,119,0.5)] active:scale-95"
-            >
-              {isDrawing ? 'Drawing...' : 'Spin The Wheel'}
-            </button>
-          )}
-          
-          {winner && (
-            <button 
-              onClick={() => onSetWinner(winner)} 
-              className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-5 rounded-2xl transition-all uppercase tracking-widest text-lg shadow-[0_0_30px_rgba(22,163,74,0.3)] active:scale-95"
-            >
-              Approve & End Raffle
-            </button>
-          )}
-        </div>
-        
-        <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest mt-8">Total Tickets in Drum: {pool.length}</p>
-      </div>
-    </div>
-  );
-};
 
 const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile, spotlightMemberId }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
@@ -1989,7 +2189,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         startY: 30,
         head: [['Name', 'Nickname', 'Email', 'Location', 'Status']],
         body: members.map(m => [
-          m.name || 'Anonymous',
+          m.name || 'Pending Setup',
           m.nickname || '-',
           m.email || 'No email saved',
           m.location || '-',
@@ -2259,8 +2459,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 });
 
                 const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-                const manualSold = r.ticketsSold || 0; 
-                const totalTaken = totalReserved + manualSold;
+                const progress = (totalReserved / r.totalTickets) * 100;
                 
                 const form = offlineForms[r.id] || { selected: '', guestName: '', qty: 1 };
 
@@ -2276,7 +2475,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         <div className="mt-4 space-y-2">
                            <div className="flex items-center justify-between bg-zinc-900/80 p-2 rounded-lg border border-pink-500/30">
                              <span className="text-pink-500 text-[10px] font-black uppercase tracking-[0.1em]">Total Taken:</span>
-                             <span className="text-pink-500 font-black text-sm">{totalTaken} / {r.totalTickets}</span>
+                             <span className="text-pink-500 font-black text-sm">{totalReserved} / {r.totalTickets}</span>
                            </div>
                         </div>
                       )}
@@ -2317,7 +2516,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                                >
                                   <option value="">-- Select Member --</option>
                                   <option value="guest">Not Registered (Manual Entry)</option>
-                                  {members.map(m => <option key={m.id} value={m.id}>{m.name || 'Anonymous'}</option>)}
+                                  {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
                                </select>
                                
                                {form.selected === 'guest' && (
@@ -2423,7 +2622,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <label className="block text-xs font-medium text-zinc-400 uppercase tracking-widest">Spotlight Member</label>
               <select value={editSpotlightId} onChange={e => setEditSpotlightId(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
                  <option value="">None</option>
-                 {members.map(m => <option key={m.id} value={m.id}>{m.name || 'Anonymous'}</option>)}
+                 {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
               </select>
             </div>
             <div className="space-y-2">
@@ -2445,7 +2644,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
         <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-800 pb-3 mb-4 gap-4">
-              <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4 text-pink-500" /> Member Moderation Hub</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4 text-pink-500" /> Member Moderation Hub</h3>
+                {members.filter(m => !m.name).length > 0 && (
+                   <span className="bg-orange-500/20 text-orange-500 border border-orange-500/50 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest animate-pulse">
+                     {members.filter(m => !m.name).length} Pending
+                   </span>
+                )}
+              </div>
               <div className="flex items-center gap-4">
                 <span className="text-[10px] text-zinc-500 font-bold uppercase italic hidden lg:inline">Rank members 1-5 to show them first</span>
                 <button onClick={handleDownloadMembers} className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-pink-500 px-3 py-1.5 rounded border border-zinc-700 transition-colors uppercase tracking-widest font-bold flex items-center gap-2">
@@ -2457,7 +2663,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           {editingMember ? (
             <div className="bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300 mb-6">
               <div className="flex justify-between items-center border-b border-zinc-800 pb-4 mb-4">
-                 <h4 className="font-bold text-white uppercase tracking-wider flex items-center gap-2"><UserCog className="w-5 h-5 text-pink-500" /> Editing Profile: {editingMember.name}</h4>
+                 <h4 className="font-bold text-white uppercase tracking-wider flex items-center gap-2"><UserCog className="w-5 h-5 text-pink-500" /> Editing Profile: {editingMember.name || editingMember.email}</h4>
                  <button onClick={() => { setEditingMember(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
@@ -2490,8 +2696,11 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <div key={m.id} className={`flex flex-col gap-3 p-4 rounded-xl border transition-colors ${m.isHidden ? 'bg-red-900/10 border-red-900/50' : 'bg-black/50 border-zinc-800/50 hover:border-zinc-700'}`}>
                 <div className="flex justify-between items-start">
                   <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white text-xs font-bold truncate max-w-[100px]">{m.name}</span>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-white text-xs font-bold truncate max-w-[100px]">{m.name || 'Pending Setup'}</span>
+                        {!m.name && (
+                           <span className="bg-orange-600/20 text-orange-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-orange-500/30 tracking-widest">INCOMPLETE</span>
+                        )}
                         {m.rank && (
                           <span className="bg-pink-600/20 text-pink-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-pink-500/30">#{m.rank}</span>
                         )}
@@ -2592,6 +2801,33 @@ const MainApp = () => {
   const [globalViewingCar, setGlobalViewingCar] = useState(null);
   const [enlargedImage, setEnlargedImage] = useState(null);
 
+  // --- INACTIVITY TIMER ---
+  useEffect(() => {
+    let inactivityTimer;
+    const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
+
+    const resetInactivityTimer = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        if (auth.currentUser) {
+          signOut(auth).catch(err => console.error("Inactivity logout error:", err));
+        }
+      }, INACTIVITY_LIMIT);
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+
+    if (user) {
+      activityEvents.forEach(evt => document.addEventListener(evt, resetInactivityTimer, { passive: true }));
+      resetInactivityTimer();
+    }
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      activityEvents.forEach(evt => document.removeEventListener(evt, resetInactivityTimer, { passive: true }));
+    };
+  }, [user]);
+
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '');
@@ -2666,7 +2902,7 @@ const MainApp = () => {
     return [...cloudMembers].sort((a, b) => (parseInt(a.rank) || 999) - (parseInt(b.rank) || 999));
   }, [cloudMembers]);
 
-  const sortedMembers = useMemo(() => allAdminMembers.filter(m => !m.isHidden), [allAdminMembers]);
+  const sortedMembers = useMemo(() => allAdminMembers.filter(m => !m.isHidden && m.name), [allAdminMembers]);
 
   const birthdayMembers = useMemo(() => {
     const today = new Date();
@@ -2733,10 +2969,17 @@ const MainApp = () => {
     setGlobalSelectedMember(m);
   };
 
+  const isRegisteredUser = user && !user.isAnonymous;
+  const requiresProfileSetup = isRegisteredUser && (!currentUserProfile || !currentUserProfile.name || currentUserProfile.name.trim() === '');
+
   if (isLoadingAuth) return <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">Establishing Secure Hub...</div>;
   if (!user) return <SplashView />;
 
   const renderContent = () => {
+    if (requiresProfileSetup) {
+      return <ProfileView user={user} userProfile={currentUserProfile} isForcedSetup={true} />;
+    }
+
     switch (activeTab) {
       case 'home': return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberModal} members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
       case 'events': return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={false} onMemberClick={handleMemberModal} />;
@@ -2760,9 +3003,11 @@ const MainApp = () => {
             <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 shadow-lg" alt="" />
             <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
           </div>
-          <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-pink-500 hover:text-white transition-all active:scale-95 shadow-xl">
-            <Menu className="w-6 h-6" />
-          </button>
+          {!requiresProfileSetup && (
+            <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-pink-500 hover:text-white transition-all active:scale-95 shadow-xl">
+              <Menu className="w-6 h-6" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -2793,7 +3038,7 @@ const MainApp = () => {
       </div>
 
       <main className="max-w-6xl mx-auto px-4 pt-10">
-        {globalSelectedMember ? (
+        {globalSelectedMember && !requiresProfileSetup ? (
           <MemberProfileModal member={globalSelectedMember} onClose={() => { setGlobalSelectedMember(null); window.history.back(); }} onCarClick={c => { window.history.pushState({modal:'car'}, ''); setGlobalViewingCar(c); }} />
         ) : renderContent()}
       </main>
@@ -2809,26 +3054,30 @@ const MainApp = () => {
             <a href="https://www.instagram.com/daily.ride.south/" target="_blank" rel="noopener noreferrer" className="hover:text-pink-500 transition-colors"><InstagramIcon className="w-5 h-5" /></a>
             <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="hover:text-pink-500 transition-colors"><TikTokIcon className="w-5 h-5" /></a>
           </div>
-          <button onClick={() => { window.location.hash = 'admin'; window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
-            <Lock className="w-3 h-3" /> Staff Entry
-          </button>
+          {!requiresProfileSetup && (
+            <button onClick={() => { window.location.hash = 'admin'; window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
+              <Lock className="w-3 h-3" /> Staff Entry
+            </button>
+          )}
         </div>
       </footer>
 
-      <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800/50 h-16 z-50 flex items-center justify-around px-4 rounded-2xl shadow-2xl">
-         {navItems.slice(0, 4).map(item => {
-           const Icon = item.icon;
-           const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
-           return (
-             <button key={item.id} onClick={() => window.location.hash = item.id} className={`flex flex-col items-center transition-all ${isActive ? 'text-pink-500 scale-110' : 'text-zinc-600'}`}>
-               <Icon className="w-5 h-5" />
-             </button>
-           );
-         })}
-         <button onClick={() => setIsMenuOpen(true)} className="flex flex-col items-center text-zinc-600">
-           <Menu className="w-5 h-5" />
-         </button>
-      </nav>
+      {!requiresProfileSetup && (
+        <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800/50 h-16 z-50 flex items-center justify-around px-4 rounded-2xl shadow-2xl">
+           {navItems.slice(0, 4).map(item => {
+             const Icon = item.icon;
+             const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
+             return (
+               <button key={item.id} onClick={() => window.location.hash = item.id} className={`flex flex-col items-center transition-all ${isActive ? 'text-pink-500 scale-110' : 'text-zinc-600'}`}>
+                 <Icon className="w-5 h-5" />
+               </button>
+             );
+           })}
+           <button onClick={() => setIsMenuOpen(true)} className="flex flex-col items-center text-zinc-600">
+             <Menu className="w-5 h-5" />
+           </button>
+        </nav>
+      )}
     </div>
   );
 };
