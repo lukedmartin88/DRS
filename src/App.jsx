@@ -1690,10 +1690,8 @@ const RafflesView = ({ raffles, user, members }) => {
 
       const amount = reservingRaffle.ticketPrice * reserveQuantity;
       
-      // IMPORTANT: Replace 'YOUR_REGION' and 'YOUR_PROJECT_ID' with your actual Firebase Cloud Function URL once deployed!
-      const cloudFunctionUrl = `https://YOUR_REGION-YOUR_PROJECT_ID.cloudfunctions.net/createSumUpCheckout`;
+      const cloudFunctionUrl = `https://us-central1-daily-ride-south-v3.cloudfunctions.net/createSumUpCheckout`;
 
-      // Call our secure middleman instead of SumUp
       const secureResponse = await fetch(cloudFunctionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1817,9 +1815,7 @@ const RafflesView = ({ raffles, user, members }) => {
             });
 
             const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-            const manualSold = raffle.ticketsSold || 0; 
-            const totalTaken = totalReserved + manualSold;
-            const progress = (totalTaken / raffle.totalTickets) * 100;
+            const progress = (totalReserved / raffle.totalTickets) * 100;
 
             return (
               <div key={raffle.id} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col md:flex-row hover:border-pink-500 transition-colors shadow-lg">
@@ -1834,7 +1830,7 @@ const RafflesView = ({ raffles, user, members }) => {
                   </div>
                   <div className="space-y-2 mt-4">
                     <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
-                        <span>{totalTaken} Tickets Taken</span>
+                        <span>{totalReserved} Tickets Taken</span>
                         <span>{Math.round(progress)}% Full</span>
                     </div>
                     <div className="w-full bg-zinc-800 rounded-full h-2 shadow-inner">
