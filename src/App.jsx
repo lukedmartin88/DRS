@@ -1307,12 +1307,12 @@ const RafflesView = ({ raffles, user, members }) => {
          const flatVal = reservingRaffle[`reservations.${user.uid}`];
          const isFlat = flatVal !== undefined;
          const currentVal = isFlat ? flatVal : (appRes[user.uid] || 0);
+         const newVal = currentVal + reserveQuantity;
+
+         const updates = {};
+         if (isFlat) updates[`reservations.${user.uid}`] = newVal;
          
-         if (isFlat) {
-           await setDoc(rRef, { [`reservations.${user.uid}`]: currentVal + reserveQuantity }, { merge: true });
-         } else {
-           await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
-         }
+         await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [user.uid]: newVal } }, { merge: true }));
       }
 
       const amount = reservingRaffle.ticketPrice * reserveQuantity;
@@ -1648,7 +1648,7 @@ const ProfileView = ({ user, userProfile }) => {
         {cars.length === 0 && <div className="text-center py-10 text-zinc-600 italic">Your garage is currently empty.</div>}
       </div>
 
-      <button onClick={handleSave} disabled={!name.trim()} className={`w-full font-black py-4 rounded-xl flex items-center justify-center gap-2 text-lg shadow-lg transition-all transform active:scale-[0.98] ${saved ? 'bg-green-600' : 'bg-pink-600 hover:bg-pink-700 shadow-pink-500/20'} disabled:opacity-50 disabled:hover:bg-pink-600`}>
+      <button onClick={handleSave} disabled={!name.trim()} className={`w-full font-black py-4 mt-6 rounded-xl flex items-center justify-center gap-2 text-lg shadow-lg transition-all transform active:scale-[0.98] ${saved ? 'bg-green-600' : 'bg-pink-600 hover:bg-pink-700 shadow-pink-500/20'} disabled:opacity-50 disabled:hover:bg-pink-600`}>
         <Save className="w-6 h-6" /> {saved ? "Changes Saved Successfully!" : "Save Profile & Garage"}
       </button>
     </div>
@@ -1818,17 +1818,13 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const newVal = currentVal + delta;
       
       if (newVal <= 0) {
-        if (isFlat) {
-          await setDoc(rRef, { [`reservations.${memberId}`]: deleteField() }, { merge: true });
-        } else {
-          await updateDoc(rRef, { [`reservations.${memberId}`]: deleteField() });
-        }
+        const updates = {};
+        updates[`reservations.${memberId}`] = deleteField();
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [memberId]: deleteField() } }, { merge: true }));
       } else {
-        if (isFlat) {
-          await setDoc(rRef, { [`reservations.${memberId}`]: newVal }, { merge: true });
-        } else {
-          await setDoc(rRef, { reservations: { [memberId]: newVal } }, { merge: true });
-        }
+        const updates = {};
+        updates[`reservations.${memberId}`] = newVal;
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [memberId]: newVal } }, { merge: true }));
       }
     } catch (err) {
       console.error("Error updating reservation:", err);
@@ -1848,17 +1844,13 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const newVal = currentCount + delta;
 
       if (newVal <= 0) {
-        if (isFlat) {
-          await setDoc(rRef, { [`offlineReservations.${guestId}`]: deleteField() }, { merge: true });
-        } else {
-          await updateDoc(rRef, { [`offlineReservations.${guestId}`]: deleteField() });
-        }
+        const updates = {};
+        updates[`offlineReservations.${guestId}`] = deleteField();
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { offlineReservations: { [guestId]: deleteField() } }, { merge: true }));
       } else {
-        if (isFlat) {
-          await setDoc(rRef, { [`offlineReservations.${guestId}`]: { ...currentRecord, count: newVal } }, { merge: true });
-        } else {
-          await setDoc(rRef, { offlineReservations: { [guestId]: { ...currentRecord, count: newVal } } }, { merge: true });
-        }
+        const updates = {};
+        updates[`offlineReservations.${guestId}`] = { name: currentRecord.name, count: newVal };
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { offlineReservations: { [guestId]: { name: currentRecord.name, count: newVal } } }, { merge: true }));
       }
     } catch (err) {
       console.error("Error updating offline reservation:", err);
@@ -1879,18 +1871,18 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id);
       if (f.selected === 'guest') {
         const newId = `guest_${Date.now()}`;
-        await setDoc(rRef, { offlineReservations: { [newId]: { name: f.guestName.trim(), count: f.qty } } }, { merge: true });
+        const updates = {};
+        updates[`offlineReservations.${newId}`] = { name: f.guestName.trim(), count: f.qty };
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { offlineReservations: { [newId]: { name: f.guestName.trim(), count: f.qty } } }, { merge: true }));
       } else {
         const appRes = r.reservations || {};
         const flatVal = r[`reservations.${f.selected}`];
         const isFlat = flatVal !== undefined;
         const currentVal = isFlat ? flatVal : (appRes[f.selected] || 0);
         
-        if (isFlat) {
-          await setDoc(rRef, { [`reservations.${f.selected}`]: currentVal + f.qty }, { merge: true });
-        } else {
-          await setDoc(rRef, { reservations: { [f.selected]: currentVal + f.qty } }, { merge: true });
-        }
+        const updates = {};
+        updates[`reservations.${f.selected}`] = currentVal + f.qty;
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [f.selected]: currentVal + f.qty } }, { merge: true }));
       }
       updateOfflineForm(raffleId, { selected: '', guestName: '', qty: 1 });
     } catch (err) {
