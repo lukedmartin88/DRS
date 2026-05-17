@@ -10,7 +10,7 @@ import {
   sendPasswordResetEmail,
   signInAnonymously
 } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, deleteField } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, deleteField, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   Calendar, 
@@ -449,34 +449,9 @@ const STATIC_EVENTS = [
 ];
 
 const guideSections = [
-  { 
-    id: '1', 
-    title: 'Managing Members', 
-    icon: Users, 
-    steps: [
-      { title: 'View Profiles', content: 'Click any member in the moderation hub to edit their profile.' }, 
-      { title: 'Ban/Hide', content: 'Use the eye icon to hide members from the directory.' }, 
-      { title: 'Member Roles', content: 'Type a custom role and rank to pin them to the top of the directory.' }
-    ] 
-  },
-  { 
-    id: '2', 
-    title: 'Event Operations', 
-    icon: Calendar, 
-    steps: [
-      { title: 'Deploy Events', content: 'Fill out the new event form to update the board.' }, 
-      { title: 'Guest Lists', content: 'Download a PDF roster of all attendees directly from the event card.' }
-    ] 
-  },
-  { 
-    id: '3', 
-    title: 'Raffle System', 
-    icon: Trophy, 
-    steps: [
-      { title: 'Offline Tickets', content: 'Use the manual reservation tool for cash payments to insert their name into the drum.' }, 
-      { title: 'The Draw Machine', content: 'Launch the draw machine to record and download the winner reveal video. The system automatically weights the odds based on tickets held.' }
-    ] 
-  }
+  { id: '1', title: 'Managing Members', icon: Users, steps: [{ title: 'View Profiles', content: 'Click any member in the moderation hub to edit their profile.' }, { title: 'Ban/Hide', content: 'Use the eye icon to hide members from the directory.' }, { title: 'Member Roles', content: 'Type a custom role and rank to pin them to the top of the directory.' }] },
+  { id: '2', title: 'Event Operations', icon: Calendar, steps: [{ title: 'Deploy Events', content: 'Fill out the new event form to update the board.' }, { title: 'Guest Lists', content: 'Download a PDF roster of all attendees directly from the event card.' }] },
+  { id: '3', title: 'Raffle System', icon: Trophy, steps: [{ title: 'Offline Tickets', content: 'Use the manual reservation tool for cash payments to insert their name into the drum.' }, { title: 'The Draw Machine', content: 'Launch the draw machine to record and download the winner reveal video. The system automatically weights the odds based on tickets held.' }] }
 ];
 
 const STATIC_CHARITY = [{ 
@@ -1330,8 +1305,14 @@ const RafflesView = ({ raffles, user, members }) => {
          const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', reservingRaffle.id);
          const appRes = reservingRaffle.reservations || {};
          const flatVal = reservingRaffle[`reservations.${user.uid}`];
-         const currentVal = flatVal !== undefined ? flatVal : (appRes[user.uid] || 0);
-         await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
+         const isFlat = flatVal !== undefined;
+         const currentVal = isFlat ? flatVal : (appRes[user.uid] || 0);
+         
+         if (isFlat) {
+           await setDoc(rRef, { [`reservations.${user.uid}`]: currentVal + reserveQuantity }, { merge: true });
+         } else {
+           await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
+         }
       }
 
       const amount = reservingRaffle.ticketPrice * reserveQuantity;
@@ -1533,147 +1514,6 @@ const RafflesView = ({ raffles, user, members }) => {
   );
 };
 
-const ProfileView = ({ user, userProfile }) => {
-  const [name, setName] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [bio, setBio] = useState('');
-  const [location, setLocation] = useState('');
-  const [instagram, setInstagram] = useState('');
-  const [birthdayDay, setBirthdayDay] = useState('');
-  const [birthdayMonth, setBirthdayMonth] = useState('');
-  const [avatar, setAvatar] = useState('');
-  const [cars, setCars] = useState([]);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (userProfile) {
-      setName(userProfile.name || '');
-      setNickname(userProfile.nickname || '');
-      setBio(userProfile.bio || '');
-      setLocation(userProfile.location || '');
-      setInstagram(userProfile.instagram || '');
-      setBirthdayDay(userProfile.birthdayDay || '');
-      setBirthdayMonth(userProfile.birthdayMonth || '');
-      setAvatar(userProfile.avatar || '');
-      setCars(userProfile.cars || []);
-    }
-  }, [userProfile]);
-
-  const handleSave = async () => {
-    if (!user) return;
-    try {
-      const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
-      await setDoc(profileRef, {
-        name, nickname, bio, location, instagram, birthdayDay, birthdayMonth, avatar, cars,
-        role: userProfile?.role || 'Member',
-        joinDate: userProfile?.joinDate || formatDate(new Date()),
-        email: user.email || '' 
-      }, { merge: true });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  };
-
-  if (!user) return <div className="text-center py-20 text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">Establishing Secure Connection...</div>;
-
-  return (
-    <div className="space-y-8 max-w-4xl mx-auto animate-in fade-in duration-700">
-      <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-4">My Profile</h2>
-      <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6 shadow-xl">
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="shrink-0 flex flex-col items-center gap-4">
-             <img src={avatar || DEFAULT_AVATAR} alt="" className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800 bg-black shadow-inner shadow-pink-500/10" />
-             <ImageUpload label="Change Avatar" onUploadSuccess={setAvatar} />
-          </div>
-          <div className="flex-grow grid sm:grid-cols-2 gap-4 h-fit">
-            <InputField label="Full Name (Required)" value={name} onChange={e => setName(e.target.value)} required={true} />
-            <InputField label="Nickname" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="E.g. Speedy" />
-            <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
-                <InputField label="Town / City" value={location} onChange={e => setLocation(e.target.value)} />
-                <InputField label="Instagram Profile Link" value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="https://instagram.com/username" />
-                <div className="sm:col-span-2 w-full">
-                   <label className="block text-sm font-medium text-zinc-400 mb-1">Birthday (Optional)</label>
-                   <div className="flex gap-2">
-                     <select value={birthdayDay} onChange={e => setBirthdayDay(e.target.value)} className="w-1/3 bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
-                        <option value="">Day</option>
-                        {[...Array(31)].map((_, i) => <option key={i+1} value={(i+1).toString()}>{i+1}{getOrdinalSuffix(i+1)}</option>)}
-                     </select>
-                     <select value={birthdayMonth} onChange={e => setBirthdayMonth(e.target.value)} className="w-2/3 bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
-                        <option value="">Month</option>
-                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => <option key={i+1} value={(i+1).toString()}>{m}</option>)}
-                     </select>
-                   </div>
-                </div>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-1">
-            <label className="block text-sm font-medium text-zinc-400">Short Bio</label>
-            <textarea value={bio} onChange={e => setBio(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all" placeholder="Tell the club about yourself and your automotive history..." rows={3} />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mt-12 border-b border-zinc-800 pb-4">
-        <h3 className="text-2xl font-bold text-white">My Garage</h3>
-        <button onClick={() => setCars(prev => [...prev, { make: '', model: '', year: 2026, specs: '', mods: '', image: '', gallery: [] }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
-      </div>
-
-      <div className="space-y-6">
-        {cars.map((car, idx) => (
-          <div key={idx} className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 relative shadow-lg animate-in slide-in-from-left-4 duration-300">
-            <button onClick={() => setCars(prev => prev.filter((_, i) => i !== idx))} className="absolute top-4 right-4 text-zinc-500 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5"/></button>
-            <div className="grid md:grid-cols-2 gap-4">
-              <InputField label="Make" value={car.make} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, make: e.target.value } : c))} />
-              <InputField label="Model" value={car.model} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, model: e.target.value } : c))} />
-              <InputField label="Year" type="number" value={car.year} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, year: e.target.value } : c))} />
-              <InputField label="Specs" value={car.specs} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, specs: e.target.value } : c))} />
-              <div className="md:col-span-2">
-                <InputField label="Mods" value={car.mods} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, mods: e.target.value } : c))} />
-              </div>
-              
-              <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50 mt-2">
-                  <ImageUpload label="Upload Main Vehicle Photo (Cover)" onUploadSuccess={url => setCars(prev => prev.map((c, i) => i === idx ? { ...c, image: url } : c))} />
-                  {car.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest flex items-center gap-1">Cover Photo Uploaded Successfully</p>}
-              </div>
-
-              <div className="md:col-span-2 mt-4 pt-4 border-t border-zinc-800/50">
-                  <h4 className="text-sm font-medium text-zinc-400 mb-3">Additional Gallery Images</h4>
-                  <div className="flex flex-wrap gap-3 mb-4">
-                      {car.gallery && car.gallery.map((gImg, gIdx) => (
-                          <div key={gIdx} className="relative w-24 h-24 group rounded-xl overflow-hidden border border-zinc-700 shadow-md">
-                              <img src={gImg} alt={`Gallery item ${gIdx + 1}`} className="w-full h-full object-cover" />
-                              <button 
-                                  onClick={() => setCars(prev => prev.map((c, i) => i === idx ? { ...c, gallery: c.gallery.filter((_, deleteIdx) => deleteIdx !== gIdx) } : c))} 
-                                  className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Remove image"
-                              >
-                                  <Trash2 className="w-6 h-6 text-red-500" />
-                              </button>
-                          </div>
-                      ))}
-                  </div>
-                  <div className="bg-black/30 p-4 rounded-lg border border-zinc-800/50 border-dashed">
-                      <ImageUpload 
-                          label="Add Another Photo to Gallery" 
-                          onUploadSuccess={url => setCars(prev => prev.map((c, i) => i === idx ? { ...c, gallery: [...(c.gallery || []), url] } : c))} 
-                      />
-                  </div>
-              </div>
-            </div>
-          </div>
-        ))}
-        {cars.length === 0 && <div className="text-center py-10 text-zinc-600 italic">Your garage is currently empty.</div>}
-      </div>
-
-      <button onClick={handleSave} disabled={!name.trim()} className={`w-full font-black py-4 rounded-xl flex items-center justify-center gap-2 text-lg shadow-lg transition-all transform active:scale-[0.98] ${saved ? 'bg-green-600' : 'bg-pink-600 hover:bg-pink-700 shadow-pink-500/20'} disabled:opacity-50 disabled:hover:bg-pink-600`}>
-        <Save className="w-6 h-6" /> {saved ? "Changes Saved Successfully!" : "Save Profile & Garage"}
-      </button>
-    </div>
-  );
-};
-
 const CharityView = () => (
   <div className="space-y-6">
     <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Charity Initiatives</h2>
@@ -1826,19 +1666,28 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   };
 
   const handleUpdateReservation = async (e, raffle, memberId, delta) => {
-    if (e) e.preventDefault();
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     if (raffle.id.startsWith('mock-')) return;
     try {
       const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
       const appRes = raffle.reservations || {};
       const flatVal = raffle[`reservations.${memberId}`];
-      const currentVal = flatVal !== undefined ? flatVal : (appRes[memberId] || 0);
+      const isFlat = flatVal !== undefined;
+      const currentVal = isFlat ? flatVal : (appRes[memberId] || 0);
       const newVal = currentVal + delta;
       
       if (newVal <= 0) {
-        await setDoc(rRef, { reservations: { [memberId]: deleteField() } }, { merge: true });
+        if (isFlat) {
+          await setDoc(rRef, { [`reservations.${memberId}`]: deleteField() }, { merge: true });
+        } else {
+          await updateDoc(rRef, { [`reservations.${memberId}`]: deleteField() });
+        }
       } else {
-        await setDoc(rRef, { reservations: { [memberId]: newVal } }, { merge: true });
+        if (isFlat) {
+          await setDoc(rRef, { [`reservations.${memberId}`]: newVal }, { merge: true });
+        } else {
+          await setDoc(rRef, { reservations: { [memberId]: newVal } }, { merge: true });
+        }
       }
     } catch (err) {
       console.error("Error updating reservation:", err);
@@ -1846,20 +1695,29 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   };
 
   const handleUpdateOfflineReservation = async (e, raffle, guestId, delta) => {
-    if (e) e.preventDefault();
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     if (raffle.id.startsWith('mock-')) return;
     try {
       const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
       const offRes = raffle.offlineReservations || {};
       const flatRecord = raffle[`offlineReservations.${guestId}`];
-      const currentRecord = offRes[guestId] || flatRecord || { count: 0, name: 'Guest' };
+      const isFlat = flatRecord !== undefined;
+      const currentRecord = isFlat ? flatRecord : (offRes[guestId] || { count: 0, name: 'Guest' });
       const currentCount = currentRecord.count || 0;
       const newVal = currentCount + delta;
 
       if (newVal <= 0) {
-        await setDoc(rRef, { offlineReservations: { [guestId]: deleteField() } }, { merge: true });
+        if (isFlat) {
+          await setDoc(rRef, { [`offlineReservations.${guestId}`]: deleteField() }, { merge: true });
+        } else {
+          await updateDoc(rRef, { [`offlineReservations.${guestId}`]: deleteField() });
+        }
       } else {
-        await setDoc(rRef, { offlineReservations: { [guestId]: { ...currentRecord, count: newVal } } }, { merge: true });
+        if (isFlat) {
+          await setDoc(rRef, { [`offlineReservations.${guestId}`]: { ...currentRecord, count: newVal } }, { merge: true });
+        } else {
+          await setDoc(rRef, { offlineReservations: { [guestId]: { ...currentRecord, count: newVal } } }, { merge: true });
+        }
       }
     } catch (err) {
       console.error("Error updating offline reservation:", err);
@@ -1871,7 +1729,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   };
 
   const handleAddOffline = async (e, raffleId) => {
-    if (e) e.preventDefault();
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     const r = raffles.find(x => x.id === raffleId);
     const f = offlineForms[raffleId];
     if (!r || !f || !f.selected) return;
@@ -1884,8 +1742,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       } else {
         const appRes = r.reservations || {};
         const flatVal = r[`reservations.${f.selected}`];
-        const currentVal = flatVal !== undefined ? flatVal : (appRes[f.selected] || 0);
-        await setDoc(rRef, { reservations: { [f.selected]: currentVal + f.qty } }, { merge: true });
+        const isFlat = flatVal !== undefined;
+        const currentVal = isFlat ? flatVal : (appRes[f.selected] || 0);
+        
+        if (isFlat) {
+          await setDoc(rRef, { [`reservations.${f.selected}`]: currentVal + f.qty }, { merge: true });
+        } else {
+          await setDoc(rRef, { reservations: { [f.selected]: currentVal + f.qty } }, { merge: true });
+        }
       }
       updateOfflineForm(raffleId, { selected: '', guestName: '', qty: 1 });
     } catch (err) {
@@ -2055,7 +1919,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           onClose={() => { window.history.back(); }} 
           onSetWinner={async (winnerName) => {
              try {
-               await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName }, { merge: true });
+               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName });
                window.history.back();
              } catch (err) { console.error(err); }
           }}
@@ -2227,9 +2091,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                       {!r.isEnded && !r.id.startsWith('mock-') && (
                         <div className="mt-4 pt-4 border-t border-zinc-800/50">
                           <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Manage Reservations</p>
-                          <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                          <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1 mb-4">
                              {allReservedList.map(m => (
-                                <div key={m.id} className="flex items-center justify-between bg-zinc-900 p-2 rounded-lg border border-zinc-700">
+                                <div key={m.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-zinc-800">
                                    <div className="flex items-center gap-2">
                                      <img src={m.avatar || DEFAULT_AVATAR} className="w-6 h-6 rounded-full object-cover" alt="" />
                                      <span className="text-xs text-zinc-300 font-bold truncate max-w-[100px]">{m.name}</span>
