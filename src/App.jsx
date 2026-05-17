@@ -10,7 +10,7 @@ import {
   sendPasswordResetEmail,
   signInAnonymously
 } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, deleteField, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, deleteField } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { 
   Calendar, 
@@ -1825,7 +1825,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     }
   };
 
-  const handleUpdateReservation = async (raffle, memberId, delta) => {
+  const handleUpdateReservation = async (e, raffle, memberId, delta) => {
+    if (e) e.preventDefault();
     if (raffle.id.startsWith('mock-')) return;
     try {
       const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
@@ -1835,7 +1836,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const newVal = currentVal + delta;
       
       if (newVal <= 0) {
-        await updateDoc(rRef, { [`reservations.${memberId}`]: deleteField() });
+        await setDoc(rRef, { reservations: { [memberId]: deleteField() } }, { merge: true });
       } else {
         await setDoc(rRef, { reservations: { [memberId]: newVal } }, { merge: true });
       }
@@ -1844,7 +1845,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     }
   };
 
-  const handleUpdateOfflineReservation = async (raffle, guestId, delta) => {
+  const handleUpdateOfflineReservation = async (e, raffle, guestId, delta) => {
+    if (e) e.preventDefault();
     if (raffle.id.startsWith('mock-')) return;
     try {
       const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
@@ -1855,7 +1857,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const newVal = currentCount + delta;
 
       if (newVal <= 0) {
-        await updateDoc(rRef, { [`offlineReservations.${guestId}`]: deleteField() });
+        await setDoc(rRef, { offlineReservations: { [guestId]: deleteField() } }, { merge: true });
       } else {
         await setDoc(rRef, { offlineReservations: { [guestId]: { ...currentRecord, count: newVal } } }, { merge: true });
       }
@@ -1868,7 +1870,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     setOfflineForms(prev => ({ ...prev, [id]: { ...(prev[id] || { selected: '', guestName: '', qty: 1 }), ...updates } }));
   };
 
-  const handleAddOffline = async (raffleId) => {
+  const handleAddOffline = async (e, raffleId) => {
+    if (e) e.preventDefault();
     const r = raffles.find(x => x.id === raffleId);
     const f = offlineForms[raffleId];
     if (!r || !f || !f.selected) return;
@@ -1885,8 +1888,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         await setDoc(rRef, { reservations: { [f.selected]: currentVal + f.qty } }, { merge: true });
       }
       updateOfflineForm(raffleId, { selected: '', guestName: '', qty: 1 });
-    } catch (e) {
-      console.error("Failed to add manual reservation:", e);
+    } catch (err) {
+      console.error("Failed to add manual reservation:", err);
     }
   };
 
@@ -2052,7 +2055,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           onClose={() => { window.history.back(); }} 
           onSetWinner={async (winnerName) => {
              try {
-               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName });
+               await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName }, { merge: true });
                window.history.back();
              } catch (err) { console.error(err); }
           }}
@@ -2160,7 +2163,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           <div className="bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300 mt-6">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-4 mb-4">
                <h4 className="font-bold text-white uppercase tracking-wider">Editing Raffle: {editingRaffle.title}</h4>
-               <button onClick={() => { setEditingRaffle(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
+               <button type="button" onClick={(e) => { e.preventDefault(); setEditingRaffle(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
             <div className="grid md:grid-cols-2 gap-6">
               <InputField label="Prize Title" value={editingRaffle.title || ''} onChange={e => setEditingRaffle({...editingRaffle, title: e.target.value})} />
@@ -2175,7 +2178,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                  <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
                  <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingRaffle.description || ''} onChange={e => setEditingRaffle({...editingRaffle, description: e.target.value})} rows={3} />
               </div>
-              <button onClick={handleUpdateRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Raffle Changes</button>
+              <button type="button" onClick={handleUpdateRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Raffle Changes</button>
             </div>
           </div>
         ) : (
@@ -2193,7 +2196,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                  <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
                  <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
               </div>
-              <button onClick={handlePublishRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
+              <button type="button" onClick={handlePublishRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
             </div>
             
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
@@ -2233,12 +2236,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                                    </div>
                                    <div className="flex items-center gap-2">
                                      <button 
-                                       onClick={() => m.type === 'offline' ? handleUpdateOfflineReservation(r, m.id, -1) : handleUpdateReservation(r, m.id, -1)} 
+                                       type="button"
+                                       onClick={(e) => m.type === 'offline' ? handleUpdateOfflineReservation(e, r, m.id, -1) : handleUpdateReservation(e, r, m.id, -1)} 
                                        className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 text-pink-500 hover:bg-zinc-700 font-black transition-colors leading-none"
                                      >-</button>
                                      <span className="text-white font-bold text-xs w-4 text-center">{m.ticketCount}</span>
                                      <button 
-                                       onClick={() => m.type === 'offline' ? handleUpdateOfflineReservation(r, m.id, 1) : handleUpdateReservation(r, m.id, 1)} 
+                                       type="button"
+                                       onClick={(e) => m.type === 'offline' ? handleUpdateOfflineReservation(e, r, m.id, 1) : handleUpdateReservation(e, r, m.id, 1)} 
                                        className="w-6 h-6 flex items-center justify-center rounded bg-zinc-800 text-pink-500 hover:bg-zinc-700 font-black transition-colors leading-none"
                                      >+</button>
                                    </div>
@@ -2279,7 +2284,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                                    className="w-20 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-pink-500"
                                  />
                                  <button 
-                                   onClick={() => handleAddOffline(r.id)}
+                                   type="button"
+                                   onClick={(e) => handleAddOffline(e, r.id)}
                                    disabled={!form.selected || (form.selected === 'guest' && !form.guestName.trim())}
                                    className="flex-grow bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 text-white font-bold rounded-lg text-[10px] uppercase tracking-widest transition-colors"
                                  >
@@ -2295,7 +2301,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                     {!r.isEnded && !r.id.startsWith('mock-') && (
                       <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-4">
                         <button 
-                          onClick={() => { window.history.pushState({ modal: 'drawRaffle' }, ''); setDrawingRaffle(r); }}
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); window.history.pushState({ modal: 'drawRaffle' }, ''); setDrawingRaffle(r); }}
                           className="w-full bg-pink-600 hover:bg-pink-500 text-white font-black py-3 rounded-lg text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(219,39,119,0.3)]"
                         >
                           <Trophy className="w-4 h-4" /> Launch Draw Machine
@@ -2310,10 +2317,12 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                             className="flex-grow bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
                           />
                           <button 
-                            onClick={async () => { 
+                            type="button"
+                            onClick={async (e) => { 
+                              e.preventDefault();
                               if (!raffleWinners[r.id]) return;
                               try {
-                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] });
+                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
                               } catch (err) { console.error(err); }
                             }} 
                             disabled={!raffleWinners[r.id]}
@@ -2328,13 +2337,16 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                     {!r.id.startsWith('mock-') && (
                       <div className="flex justify-between items-center mt-4 pt-4 border-t border-zinc-800/50">
                         <button
-                          onClick={() => { window.history.pushState({ modal: 'editRaffle' }, ''); setEditingRaffle(r); }}
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); window.history.pushState({ modal: 'editRaffle' }, ''); setEditingRaffle(r); }}
                           className="text-pink-500 group-hover:text-pink-400 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
                         >
                           <Edit3 className="w-3 h-3" /> Edit
                         </button>
                         <button 
-                          onClick={async () => { 
+                          type="button"
+                          onClick={async (e) => { 
+                            e.preventDefault();
                             if(window.confirm('PERMANENTLY DELETE RAFFLE?')) {
                               try {
                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id));
