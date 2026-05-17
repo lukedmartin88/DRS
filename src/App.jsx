@@ -227,17 +227,24 @@ const parseRaffleReservations = (raffle, cloudMembers) => {
   });
 
   Object.keys(offRes).forEach(gid => {
+    const record = offRes[gid];
+    const safeCount = typeof record === 'object' ? record.count : parseInt(record) || 0;
+    const safeName = typeof record === 'object' ? record.name : 'Guest Participant';
+    
     list.push({
       id: gid,
-      name: offRes[gid].name || 'Guest Participant',
+      name: safeName,
       avatar: DEFAULT_AVATAR,
-      ticketCount: offRes[gid].count || 0,
+      ticketCount: safeCount,
       type: 'offline'
     });
   });
 
-  // Sort alphabetically to prevent jumping during live updates
-  list.sort((a, b) => a.name.localeCompare(b.name));
+  list.sort((a, b) => {
+    const nameCmp = a.name.localeCompare(b.name);
+    if (nameCmp !== 0) return nameCmp;
+    return a.id.localeCompare(b.id);
+  });
 
   return list;
 };
@@ -1280,6 +1287,18 @@ const RafflesView = ({ raffles, user, members }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [loginPrompt, setLoginPrompt] = useState(false);
+  const [sumupCheckoutId, setSumupCheckoutId] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!document.getElementById('sumup-card-sdk')) {
+      const script = document.createElement('script');
+      script.id = 'sumup-card-sdk';
+      script.src = 'https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   const membersById = useMemo(() => {
     if (!members) return {};
@@ -1294,6 +1313,8 @@ const RafflesView = ({ raffles, user, members }) => {
     setReservingRaffle(raffle);
     setReserveQuantity(1);
     setSubmitError('');
+    setSumupCheckoutId(null);
+    setPaymentSuccess(false);
   };
 
   const submitReservation = async () => {
@@ -1336,16 +1357,40 @@ const RafflesView = ({ raffles, user, members }) => {
       const { checkoutId } = await secureResponse.json();
 
       if (checkoutId) {
-        window.location.href = `https://checkout.sumup.com/pay/${checkoutId}`;
+        setSumupCheckoutId(checkoutId);
       } else {
         throw new Error('Failed to generate checkout link');
       }
     } catch (e) {
       console.error(e);
       setSubmitError(e.message === 'Failed to fetch' ? 'Connection Blocked: Check Cloud Function URL & Logs.' : `Error: ${e.message}`);
+    } finally {
       setIsSubmitting(false);
     }
   };
+
+  useEffect(() => {
+    let sumupCardInstance = null;
+    if (sumupCheckoutId && window.SumUpCard) {
+      sumupCardInstance = window.SumUpCard.mount({
+        id: 'sumup-card-container',
+        checkoutId: sumupCheckoutId,
+        onResponse: (type, body) => {
+          if (type === 'success') {
+            setPaymentSuccess(true);
+          } else if (type === 'fail' || type === 'error') {
+            setSubmitError('Payment failed or was cancelled. Please try again.');
+            setSumupCheckoutId(null);
+          }
+        }
+      });
+    }
+    return () => {
+      if (sumupCardInstance && sumupCardInstance.unmount) {
+        sumupCardInstance.unmount();
+      }
+    };
+  }, [sumupCheckoutId]);
 
   const activeRaffles = raffles.filter(r => !r.isEnded);
   const pastRaffles = raffles.filter(r => r.isEnded);
@@ -1384,33 +1429,46 @@ const RafflesView = ({ raffles, user, members }) => {
       {reservingRaffle && (
         <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative">
-            <button onClick={() => setReservingRaffle(null)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6"/></button>
+            <button onClick={() => { setReservingRaffle(null); setSumupCheckoutId(null); setPaymentSuccess(false); }} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6"/></button>
             <div className="text-center mb-6">
               <Ticket className="w-12 h-12 text-pink-500 mx-auto mb-4" />
               <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Reserve Tickets</h3>
               <p className="text-zinc-400 text-sm mt-1">{reservingRaffle.title}</p>
             </div>
             
-            <div className="space-y-6">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 text-center mb-3">Select Quantity</label>
-                <div className="flex items-center justify-between bg-black border border-zinc-800 rounded-2xl p-2">
-                  <button onClick={() => setReserveQuantity(Math.max(1, reserveQuantity - 1))} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">-</button>
-                  <span className="text-white font-black text-3xl">{reserveQuantity}</span>
-                  <button onClick={() => setReserveQuantity(reserveQuantity + 1)} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">+</button>
+            {paymentSuccess ? (
+              <div className="text-center space-y-4 animate-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/50">
+                  <CheckCircle2 className="w-10 h-10 text-green-500" />
                 </div>
+                <h4 className="text-xl font-black text-white uppercase tracking-widest">Payment Complete!</h4>
+                <p className="text-zinc-400 text-sm">Your tickets have been secured in the draw.</p>
+                <button onClick={() => { setReservingRaffle(null); setPaymentSuccess(false); setSumupCheckoutId(null); }} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs mt-4">Close Menu</button>
               </div>
-              
-              <div className="bg-black/50 p-4 rounded-xl border border-zinc-800/50 text-center">
-                 <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total Cost</p>
-                 <p className="text-pink-500 font-black text-2xl">£{reservingRaffle.ticketPrice * reserveQuantity}</p>
-              </div>
+            ) : sumupCheckoutId ? (
+              <div className="bg-white rounded-xl p-4 min-h-[350px] animate-in fade-in duration-500" id="sumup-card-container"></div>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 text-center mb-3">Select Quantity</label>
+                  <div className="flex items-center justify-between bg-black border border-zinc-800 rounded-2xl p-2">
+                    <button onClick={() => setReserveQuantity(Math.max(1, reserveQuantity - 1))} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">-</button>
+                    <span className="text-white font-black text-3xl">{reserveQuantity}</span>
+                    <button onClick={() => setReserveQuantity(reserveQuantity + 1)} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">+</button>
+                  </div>
+                </div>
+                
+                <div className="bg-black/50 p-4 rounded-xl border border-zinc-800/50 text-center">
+                   <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total Cost</p>
+                   <p className="text-pink-500 font-black text-2xl">£{reservingRaffle.ticketPrice * reserveQuantity}</p>
+                </div>
 
-              <button onClick={submitReservation} disabled={isSubmitting} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]">
-                {isSubmitting ? 'Connecting to SumUp...' : 'Confirm & Pay via SumUp'}
-              </button>
-              {submitError && <p className="text-red-500 text-[10px] font-bold text-center uppercase tracking-widest mt-2">{submitError}</p>}
-            </div>
+                <button onClick={submitReservation} disabled={isSubmitting} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]">
+                  {isSubmitting ? 'Loading Checkout...' : 'Confirm & Pay via SumUp'}
+                </button>
+                {submitError && <p className="text-red-500 text-[10px] font-bold text-center uppercase tracking-widest mt-2">{submitError}</p>}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1818,13 +1876,17 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const newVal = currentVal + delta;
       
       if (newVal <= 0) {
-        const updates = {};
-        updates[`reservations.${memberId}`] = deleteField();
-        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [memberId]: deleteField() } }, { merge: true }));
+        if (isFlat) {
+          await setDoc(rRef, { [`reservations.${memberId}`]: deleteField() }, { merge: true });
+        } else {
+          await updateDoc(rRef, { [`reservations.${memberId}`]: deleteField() });
+        }
       } else {
-        const updates = {};
-        updates[`reservations.${memberId}`] = newVal;
-        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [memberId]: newVal } }, { merge: true }));
+        if (isFlat) {
+          await setDoc(rRef, { [`reservations.${memberId}`]: newVal }, { merge: true });
+        } else {
+          await setDoc(rRef, { reservations: { [memberId]: newVal } }, { merge: true });
+        }
       }
     } catch (err) {
       console.error("Error updating reservation:", err);
@@ -1840,17 +1902,22 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const flatRecord = raffle[`offlineReservations.${guestId}`];
       const isFlat = flatRecord !== undefined;
       const currentRecord = isFlat ? flatRecord : (offRes[guestId] || { count: 0, name: 'Guest' });
-      const currentCount = currentRecord.count || 0;
+      const currentCount = typeof currentRecord === 'object' ? currentRecord.count : parseInt(currentRecord) || 0;
+      const currentName = typeof currentRecord === 'object' ? currentRecord.name : 'Guest';
       const newVal = currentCount + delta;
 
       if (newVal <= 0) {
-        const updates = {};
-        updates[`offlineReservations.${guestId}`] = deleteField();
-        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { offlineReservations: { [guestId]: deleteField() } }, { merge: true }));
+        if (isFlat) {
+          await setDoc(rRef, { [`offlineReservations.${guestId}`]: deleteField() }, { merge: true });
+        } else {
+          await updateDoc(rRef, { [`offlineReservations.${guestId}`]: deleteField() });
+        }
       } else {
-        const updates = {};
-        updates[`offlineReservations.${guestId}`] = { name: currentRecord.name, count: newVal };
-        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { offlineReservations: { [guestId]: { name: currentRecord.name, count: newVal } } }, { merge: true }));
+        if (isFlat) {
+          await setDoc(rRef, { [`offlineReservations.${guestId}`]: { name: currentName, count: newVal } }, { merge: true });
+        } else {
+          await setDoc(rRef, { offlineReservations: { [guestId]: { name: currentName, count: newVal } } }, { merge: true });
+        }
       }
     } catch (err) {
       console.error("Error updating offline reservation:", err);
@@ -1871,18 +1938,21 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id);
       if (f.selected === 'guest') {
         const newId = `guest_${Date.now()}`;
-        const updates = {};
-        updates[`offlineReservations.${newId}`] = { name: f.guestName.trim(), count: f.qty };
-        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { offlineReservations: { [newId]: { name: f.guestName.trim(), count: f.qty } } }, { merge: true }));
+        const safeName = f.guestName ? f.guestName.trim() : 'Guest';
+        const safeCount = parseInt(f.qty) || 1;
+        await setDoc(rRef, { offlineReservations: { [newId]: { name: safeName, count: safeCount } } }, { merge: true });
       } else {
         const appRes = r.reservations || {};
         const flatVal = r[`reservations.${f.selected}`];
         const isFlat = flatVal !== undefined;
         const currentVal = isFlat ? flatVal : (appRes[f.selected] || 0);
+        const safeCount = parseInt(f.qty) || 1;
         
-        const updates = {};
-        updates[`reservations.${f.selected}`] = currentVal + f.qty;
-        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [f.selected]: currentVal + f.qty } }, { merge: true }));
+        if (isFlat) {
+          await setDoc(rRef, { [`reservations.${f.selected}`]: currentVal + safeCount }, { merge: true });
+        } else {
+          await setDoc(rRef, { reservations: { [f.selected]: currentVal + safeCount } }, { merge: true });
+        }
       }
       updateOfflineForm(raffleId, { selected: '', guestName: '', qty: 1 });
     } catch (err) {
@@ -2052,7 +2122,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           onClose={() => { window.history.back(); }} 
           onSetWinner={async (winnerName) => {
              try {
-               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName });
+               await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName }, { merge: true });
                window.history.back();
              } catch (err) { console.error(err); }
           }}
@@ -2319,7 +2389,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                               e.preventDefault();
                               if (!raffleWinners[r.id]) return;
                               try {
-                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] });
+                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
                               } catch (err) { console.error(err); }
                             }} 
                             disabled={!raffleWinners[r.id]}
