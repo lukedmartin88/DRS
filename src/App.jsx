@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -1282,6 +1282,76 @@ const MembersView = ({ members, onMemberClick }) => {
   );
 };
 
+const CountdownTimer = ({ drawDate }) => {
+  const [timeLeft, setTimeLeft] = useState(null);
+  
+  useEffect(() => {
+    if (!drawDate) return;
+    const calc = () => {
+      const target = parseEventDateStr(drawDate);
+      const now = new Date();
+      const diff = target - now;
+      if (isNaN(diff) || diff <= 0 || target.getFullYear() === 9999) { setTimeLeft(null); return; }
+      setTimeLeft({
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
+        mins: Math.floor((diff % 3600000) / 60000),
+        secs: Math.floor((diff % 60000) / 1000),
+      });
+    };
+    calc();
+    const t = setInterval(calc, 1000);
+    return () => clearInterval(t);
+  }, [drawDate]);
+
+  if (!timeLeft) return null;
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+      <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+        <Clock className="w-3.5 h-3.5 text-pink-500" /> Draw Countdown
+      </p>
+      <div className="grid grid-cols-4 gap-3">
+        {[['Days', timeLeft.days], ['Hours', timeLeft.hours], ['Mins', timeLeft.mins], ['Secs', timeLeft.secs]].map(([label, val]) => (
+          <div key={label} className="bg-black rounded-xl p-3 text-center border border-zinc-800">
+            <span className="text-2xl font-black text-pink-500 tabular-nums">
+              {String(val).padStart(2, '0')}
+            </span>
+            <p className="text-zinc-600 text-[9px] font-bold uppercase tracking-widest mt-1">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const SumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
+  useEffect(() => {
+    let instance = null;
+    if (checkoutId && window.SumUpCard) {
+      instance = window.SumUpCard.mount({
+        id: 'raffle-sumup-container',
+        checkoutId: checkoutId,
+        onResponse: (type, body) => {
+          console.log('SumUp Response:', type, body);
+          if (type === 'success' || type === 'sent') {
+            onSuccess();
+          } else if (type === 'fail' || type === 'error') {
+            onFail(body);
+          }
+        },
+      });
+    }
+    return () => {
+      if (instance && instance.unmount) {
+        instance.unmount();
+      }
+    };
+  }, [checkoutId, onSuccess, onFail]);
+
+  return <div className="bg-white rounded-xl p-4 min-h-[350px] animate-in fade-in duration-500" id="raffle-sumup-container" />;
+});
+
 const RafflePreviewCard = ({ raffle, members, onClick }) => {
   const allReservedList = parseRaffleReservations(raffle, members);
   const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
@@ -1311,6 +1381,14 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
             </span>
           </div>
         )}
+        
+        {!raffle.isEnded && raffle.isPaused && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <span className="bg-black/90 text-orange-500 font-black text-sm uppercase tracking-[0.3em] px-5 py-2 border border-orange-500/50 -rotate-3 shadow-2xl">
+              Paused
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="p-4 space-y-3 flex flex-col flex-grow justify-between">
@@ -1325,7 +1403,7 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
                 <img
                   key={m.id}
                   src={m.avatar || DEFAULT_AVATAR}
-                  title={`${m.name} - ${m.ticketCount} ticket${m.ticketCount !== 1 ? 's' : ''}`}
+                  title={`${m.name} : ${m.ticketCount} ticket${m.ticketCount !== 1 ? 's' : ''}`}
                   className="w-7 h-7 rounded-full border-2 border-zinc-900 object-cover relative z-10"
                   alt=""
                 />
@@ -1378,50 +1456,15 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
     return members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
   }, [members]);
 
-  const [timeLeft, setTimeLeft] = useState({});
-  useEffect(() => {
-    if (!raffle?.drawDate) return;
-    const calc = () => {
-      const target = new Date(raffle.drawDate);
-      const now = new Date();
-      const diff = target - now;
-      if (diff <= 0) { setTimeLeft(null); return; }
-      setTimeLeft({
-        days: Math.floor(diff / 86400000),
-        hours: Math.floor((diff % 86400000) / 3600000),
-        mins: Math.floor((diff % 3600000) / 60000),
-        secs: Math.floor((diff % 60000) / 1000),
-      });
-    };
-    calc();
-    const t = setInterval(calc, 1000);
-    return () => clearInterval(t);
-  }, [raffle?.drawDate]);
-
-  useEffect(() => {
-    if (!document.getElementById('sumup-card-sdk')) {
-      const script = document.createElement('script');
-      script.id = 'sumup-card-sdk';
-      script.src = 'https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
+  const handlePaymentSuccess = useCallback(() => {
+    setPaymentSuccess(true);
   }, []);
 
-  useEffect(() => {
-    let instance = null;
-    if (sumupCheckoutId && window.SumUpCard) {
-      instance = window.SumUpCard.mount({
-        id: 'raffle-sumup-container',
-        checkoutId: sumupCheckoutId,
-        onResponse: (type) => {
-          if (type === 'success') setPaymentSuccess(true);
-          else { setSubmitError('Payment failed or was cancelled.'); setSumupCheckoutId(null); }
-        },
-      });
-    }
-    return () => { if (instance?.unmount) instance.unmount(); };
-  }, [sumupCheckoutId]);
+  const handlePaymentFail = useCallback((body) => {
+    console.error("Payment Failed:", body);
+    setSubmitError('Payment failed or was cancelled. Please try again.');
+    setSumupCheckoutId(null);
+  }, []);
 
   if (!raffle) return (
     <div className="text-center py-20 text-zinc-500">
@@ -1471,7 +1514,6 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
       else throw new Error('No checkout ID returned');
     } catch (e) {
       setSubmitError(e.message.includes('fetch') ? 'Connection error. Please try again.' : e.message);
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -1490,7 +1532,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
 
         <div className="space-y-6">
           <div className="relative rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-black">
-            <div className="relative h-72 md:h-96">
+            <div className="relative aspect-[3/4] w-full max-w-md mx-auto bg-zinc-950">
               {galleryImages.length > 0 ? (
                 <img
                   key={activeImg}
@@ -1562,23 +1604,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
             )}
           </div>
 
-          {!raffle.isEnded && timeLeft && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-pink-500" /> Draw Countdown
-              </p>
-              <div className="grid grid-cols-4 gap-3">
-                {[['Days', timeLeft.days], ['Hours', timeLeft.hours], ['Mins', timeLeft.mins], ['Secs', timeLeft.secs]].map(([label, val]) => (
-                  <div key={label} className="bg-black rounded-xl p-3 text-center border border-zinc-800">
-                    <span className="text-2xl font-black text-pink-500 tabular-nums">
-                      {String(val).padStart(2, '0')}
-                    </span>
-                    <p className="text-zinc-600 text-[9px] font-bold uppercase tracking-widest mt-1">{label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {!raffle.isEnded && <CountdownTimer drawDate={raffle.drawDate} />}
 
           {raffle.isEnded && (
             <div className="bg-pink-900/20 border border-pink-500/40 rounded-2xl p-6 text-center">
@@ -1656,6 +1682,11 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
               <div className="text-center py-6">
                 <p className="text-pink-500 font-black uppercase tracking-widest">This draw has closed.</p>
               </div>
+            ) : raffle.isPaused ? (
+              <div className="text-center py-6">
+                <p className="text-orange-500 font-black uppercase tracking-widest">This draw is currently paused.</p>
+                <p className="text-zinc-400 text-xs mt-2">Ticket reservations are temporarily disabled.</p>
+              </div>
             ) : loginPrompt ? (
               <div className="text-center space-y-4">
                 <UserCircle className="w-12 h-12 text-pink-500 mx-auto" />
@@ -1677,7 +1708,11 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                 <p className="text-zinc-400 text-sm">Your tickets are in the drum. Good luck!</p>
               </div>
             ) : sumupCheckoutId ? (
-              <div className="bg-white rounded-xl p-4 min-h-[350px]" id="raffle-sumup-container" />
+              <SumUpWidget 
+                checkoutId={sumupCheckoutId} 
+                onSuccess={handlePaymentSuccess} 
+                onFail={handlePaymentFail} 
+              />
             ) : (
               <div className="space-y-5">
                 <div>
@@ -1730,6 +1765,16 @@ const RafflesView = ({ raffles, user, members }) => {
   const activeRaffles = raffles.filter((r) => !r.isEnded);
   const pastRaffles = raffles.filter((r) => r.isEnded);
 
+  useEffect(() => {
+    if (!document.getElementById('sumup-card-sdk')) {
+      const script = document.createElement('script');
+      script.id = 'sumup-card-sdk';
+      script.src = 'https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   const handleOpen = (raffle) => {
     window.location.hash = `raffle_detail_${raffle.id}`;
   };
@@ -1747,7 +1792,7 @@ const RafflesView = ({ raffles, user, members }) => {
         <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
         {activeRaffles.length === 0 ? (
           <p className="text-zinc-500 py-12 text-center italic border border-dashed border-zinc-800 rounded-3xl">
-            No active raffles right now - check back soon!
+            No active raffles right now. Check back soon!
           </p>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -1766,6 +1811,124 @@ const RafflesView = ({ raffles, user, members }) => {
               <RafflePreviewCard key={r.id} raffle={r} members={members} onClick={() => handleOpen(r)} />
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
+  const [current, setCurrent] = useState('READY');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [winner1, setWinner1] = useState(null);
+  const [winner2, setWinner2] = useState(null);
+  const [drawPhase, setDrawPhase] = useState(1);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const canvasRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
+
+  const hasSecondPrize = !!raffle.prize2Title;
+
+  const initialPool = useMemo(() => {
+    const list = parseRaffleReservations(raffle, members);
+    const p = [];
+    list.forEach(item => {
+      for (let i = 0; i < item.ticketCount; i++) {
+        p.push(item.name);
+      }
+    });
+    return p.sort(() => 0.5 - Math.random());
+  }, [raffle, members]);
+
+  const activePool = useRef([...initialPool]);
+
+  const drawFrame = (name, isW, phaseText) => {
+    if (!canvasRef.current) return;
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.fillStyle = '#09090b'; ctx.fillRect(0,0,800,600);
+    ctx.fillStyle = '#ec4899'; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('DRS OFFICIAL DRAW', 400, 80);
+    ctx.fillStyle = '#a1a1aa'; ctx.font = 'bold 24px sans-serif'; ctx.fillText(phaseText, 400, 130);
+    ctx.fillStyle = isW ? '#422006' : '#18181b'; ctx.fillRect(100, 220, 600, 160);
+    ctx.fillStyle = isW ? '#eab308' : '#fff'; ctx.font = 'bold 50px sans-serif'; ctx.fillText(name.toUpperCase(), 400, 320);
+    if(isW) { ctx.fillStyle = '#eab308'; ctx.font = 'bold 40px sans-serif'; ctx.fillText('WINNER!', 400, 460); }
+  };
+
+  const spin = () => {
+    if(activePool.current.length === 0) return;
+    setIsDrawing(true); chunksRef.current = [];
+    const stream = canvasRef.current.captureStream(30);
+    recorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    recorderRef.current.ondataavailable = e => chunksRef.current.push(e.data);
+    recorderRef.current.onstop = () => setVideoUrl(URL.createObjectURL(new Blob(chunksRef.current, { type: 'video/webm' })));
+    recorderRef.current.start();
+
+    let ticks = 0; 
+    const targetIndex = Math.floor(Math.random() * activePool.current.length);
+    const target = activePool.current[targetIndex];
+    const phaseText = drawPhase === 1 ? `1ST PLACE: ${raffle.title.toUpperCase()}` : `2ND PLACE: ${raffle.prize2Title.toUpperCase()}`;
+
+    const go = (speed) => {
+      ticks++;
+      if (ticks < 40) {
+        const n = activePool.current[Math.floor(Math.random() * activePool.current.length)];
+        setCurrent(n); drawFrame(n, false, phaseText);
+        setTimeout(() => go(speed + 5), speed);
+      } else {
+        setCurrent(target); 
+        drawFrame(target, true, phaseText);
+        
+        if (drawPhase === 1) {
+            setWinner1(target);
+            activePool.current.splice(targetIndex, 1);
+        } else {
+            setWinner2(target);
+        }
+        
+        setTimeout(() => { recorderRef.current.stop(); setIsDrawing(false); }, 2500);
+      }
+    };
+    go(30);
+  };
+
+  const handleNextPhase = () => {
+      setDrawPhase(2);
+      setCurrent('READY');
+      setVideoUrl(null);
+  };
+
+  const currentWinner = drawPhase === 1 ? winner1 : winner2;
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-zinc-950 flex flex-col items-center justify-center p-4">
+      <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
+      <canvas ref={canvasRef} width="800" height="600" className="hidden" />
+      <Trophy className={`w-20 h-20 mb-8 ${currentWinner ? 'text-yellow-500 scale-125' : 'text-pink-600'} transition-transform duration-500`} />
+      
+      <div className="mb-6 text-center">
+         <p className="text-pink-500 font-bold uppercase tracking-widest">{drawPhase === 1 ? '1st Place Draw' : '2nd Place Draw'}</p>
+         <p className="text-white font-black text-xl">{drawPhase === 1 ? raffle.title : raffle.prize2Title}</p>
+      </div>
+
+      <div className={`w-full py-16 px-4 rounded-3xl border ${currentWinner ? 'border-yellow-500 bg-zinc-900/80' : 'border-zinc-800 bg-black/50'} text-center mb-12 max-w-4xl transition-colors duration-500`}>
+        <h2 className="text-4xl md:text-6xl font-black text-white italic uppercase break-words">{current}</h2>
+      </div>
+      
+      {!currentWinner && (
+        <button onClick={spin} disabled={isDrawing || activePool.current.length === 0} className="bg-pink-600 text-white font-black py-5 px-12 rounded-2xl uppercase text-lg shadow-pink-500/20 disabled:opacity-50">
+          {isDrawing ? 'Drawing & Recording...' : 'Spin the Wheel'}
+        </button>
+      )}
+      
+      {currentWinner && (
+        <div className="flex flex-col gap-4 items-center w-full max-w-md">
+          {videoUrl && <a href={videoUrl} download={`DRS_Draw_Phase${drawPhase}_${Date.now()}.webm`} className="w-full bg-zinc-800 text-white py-4 px-8 rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 hover:bg-zinc-700 transition-colors"><Video className="w-4 h-4" /> Download Video</a>}
+          
+          {drawPhase === 1 && hasSecondPrize ? (
+              <button onClick={handleNextPhase} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors">Proceed to 2nd Place Draw</button>
+          ) : (
+              <button onClick={() => onSetWinner(winner1, winner2)} className="w-full bg-green-600 hover:bg-green-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors shadow-green-500/20 shadow-lg">Approve & Close All</button>
+          )}
         </div>
       )}
     </div>
@@ -2508,6 +2671,19 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                           >
                             End Raffle Manually
                           </button>
+                          
+                          <button 
+                            type="button"
+                            onClick={async (e) => { 
+                              e.preventDefault();
+                              try {
+                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isPaused: !r.isPaused });
+                              } catch (err) { console.error(err); }
+                            }} 
+                            className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 mt-1"
+                          >
+                            {r.isPaused ? 'Resume Draw' : 'Pause Draw'}
+                          </button>
                         </div>
                       </div>
                     )}
@@ -3058,14 +3234,6 @@ const MainApp = () => {
   );
 };
 
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <MainApp />
-    </ErrorBoundary>
-  );
-}
-
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -3101,4 +3269,12 @@ class ErrorBoundary extends React.Component {
     }
     return this.props.children;
   }
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
 }
