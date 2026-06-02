@@ -240,6 +240,7 @@ const parseRaffleReservations = (raffle, cloudMembers) => {
     });
   });
 
+  // Sort alphabetically to prevent jumping during live updates
   list.sort((a, b) => {
     const nameCmp = a.name.localeCompare(b.name);
     if (nameCmp !== 0) return nameCmp;
@@ -1559,8 +1560,15 @@ const RafflesView = ({ raffles, user, members }) => {
                   <h3 className="text-xl font-black text-white truncate w-full uppercase tracking-tight">{raffle.title}</h3>
                   <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Ended: {raffle.drawDate}</p>
                   <div className="mt-4 p-4 bg-zinc-950 rounded-xl w-full border border-zinc-800 shadow-inner">
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">Winner</p>
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">1st Place</p>
                     <p className="text-pink-500 font-black text-xl uppercase tracking-widest">{raffle.winner}</p>
+                    {raffle.winner2 && (
+                       <>
+                         <div className="h-px w-12 bg-zinc-800 mx-auto my-3"></div>
+                         <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">2nd Place</p>
+                         <p className="text-pink-500 font-black text-lg uppercase tracking-widest">{raffle.winner2}</p>
+                       </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1742,7 +1750,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [editingMember, setEditingMember] = useState(null);
   const [editingRaffle, setEditingRaffle] = useState(null);
   const [drawingRaffle, setDrawingRaffle] = useState(null);
-  const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '' });
+  const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', prize2Title: '' });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
   const [editSpotlightId, setEditSpotlightId] = useState(spotlightMemberId || '');
@@ -1847,7 +1855,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const handlePublishRaffle = async () => {
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), newRaffle);
-      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '' });
+      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', prize2Title: '' });
     } catch (err) {
       console.error("Error saving raffle:", err);
     }
@@ -1940,7 +1948,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         const newId = `guest_${Date.now()}`;
         const safeName = f.guestName ? f.guestName.trim() : 'Guest';
         const safeCount = parseInt(f.qty) || 1;
-        await setDoc(rRef, { offlineReservations: { [newId]: { name: safeName, count: safeCount } } }, { merge: true });
+        const updates = {};
+        updates[`offlineReservations.${newId}`] = { name: safeName, count: safeCount };
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { offlineReservations: { [newId]: { name: safeName, count: safeCount } } }, { merge: true }));
       } else {
         const appRes = r.reservations || {};
         const flatVal = r[`reservations.${f.selected}`];
@@ -1948,11 +1958,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         const currentVal = isFlat ? flatVal : (appRes[f.selected] || 0);
         const safeCount = parseInt(f.qty) || 1;
         
-        if (isFlat) {
-          await setDoc(rRef, { [`reservations.${f.selected}`]: currentVal + safeCount }, { merge: true });
-        } else {
-          await setDoc(rRef, { reservations: { [f.selected]: currentVal + safeCount } }, { merge: true });
-        }
+        const updates = {};
+        updates[`reservations.${f.selected}`] = currentVal + safeCount;
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [f.selected]: currentVal + safeCount } }, { merge: true }));
       }
       updateOfflineForm(raffleId, { selected: '', guestName: '', qty: 1 });
     } catch (err) {
@@ -2120,9 +2128,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           raffle={drawingRaffle} 
           members={members} 
           onClose={() => { window.history.back(); }} 
-          onSetWinner={async (winnerName) => {
+          onSetWinner={async (winner1, winner2) => {
              try {
-               await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winnerName }, { merge: true });
+               await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', drawingRaffle.id), { isEnded: true, winner: winner1, winner2: winner2 || null });
                window.history.back();
              } catch (err) { console.error(err); }
           }}
@@ -2237,6 +2245,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <InputField label="Live Draw Date" value={editingRaffle.drawDate || ''} onChange={e => setEditingRaffle({...editingRaffle, drawDate: e.target.value})} />
               <InputField label="Ticket Cost (£)" value={editingRaffle.ticketPrice || ''} onChange={e => setEditingRaffle({...editingRaffle, ticketPrice: e.target.value})} />
               <InputField label="Maximum Ticket Cap" type="number" value={editingRaffle.totalTickets || 100} onChange={e => setEditingRaffle({...editingRaffle, totalTickets: Number(e.target.value)})} />
+              <InputField label="2nd Place Prize (Optional)" value={editingRaffle.prize2Title || ''} onChange={e => setEditingRaffle({...editingRaffle, prize2Title: e.target.value})} />
               <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
                  <ImageUpload label="Update Prize Image" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image: url})} />
                  {editingRaffle.image && <img src={editingRaffle.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
@@ -2255,6 +2264,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <InputField label="Live Draw Date" value={newRaffle.drawDate} onChange={e => setNewRaffle({...newRaffle, drawDate: e.target.value})} />
               <InputField label="Ticket Cost (£)" value={newRaffle.ticketPrice} onChange={e => setNewRaffle({...newRaffle, ticketPrice: e.target.value})} />
               <InputField label="Maximum Ticket Cap" type="number" value={newRaffle.totalTickets} onChange={e => setNewRaffle({...newRaffle, totalTickets: Number(e.target.value)})} />
+              <InputField label="2nd Place Prize (Optional)" value={newRaffle.prize2Title || ''} onChange={e => setNewRaffle({...newRaffle, prize2Title: e.target.value})} />
               <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
                  <ImageUpload label="Upload Prize Image" onUploadSuccess={url => setNewRaffle({...newRaffle, image: url})} />
                  {newRaffle.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">Prize Photo Uploaded Successfully</p>}
@@ -2375,27 +2385,38 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                           <Trophy className="w-4 h-4" /> Launch Draw Machine
                         </button>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2">
                           <input 
                             type="text" 
-                            placeholder="Or manual winner name..." 
-                            value={raffleWinners[r.id] || ''} 
-                            onChange={e => setRaffleWinners({...raffleWinners, [r.id]: e.target.value})} 
-                            className="flex-grow bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                            placeholder="1st Place Winner Name..." 
+                            value={raffleWinners[r.id]?.w1 || ''} 
+                            onChange={e => setRaffleWinners({...raffleWinners, [r.id]: { ...raffleWinners[r.id], w1: e.target.value }})} 
+                            className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
                           />
+                          {r.prize2Title && (
+                              <input 
+                                type="text" 
+                                placeholder="2nd Place Winner Name..." 
+                                value={raffleWinners[r.id]?.w2 || ''} 
+                                onChange={e => setRaffleWinners({...raffleWinners, [r.id]: { ...raffleWinners[r.id], w2: e.target.value }})} 
+                                className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                              />
+                          )}
                           <button 
                             type="button"
                             onClick={async (e) => { 
                               e.preventDefault();
-                              if (!raffleWinners[r.id]) return;
+                              const w1 = raffleWinners[r.id]?.w1;
+                              const w2 = raffleWinners[r.id]?.w2;
+                              if (!w1) return;
                               try {
-                                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: raffleWinners[r.id] }, { merge: true });
+                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: w1, winner2: w2 || null });
                               } catch (err) { console.error(err); }
                             }} 
-                            disabled={!raffleWinners[r.id]}
-                            className="px-4 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700"
+                            disabled={!raffleWinners[r.id]?.w1}
+                            className="w-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 mt-1"
                           >
-                            End
+                            End Raffle Manually
                           </button>
                         </div>
                       </div>
@@ -2607,13 +2628,17 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
   const [current, setCurrent] = useState('READY');
   const [isDrawing, setIsDrawing] = useState(false);
-  const [winner, setWinner] = useState(null);
+  const [winner1, setWinner1] = useState(null);
+  const [winner2, setWinner2] = useState(null);
+  const [drawPhase, setDrawPhase] = useState(1);
   const [videoUrl, setVideoUrl] = useState(null);
   const canvasRef = useRef(null);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
 
-  const pool = useMemo(() => {
+  const hasSecondPrize = !!raffle.prize2Title;
+
+  const initialPool = useMemo(() => {
     const list = parseRaffleReservations(raffle, members);
     const p = [];
     list.forEach(item => {
@@ -2624,18 +2649,21 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
     return p.sort(() => 0.5 - Math.random());
   }, [raffle, members]);
 
-  const drawFrame = (name, isW) => {
+  const activePool = useRef([...initialPool]);
+
+  const drawFrame = (name, isW, phaseText) => {
     if (!canvasRef.current) return;
     const ctx = canvasRef.current.getContext('2d');
     ctx.fillStyle = '#09090b'; ctx.fillRect(0,0,800,600);
-    ctx.fillStyle = '#ec4899'; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('DRS OFFICIAL DRAW', 400, 100);
+    ctx.fillStyle = '#ec4899'; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('DRS OFFICIAL DRAW', 400, 80);
+    ctx.fillStyle = '#a1a1aa'; ctx.font = 'bold 24px sans-serif'; ctx.fillText(phaseText, 400, 130);
     ctx.fillStyle = isW ? '#422006' : '#18181b'; ctx.fillRect(100, 220, 600, 160);
     ctx.fillStyle = isW ? '#eab308' : '#fff'; ctx.font = 'bold 50px sans-serif'; ctx.fillText(name.toUpperCase(), 400, 320);
     if(isW) { ctx.fillStyle = '#eab308'; ctx.font = 'bold 40px sans-serif'; ctx.fillText('WINNER!', 400, 460); }
   };
 
   const spin = () => {
-    if(pool.length === 0) return;
+    if(activePool.current.length === 0) return;
     setIsDrawing(true); chunksRef.current = [];
     const stream = canvasRef.current.captureStream(30);
     recorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
@@ -2643,34 +2671,72 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
     recorderRef.current.onstop = () => setVideoUrl(URL.createObjectURL(new Blob(chunksRef.current, { type: 'video/webm' })));
     recorderRef.current.start();
 
-    let ticks = 0; const target = pool[Math.floor(Math.random() * pool.length)];
+    let ticks = 0; 
+    const targetIndex = Math.floor(Math.random() * activePool.current.length);
+    const target = activePool.current[targetIndex];
+    const phaseText = drawPhase === 1 ? `1ST PLACE: ${raffle.title.toUpperCase()}` : `2ND PLACE: ${raffle.prize2Title.toUpperCase()}`;
+
     const go = (speed) => {
       ticks++;
       if (ticks < 40) {
-        const n = pool[Math.floor(Math.random() * pool.length)];
-        setCurrent(n); drawFrame(n, false);
+        const n = activePool.current[Math.floor(Math.random() * activePool.current.length)];
+        setCurrent(n); drawFrame(n, false, phaseText);
         setTimeout(() => go(speed + 5), speed);
       } else {
-        setCurrent(target); setWinner(target); drawFrame(target, true);
+        setCurrent(target); 
+        drawFrame(target, true, phaseText);
+        
+        if (drawPhase === 1) {
+            setWinner1(target);
+            activePool.current.splice(targetIndex, 1);
+        } else {
+            setWinner2(target);
+        }
+        
         setTimeout(() => { recorderRef.current.stop(); setIsDrawing(false); }, 2500);
       }
     };
     go(30);
   };
 
+  const handleNextPhase = () => {
+      setDrawPhase(2);
+      setCurrent('READY');
+      setVideoUrl(null);
+  };
+
+  const currentWinner = drawPhase === 1 ? winner1 : winner2;
+
   return (
     <div className="fixed inset-0 z-[150] bg-zinc-950 flex flex-col items-center justify-center p-4">
-      <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500"><X className="w-8 h-8" /></button>
+      <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
       <canvas ref={canvasRef} width="800" height="600" className="hidden" />
-      <Trophy className={`w-20 h-20 mb-8 ${winner ? 'text-yellow-500 scale-125' : 'text-pink-600'}`} />
-      <div className={`w-full py-16 px-4 rounded-3xl border ${winner ? 'border-yellow-500 bg-zinc-900/80' : 'border-zinc-800 bg-black/50'} text-center mb-12 max-w-4xl`}>
+      <Trophy className={`w-20 h-20 mb-8 ${currentWinner ? 'text-yellow-500 scale-125' : 'text-pink-600'} transition-transform duration-500`} />
+      
+      <div className="mb-6 text-center">
+         <p className="text-pink-500 font-bold uppercase tracking-widest">{drawPhase === 1 ? '1st Place Draw' : '2nd Place Draw'}</p>
+         <p className="text-white font-black text-xl">{drawPhase === 1 ? raffle.title : raffle.prize2Title}</p>
+      </div>
+
+      <div className={`w-full py-16 px-4 rounded-3xl border ${currentWinner ? 'border-yellow-500 bg-zinc-900/80' : 'border-zinc-800 bg-black/50'} text-center mb-12 max-w-4xl transition-colors duration-500`}>
         <h2 className="text-4xl md:text-6xl font-black text-white italic uppercase break-words">{current}</h2>
       </div>
-      {!winner && <button onClick={spin} disabled={isDrawing} className="bg-pink-600 text-white font-black py-5 px-12 rounded-2xl uppercase text-lg shadow-pink-500/20">{isDrawing ? 'Drawing & Recording...' : 'Spin the Wheel'}</button>}
-      {winner && (
-        <div className="flex gap-4">
-          {videoUrl && <a href={videoUrl} download={`DRS_Draw_${Date.now()}.webm`} className="bg-zinc-800 text-white py-4 px-8 rounded-xl font-black uppercase text-xs flex items-center gap-2"><Video /> Download Video</a>}
-          <button onClick={() => onSetWinner(winner)} className="bg-green-600 text-white py-4 px-8 rounded-xl font-black uppercase text-xs">Approve & Close</button>
+      
+      {!currentWinner && (
+        <button onClick={spin} disabled={isDrawing || activePool.current.length === 0} className="bg-pink-600 text-white font-black py-5 px-12 rounded-2xl uppercase text-lg shadow-pink-500/20 disabled:opacity-50">
+          {isDrawing ? 'Drawing & Recording...' : 'Spin the Wheel'}
+        </button>
+      )}
+      
+      {currentWinner && (
+        <div className="flex flex-col gap-4 items-center w-full max-w-md">
+          {videoUrl && <a href={videoUrl} download={`DRS_Draw_Phase${drawPhase}_${Date.now()}.webm`} className="w-full bg-zinc-800 text-white py-4 px-8 rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 hover:bg-zinc-700 transition-colors"><Video className="w-4 h-4" /> Download Video</a>}
+          
+          {drawPhase === 1 && hasSecondPrize ? (
+              <button onClick={handleNextPhase} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors">Proceed to 2nd Place Draw</button>
+          ) : (
+              <button onClick={() => onSetWinner(winner1, winner2)} className="w-full bg-green-600 hover:bg-green-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors shadow-green-500/20 shadow-lg">Approve & Close All</button>
+          )}
         </div>
       )}
     </div>
