@@ -1282,14 +1282,121 @@ const MembersView = ({ members, onMemberClick }) => {
   );
 };
 
-const RafflesView = ({ raffles, user, members }) => {
-  const [reservingRaffle, setReservingRaffle] = useState(null);
+const RafflePreviewCard = ({ raffle, members, onClick }) => {
+  const allReservedList = parseRaffleReservations(raffle, members);
+  const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
+  const progress = Math.min((totalReserved / raffle.totalTickets) * 100, 100);
+
+  return (
+    <div
+      onClick={onClick}
+      className="group relative bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-pink-500 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-pink-500/10 hover:-translate-y-1 flex flex-col"
+    >
+      <div className="relative h-52 overflow-hidden shrink-0">
+        <img
+          src={raffle.image || DEFAULT_CAR}
+          alt={raffle.title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent" />
+
+        <div className="absolute top-3 left-3 bg-pink-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-lg uppercase tracking-widest">
+          £{raffle.ticketPrice} / ticket
+        </div>
+
+        {raffle.isEnded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <span className="bg-black/90 text-pink-500 font-black text-sm uppercase tracking-[0.3em] px-5 py-2 border border-pink-500/50 -rotate-3 shadow-2xl">
+              Concluded
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 space-y-3 flex flex-col flex-grow justify-between">
+        <h3 className="text-white font-black uppercase tracking-tight text-base leading-tight truncate">
+          {raffle.title}
+        </h3>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {allReservedList.slice(0, 5).map((m) => (
+                <img
+                  key={m.id}
+                  src={m.avatar || DEFAULT_AVATAR}
+                  title={`${m.name} - ${m.ticketCount} ticket${m.ticketCount !== 1 ? 's' : ''}`}
+                  className="w-7 h-7 rounded-full border-2 border-zinc-900 object-cover relative z-10"
+                  alt=""
+                />
+              ))}
+              {allReservedList.length > 5 && (
+                <div className="w-7 h-7 rounded-full border-2 border-zinc-900 bg-zinc-700 flex items-center justify-center text-[9px] font-black text-white relative z-10">
+                  +{allReservedList.length - 5}
+                </div>
+              )}
+            </div>
+            {allReservedList.length === 0 && (
+              <span className="text-zinc-600 text-[10px] italic">No tickets yet</span>
+            )}
+          </div>
+          <span className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">
+            {totalReserved}/{raffle.totalTickets} sold
+          </span>
+        </div>
+
+        <div>
+          <div className="w-full bg-zinc-800 rounded-full h-1.5 shadow-inner">
+            <div
+              className="bg-pink-500 h-1.5 rounded-full transition-all duration-1000 shadow-[0_0_6px_rgba(236,72,153,0.6)]"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+
+          <button className="w-full mt-4 bg-zinc-800 group-hover:bg-pink-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-colors duration-300 flex items-center justify-center gap-2">
+            <Eye className="w-3.5 h-3.5" />
+            {raffle.isEnded ? 'View Results' : 'View Draw'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
+  const raffle = raffles.find((r) => r.id === raffleId);
+  const [activeImg, setActiveImg] = useState(0);
   const [reserveQuantity, setReserveQuantity] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [loginPrompt, setLoginPrompt] = useState(false);
   const [sumupCheckoutId, setSumupCheckoutId] = useState(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  const membersById = useMemo(() => {
+    if (!members) return {};
+    return members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
+  }, [members]);
+
+  const [timeLeft, setTimeLeft] = useState({});
+  useEffect(() => {
+    if (!raffle?.drawDate) return;
+    const calc = () => {
+      const target = new Date(raffle.drawDate);
+      const now = new Date();
+      const diff = target - now;
+      if (diff <= 0) { setTimeLeft(null); return; }
+      setTimeLeft({
+        days: Math.floor(diff / 86400000),
+        hours: Math.floor((diff % 86400000) / 3600000),
+        mins: Math.floor((diff % 3600000) / 60000),
+        secs: Math.floor((diff % 60000) / 1000),
+      });
+    };
+    calc();
+    const t = setInterval(calc, 1000);
+    return () => clearInterval(t);
+  }, [raffle?.drawDate]);
 
   useEffect(() => {
     if (!document.getElementById('sumup-card-sdk')) {
@@ -1301,277 +1408,362 @@ const RafflesView = ({ raffles, user, members }) => {
     }
   }, []);
 
-  const membersById = useMemo(() => {
-    if (!members) return {};
-    return members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
-  }, [members]);
+  useEffect(() => {
+    let instance = null;
+    if (sumupCheckoutId && window.SumUpCard) {
+      instance = window.SumUpCard.mount({
+        id: 'raffle-sumup-container',
+        checkoutId: sumupCheckoutId,
+        onResponse: (type) => {
+          if (type === 'success') setPaymentSuccess(true);
+          else { setSubmitError('Payment failed or was cancelled.'); setSumupCheckoutId(null); }
+        },
+      });
+    }
+    return () => { if (instance?.unmount) instance.unmount(); };
+  }, [sumupCheckoutId]);
 
-  const handleReserveClick = (raffle) => {
-    if (!user || user.isAnonymous || !membersById[user.uid] || !membersById[user.uid].name) {
+  if (!raffle) return (
+    <div className="text-center py-20 text-zinc-500">
+      <p className="font-bold uppercase tracking-widest">Raffle not found.</p>
+      <button onClick={onBack} className="mt-4 text-pink-500 underline text-sm">Go back</button>
+    </div>
+  );
+
+  const allReservedList = parseRaffleReservations(raffle, members);
+  const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
+  const progress = Math.min((totalReserved / raffle.totalTickets) * 100, 100);
+
+  const galleryImages = [
+    raffle.image,
+    raffle.image2,
+    ...(raffle.extraImages || []),
+  ].filter(Boolean);
+
+  const submitReservation = async () => {
+    if (!user || user.isAnonymous || !membersById[user.uid]?.name) {
       setLoginPrompt(true);
       return;
     }
-    setReservingRaffle(raffle);
-    setReserveQuantity(1);
-    setSubmitError('');
-    setSumupCheckoutId(null);
-    setPaymentSuccess(false);
-  };
-
-  const submitReservation = async () => {
-    if (!reservingRaffle || !user) return;
     setIsSubmitting(true);
     setSubmitError('');
     try {
-      if (!reservingRaffle.id.startsWith('mock-')) {
-         const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', reservingRaffle.id);
-         const appRes = reservingRaffle.reservations || {};
-         const flatVal = reservingRaffle[`reservations.${user.uid}`];
-         const isFlat = flatVal !== undefined;
-         const currentVal = isFlat ? flatVal : (appRes[user.uid] || 0);
-         const newVal = currentVal + reserveQuantity;
-
-         const updates = {};
-         if (isFlat) updates[`reservations.${user.uid}`] = newVal;
-         
-         await updateDoc(rRef, updates).catch(() => setDoc(rRef, { reservations: { [user.uid]: newVal } }, { merge: true }));
+      if (!raffle.id.startsWith('mock-')) {
+        const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
+        const currentVal = (raffle.reservations || {})[user.uid] || 0;
+        await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
       }
-
-      const amount = reservingRaffle.ticketPrice * reserveQuantity;
-      
-      const cloudFunctionUrl = `https://us-central1-daily-ride-south-v3.cloudfunctions.net/createSumUpCheckout`;
-
-      const secureResponse = await fetch(cloudFunctionUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reference: `drs_${user.uid}_${Date.now()}`,
-          amount: amount,
-          description: `DRS Raffle: ${reservingRaffle.title} (x${reserveQuantity})`
-        })
-      });
-
-      if (!secureResponse.ok) {
-         throw new Error(`Server returned ${secureResponse.status}`);
-      }
-
-      const { checkoutId } = await secureResponse.json();
-
-      if (checkoutId) {
-        setSumupCheckoutId(checkoutId);
-      } else {
-        throw new Error('Failed to generate checkout link');
-      }
+      const res = await fetch(
+        'https://us-central1-daily-ride-south-v3.cloudfunctions.net/createSumUpCheckout',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reference: `drs_${user.uid}_${Date.now()}`,
+            amount: raffle.ticketPrice * reserveQuantity,
+            description: `DRS Raffle: ${raffle.title} (x${reserveQuantity})`,
+          }),
+        }
+      );
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const { checkoutId } = await res.json();
+      if (checkoutId) setSumupCheckoutId(checkoutId);
+      else throw new Error('No checkout ID returned');
     } catch (e) {
-      console.error(e);
-      setSubmitError(e.message === 'Failed to fetch' ? 'Connection Blocked: Check Cloud Function URL & Logs.' : `Error: ${e.message}`);
+      setSubmitError(e.message.includes('fetch') ? 'Connection error. Please try again.' : e.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  useEffect(() => {
-    let sumupCardInstance = null;
-    if (sumupCheckoutId && window.SumUpCard) {
-      sumupCardInstance = window.SumUpCard.mount({
-        id: 'sumup-card-container',
-        checkoutId: sumupCheckoutId,
-        onResponse: (type, body) => {
-          if (type === 'success') {
-            setPaymentSuccess(true);
-          } else if (type === 'fail' || type === 'error') {
-            setSubmitError('Payment failed or was cancelled. Please try again.');
-            setSumupCheckoutId(null);
-          }
-        }
-      });
-    }
-    return () => {
-      if (sumupCardInstance && sumupCardInstance.unmount) {
-        sumupCardInstance.unmount();
-      }
-    };
-  }, [sumupCheckoutId]);
-
-  const activeRaffles = raffles.filter(r => !r.isEnded);
-  const pastRaffles = raffles.filter(r => r.isEnded);
-
   return (
-    <div className="space-y-12">
-      {loginPrompt && (
-        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative text-center">
-            <button onClick={() => setLoginPrompt(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6"/></button>
-            <UserCircle className="w-12 h-12 text-pink-500 mx-auto mb-4" />
-            <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Member Access Required</h3>
-            <p className="text-zinc-400 text-sm mb-6">
-              You must be logged into your registered club account to reserve tickets. 
-              <br/><br/>
-              If you opened this from WhatsApp or Instagram, please open the link in Chrome/Safari, or tap below to sign in.
-            </p>
-            <div className="space-y-3">
-              <button 
-                onClick={() => { setLoginPrompt(false); signOut(auth); }} 
-                className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
-              >
-                Sign In / Register
-              </button>
-              <button 
-                onClick={() => setLoginPrompt(false)} 
-                className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg active:scale-[0.98]"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group"
+      >
+        <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        <span className="text-xs font-black uppercase tracking-widest">Back to Raffles</span>
+      </button>
 
-      {reservingRaffle && (
-        <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-3xl shadow-2xl max-w-sm w-full relative">
-            <button onClick={() => { setReservingRaffle(null); setSumupCheckoutId(null); setPaymentSuccess(false); }} className="absolute top-4 right-4 text-zinc-500 hover:text-white transition-colors"><X className="w-6 h-6"/></button>
-            <div className="text-center mb-6">
-              <Ticket className="w-12 h-12 text-pink-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Reserve Tickets</h3>
-              <p className="text-zinc-400 text-sm mt-1">{reservingRaffle.title}</p>
-            </div>
-            
-            {paymentSuccess ? (
-              <div className="text-center space-y-4 animate-in zoom-in-95 duration-500">
-                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/50">
-                  <CheckCircle2 className="w-10 h-10 text-green-500" />
+      <div className="grid lg:grid-cols-2 gap-10 lg:gap-16">
+
+        <div className="space-y-6">
+          <div className="relative rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl bg-black">
+            <div className="relative h-72 md:h-96">
+              {galleryImages.length > 0 ? (
+                <img
+                  key={activeImg}
+                  src={galleryImages[activeImg]}
+                  alt="Prize"
+                  className="w-full h-full object-cover animate-in fade-in duration-500"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-zinc-900">
+                  <ImageIcon className="w-16 h-16 text-zinc-700" />
                 </div>
-                <h4 className="text-xl font-black text-white uppercase tracking-widest">Payment Complete!</h4>
-                <p className="text-zinc-400 text-sm">Your tickets have been secured in the draw.</p>
-                <button onClick={() => { setReservingRaffle(null); setPaymentSuccess(false); setSumupCheckoutId(null); }} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs mt-4">Close Menu</button>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+
+              {galleryImages.length > 1 && (
+                <>
+                  <button
+                    onClick={() => setActiveImg((p) => (p - 1 + galleryImages.length) % galleryImages.length)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-pink-600 text-white p-2 rounded-full transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setActiveImg((p) => (p + 1) % galleryImages.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-pink-600 text-white p-2 rounded-full transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+
+              {activeImg === 0 && (
+                <div className="absolute top-3 left-3 bg-pink-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest shadow">
+                  1st Prize
+                </div>
+              )}
+              {activeImg === 1 && raffle.image2 && (
+                <div className="absolute top-3 left-3 bg-zinc-700 text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest shadow">
+                  2nd Prize
+                </div>
+              )}
+            </div>
+
+            {galleryImages.length > 1 && (
+              <div className="flex gap-2 p-3 bg-zinc-950 overflow-x-auto">
+                {galleryImages.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveImg(i)}
+                    className={`shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all ${
+                      activeImg === i ? 'border-pink-500 opacity-100' : 'border-zinc-700 opacity-50 hover:opacity-75'
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
               </div>
-            ) : sumupCheckoutId ? (
-              <div className="bg-white rounded-xl p-4 min-h-[350px] animate-in fade-in duration-500" id="sumup-card-container"></div>
-            ) : (
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 text-center mb-3">Select Quantity</label>
-                  <div className="flex items-center justify-between bg-black border border-zinc-800 rounded-2xl p-2">
-                    <button onClick={() => setReserveQuantity(Math.max(1, reserveQuantity - 1))} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">-</button>
-                    <span className="text-white font-black text-3xl">{reserveQuantity}</span>
-                    <button onClick={() => setReserveQuantity(reserveQuantity + 1)} className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors">+</button>
-                  </div>
-                </div>
-                
-                <div className="bg-black/50 p-4 rounded-xl border border-zinc-800/50 text-center">
-                   <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total Cost</p>
-                   <p className="text-pink-500 font-black text-2xl">£{reservingRaffle.ticketPrice * reserveQuantity}</p>
-                </div>
+            )}
+          </div>
 
-                <button onClick={submitReservation} disabled={isSubmitting} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]">
-                  {isSubmitting ? 'Loading Checkout...' : 'Confirm & Pay via SumUp'}
-                </button>
-                {submitError && <p className="text-red-500 text-[10px] font-bold text-center uppercase tracking-widest mt-2">{submitError}</p>}
+          <div>
+            <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter leading-none">
+              {raffle.title}
+            </h1>
+            {raffle.prize2Title && (
+              <p className="text-zinc-400 font-bold uppercase tracking-widest text-xs mt-2">
+                + 2nd Place: <span className="text-white">{raffle.prize2Title}</span>
+              </p>
+            )}
+          </div>
+
+          {!raffle.isEnded && timeLeft && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-pink-500" /> Draw Countdown
+              </p>
+              <div className="grid grid-cols-4 gap-3">
+                {[['Days', timeLeft.days], ['Hours', timeLeft.hours], ['Mins', timeLeft.mins], ['Secs', timeLeft.secs]].map(([label, val]) => (
+                  <div key={label} className="bg-black rounded-xl p-3 text-center border border-zinc-800">
+                    <span className="text-2xl font-black text-pink-500 tabular-nums">
+                      {String(val).padStart(2, '0')}
+                    </span>
+                    <p className="text-zinc-600 text-[9px] font-bold uppercase tracking-widest mt-1">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {raffle.isEnded && (
+            <div className="bg-pink-900/20 border border-pink-500/40 rounded-2xl p-6 text-center">
+              <Trophy className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
+              <p className="text-pink-500 font-black uppercase tracking-widest text-sm mb-2">Draw Complete</p>
+              <p className="text-white font-bold">1st Place: <span className="text-yellow-400">{raffle.winner}</span></p>
+              {raffle.winner2 && (
+                <p className="text-zinc-400 font-bold mt-1">2nd Place: <span className="text-white">{raffle.winner2}</span></p>
+              )}
+            </div>
+          )}
+
+          {raffle.description && (
+            <div className="bg-zinc-900/60 border border-zinc-800/50 rounded-2xl p-6">
+              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-3">About This Draw</p>
+              <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{raffle.description}</p>
+            </div>
+          )}
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-4">
+              Ticket Holders ({allReservedList.length})
+            </p>
+            {allReservedList.length === 0 ? (
+              <p className="text-zinc-600 italic text-sm">No tickets reserved yet - be the first!</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+                {allReservedList.map((m) => (
+                  <div key={m.id} className="flex items-center gap-2 bg-black/50 rounded-xl p-2 border border-zinc-800/50">
+                    <img src={m.avatar || DEFAULT_AVATAR} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
+                    <div className="min-w-0">
+                      <p className="text-white text-xs font-bold truncate">{m.name}</p>
+                      <p className="text-pink-500 text-[9px] font-black uppercase tracking-widest">
+                        {m.ticketCount} ticket{m.ticketCount !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
-      )}
 
-      <div className="space-y-6">
-        <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
-        <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-8">
-          <p className="text-zinc-300 text-sm md:text-base leading-relaxed italic">
-            Try your luck and win some incredible club prizes whilst raising funds to keep the club going. Secure your tickets below and checkout securely via SumUp.
-          </p>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-2">
-          {activeRaffles.map(raffle => {
-            const allReservedList = parseRaffleReservations(raffle, members);
-            const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-            const progress = (totalReserved / raffle.totalTickets) * 100;
+        <div className="lg:sticky lg:top-28 h-fit">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
 
-            return (
-              <div key={raffle.id} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col md:flex-row hover:border-pink-500 transition-colors shadow-lg">
-                <div className="md:w-2/5 h-48 md:h-auto relative">
-                  <img src={raffle.image || DEFAULT_CAR} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute top-2 left-2 bg-pink-600 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">£{raffle.ticketPrice} / Ticket</div>
-                </div>
-                <div className="p-5 md:w-3/5 flex flex-col">
-                  <div>
-                    <h3 className="text-xl font-bold text-white">{raffle.title}</h3>
-                    <p className="text-zinc-400 text-sm mt-1">{raffle.description}</p>
-                  </div>
-                  <div className="space-y-2 mt-4">
-                    <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
-                        <span>{totalReserved} Tickets Taken</span>
-                        <span>{Math.round(progress)}% Full</span>
-                    </div>
-                    <div className="w-full bg-zinc-800 rounded-full h-2 shadow-inner">
-                      <div className="bg-pink-500 h-2 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ width: `${progress}%` }}></div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-zinc-800/50">
-                    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-3">Members Reserving</p>
-                    <div className="flex -space-x-3 overflow-hidden p-1">
-                        {allReservedList.slice(0, 6).map(m => (
-                          <img 
-                            key={m.id} 
-                            src={m.avatar || DEFAULT_AVATAR} 
-                            title={`${m.name} (${m.ticketCount} tickets)`} 
-                            className="inline-block h-8 w-8 rounded-full ring-2 ring-zinc-900 object-cover relative z-10 hover:z-20 shadow-lg" 
-                            alt="avatar" 
-                          />
-                        ))}
-                        {allReservedList.length > 6 && (
-                          <div className="flex items-center justify-center h-8 w-8 rounded-full ring-2 ring-zinc-900 bg-zinc-800 text-[10px] font-bold text-white z-10">
-                            +{allReservedList.length - 6}
-                          </div>
-                        )}
-                        {allReservedList.length === 0 && (
-                          <span className="text-xs text-zinc-600 font-medium italic py-1">Be the first to reserve!</span>
-                        )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center text-xs text-zinc-400 pt-4 mt-auto">
-                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> Draws {raffle.drawDate}</span>
-                    <button onClick={() => handleReserveClick(raffle)} className="bg-zinc-800 hover:bg-zinc-700 text-white font-bold px-4 py-2 rounded-lg border border-zinc-700 text-[10px] transition-colors uppercase tracking-widest">Reserve</button>
-                  </div>
-                </div>
+            <div className="flex justify-between items-center pb-5 border-b border-zinc-800">
+              <div>
+                <span className="text-pink-500 font-black text-3xl">£{raffle.ticketPrice}</span>
+                <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest ml-2">/ Ticket</span>
               </div>
-            );
-          })}
-          {activeRaffles.length === 0 && <p className="text-zinc-500 py-12 text-center col-span-full italic">No active raffles available at the moment. Check back soon!</p>}
+              <div className="text-right">
+                <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-widest">Draw Date</p>
+                <p className="text-white text-xs font-bold">{raffle.drawDate}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
+                <span>{totalReserved} sold</span>
+                <span>{raffle.totalTickets - totalReserved} remaining</span>
+              </div>
+              <div className="w-full bg-zinc-800 rounded-full h-2.5 shadow-inner">
+                <div
+                  className="bg-pink-500 h-2.5 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(236,72,153,0.5)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-zinc-600 text-[9px] text-right font-bold uppercase tracking-widest">
+                {Math.round(progress)}% full
+              </p>
+            </div>
+
+            {raffle.isEnded ? (
+              <div className="text-center py-6">
+                <p className="text-pink-500 font-black uppercase tracking-widest">This draw has closed.</p>
+              </div>
+            ) : loginPrompt ? (
+              <div className="text-center space-y-4">
+                <UserCircle className="w-12 h-12 text-pink-500 mx-auto" />
+                <p className="text-white font-bold uppercase tracking-widest text-sm">Member Access Required</p>
+                <p className="text-zinc-400 text-xs">Log in or complete your profile to buy tickets.</p>
+                <button
+                  onClick={() => { window.location.hash = 'profile'; }}
+                  className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all"
+                >
+                  Go to Profile
+                </button>
+              </div>
+            ) : paymentSuccess ? (
+              <div className="text-center space-y-4 py-4">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto border border-green-500/50">
+                  <CheckCircle2 className="w-8 h-8 text-green-500" />
+                </div>
+                <p className="text-xl font-black text-white uppercase tracking-widest">Payment Complete!</p>
+                <p className="text-zinc-400 text-sm">Your tickets are in the drum. Good luck!</p>
+              </div>
+            ) : sumupCheckoutId ? (
+              <div className="bg-white rounded-xl p-4 min-h-[350px]" id="raffle-sumup-container" />
+            ) : (
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center mb-3">
+                    Number of Tickets
+                  </label>
+                  <div className="flex items-center justify-between bg-black border border-zinc-800 rounded-2xl p-2">
+                    <button
+                      onClick={() => setReserveQuantity((q) => Math.max(1, q - 1))}
+                      className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors"
+                    >
+                      -
+                    </button>
+                    <span className="text-white font-black text-4xl tabular-nums">{reserveQuantity}</span>
+                    <button
+                      onClick={() => setReserveQuantity((q) => q + 1)}
+                      className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-black/50 p-4 rounded-xl border border-zinc-800/50 text-center">
+                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total</p>
+                  <p className="text-pink-500 font-black text-3xl">£{raffle.ticketPrice * reserveQuantity}</p>
+                </div>
+
+                <button
+                  onClick={submitReservation}
+                  disabled={isSubmitting}
+                  className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
+                >
+                  {isSubmitting ? 'Loading Checkout...' : 'Confirm & Pay via SumUp'}
+                </button>
+
+                {submitError && (
+                  <p className="text-red-500 text-[10px] font-bold text-center uppercase tracking-widest">{submitError}</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+const RafflesView = ({ raffles, user, members }) => {
+  const activeRaffles = raffles.filter((r) => !r.isEnded);
+  const pastRaffles = raffles.filter((r) => r.isEnded);
+
+  const handleOpen = (raffle) => {
+    window.location.hash = `raffle_detail_${raffle.id}`;
+  };
+
+  return (
+    <div className="space-y-12">
+      <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner">
+        <p className="text-zinc-300 text-sm md:text-base leading-relaxed italic">
+          Try your luck and win incredible club prizes whilst raising funds to keep DRS going.
+          Click any draw to see full details and secure your tickets.
+        </p>
+      </div>
+
+      <div className="space-y-5">
+        <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
+        {activeRaffles.length === 0 ? (
+          <p className="text-zinc-500 py-12 text-center italic border border-dashed border-zinc-800 rounded-3xl">
+            No active raffles right now - check back soon!
+          </p>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {activeRaffles.map((r) => (
+              <RafflePreviewCard key={r.id} raffle={r} members={members} onClick={() => handleOpen(r)} />
+            ))}
+          </div>
+        )}
       </div>
 
       {pastRaffles.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Past Winners</h2>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {pastRaffles.map(raffle => (
-              <div key={raffle.id} className="bg-zinc-900/50 rounded-2xl overflow-hidden border border-zinc-800 flex flex-col shadow-lg opacity-90 hover:opacity-100 transition-opacity">
-                <div className="h-56 relative group">
-                  <img src={raffle.image || DEFAULT_CAR} alt="" className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
-                  <div className="absolute inset-0 bg-pink-900/20 mix-blend-multiply"></div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                     <span className="bg-black/90 text-pink-500 font-black text-xl uppercase tracking-[0.3em] px-6 py-3 border border-pink-500/50 transform -rotate-6 shadow-2xl backdrop-blur-sm">Concluded</span>
-                  </div>
-                </div>
-                <div className="p-6 flex flex-col flex-grow text-center items-center justify-center space-y-3">
-                  <h3 className="text-xl font-black text-white truncate w-full uppercase tracking-tight">{raffle.title}</h3>
-                  <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.2em]">Ended: {raffle.drawDate}</p>
-                  <div className="mt-4 p-4 bg-zinc-950 rounded-xl w-full border border-zinc-800 shadow-inner">
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">1st Place</p>
-                    <p className="text-pink-500 font-black text-xl uppercase tracking-widest">{raffle.winner}</p>
-                    {raffle.winner2 && (
-                       <>
-                         <div className="h-px w-12 bg-zinc-800 mx-auto my-3"></div>
-                         <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1 font-bold">2nd Place</p>
-                         <p className="text-pink-500 font-black text-lg uppercase tracking-widest">{raffle.winner2}</p>
-                       </>
-                    )}
-                  </div>
-                </div>
-              </div>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {pastRaffles.map((r) => (
+              <RafflePreviewCard key={r.id} raffle={r} members={members} onClick={() => handleOpen(r)} />
             ))}
           </div>
         </div>
@@ -1579,167 +1771,6 @@ const RafflesView = ({ raffles, user, members }) => {
     </div>
   );
 };
-
-const ProfileView = ({ user, userProfile }) => {
-  const [name, setName] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [bio, setBio] = useState('');
-  const [location, setLocation] = useState('');
-  const [instagram, setInstagram] = useState('');
-  const [birthdayDay, setBirthdayDay] = useState('');
-  const [birthdayMonth, setBirthdayMonth] = useState('');
-  const [avatar, setAvatar] = useState('');
-  const [cars, setCars] = useState([]);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (userProfile) {
-      setName(userProfile.name || '');
-      setNickname(userProfile.nickname || '');
-      setBio(userProfile.bio || '');
-      setLocation(userProfile.location || '');
-      setInstagram(userProfile.instagram || '');
-      setBirthdayDay(userProfile.birthdayDay || '');
-      setBirthdayMonth(userProfile.birthdayMonth || '');
-      setAvatar(userProfile.avatar || '');
-      setCars(userProfile.cars || []);
-    }
-  }, [userProfile]);
-
-  const handleSave = async () => {
-    if (!user) return;
-    try {
-      const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid);
-      await setDoc(profileRef, {
-        name, nickname, bio, location, instagram, birthdayDay, birthdayMonth, avatar, cars,
-        role: userProfile?.role || 'Member',
-        joinDate: userProfile?.joinDate || formatDate(new Date()),
-        email: user.email || '' 
-      }, { merge: true });
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      console.error("Save failed:", err);
-    }
-  };
-
-  if (!user) return <div className="text-center py-20 text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">Establishing Secure Connection...</div>;
-
-  return (
-    <div className="space-y-8 max-w-4xl mx-auto animate-in fade-in duration-700">
-      <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-4">My Profile</h2>
-      <div className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 space-y-6 shadow-xl">
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="shrink-0 flex flex-col items-center gap-4">
-             <img src={avatar || DEFAULT_AVATAR} alt="" className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800 bg-black shadow-inner shadow-pink-500/10" />
-             <ImageUpload label="Change Avatar" onUploadSuccess={setAvatar} />
-          </div>
-          <div className="flex-grow grid sm:grid-cols-2 gap-4 h-fit">
-            <InputField label="Full Name (Required)" value={name} onChange={e => setName(e.target.value)} required={true} />
-            <InputField label="Nickname" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="E.g. Speedy" />
-            <div className="sm:col-span-2 grid sm:grid-cols-2 gap-4">
-                <InputField label="Town / City" value={location} onChange={e => setLocation(e.target.value)} />
-                <InputField label="Instagram Profile Link" value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="https://instagram.com/username" />
-                <div className="sm:col-span-2 w-full">
-                   <label className="block text-sm font-medium text-zinc-400 mb-1">Birthday (Optional)</label>
-                   <div className="flex gap-2">
-                     <select value={birthdayDay} onChange={e => setBirthdayDay(e.target.value)} className="w-1/3 bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
-                        <option value="">Day</option>
-                        {[...Array(31)].map((_, i) => <option key={i+1} value={(i+1).toString()}>{i+1}{getOrdinalSuffix(i+1)}</option>)}
-                     </select>
-                     <select value={birthdayMonth} onChange={e => setBirthdayMonth(e.target.value)} className="w-2/3 bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
-                        <option value="">Month</option>
-                        {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((m, i) => <option key={i+1} value={(i+1).toString()}>{m}</option>)}
-                     </select>
-                   </div>
-                </div>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-1">
-            <label className="block text-sm font-medium text-zinc-400">Short Bio</label>
-            <textarea value={bio} onChange={e => setBio(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 outline-none focus:border-pink-500 transition-all" placeholder="Tell the club about yourself and your automotive history..." rows={3} />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mt-12 border-b border-zinc-800 pb-4">
-        <h3 className="text-2xl font-bold text-white">My Garage</h3>
-        <button onClick={() => setCars(prev => [...prev, { make: '', model: '', year: 2026, specs: '', mods: '', image: '', gallery: [] }])} className="bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm border border-zinc-700 transition-colors"><Plus className="w-4 h-4" /> Add Vehicle</button>
-      </div>
-
-      <div className="space-y-6">
-        {cars.map((car, idx) => (
-          <div key={idx} className="bg-zinc-900 p-6 rounded-xl border border-zinc-800 relative shadow-lg animate-in slide-in-from-left-4 duration-300">
-            <button onClick={() => setCars(prev => prev.filter((_, i) => i !== idx))} className="absolute top-4 right-4 text-zinc-500 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5"/></button>
-            <div className="grid md:grid-cols-2 gap-4">
-              <InputField label="Make" value={car.make} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, make: e.target.value } : c))} />
-              <InputField label="Model" value={car.model} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, model: e.target.value } : c))} />
-              <InputField label="Year" type="number" value={car.year} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, year: e.target.value } : c))} />
-              <InputField label="Specs" value={car.specs} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, specs: e.target.value } : c))} />
-              <div className="md:col-span-2">
-                <InputField label="Mods" value={car.mods} onChange={e => setCars(prev => prev.map((c, i) => i === idx ? { ...c, mods: e.target.value } : c))} />
-              </div>
-              
-              <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50 mt-2">
-                  <ImageUpload label="Upload Main Vehicle Photo (Cover)" onUploadSuccess={url => setCars(prev => prev.map((c, i) => i === idx ? { ...c, image: url } : c))} />
-                  {car.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest flex items-center gap-1">Cover Photo Uploaded Successfully</p>}
-              </div>
-
-              <div className="md:col-span-2 mt-4 pt-4 border-t border-zinc-800/50">
-                  <h4 className="text-sm font-medium text-zinc-400 mb-3">Additional Gallery Images</h4>
-                  <div className="flex flex-wrap gap-3 mb-4">
-                      {car.gallery && car.gallery.map((gImg, gIdx) => (
-                          <div key={gIdx} className="relative w-24 h-24 group rounded-xl overflow-hidden border border-zinc-700 shadow-md">
-                              <img src={gImg} alt={`Gallery item ${gIdx + 1}`} className="w-full h-full object-cover" />
-                              <button 
-                                  onClick={() => setCars(prev => prev.map((c, i) => i === idx ? { ...c, gallery: c.gallery.filter((_, deleteIdx) => deleteIdx !== gIdx) } : c))} 
-                                  className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Remove image"
-                              >
-                                  <Trash2 className="w-6 h-6 text-red-500" />
-                              </button>
-                          </div>
-                      ))}
-                  </div>
-                  <div className="bg-black/30 p-4 rounded-lg border border-zinc-800/50 border-dashed">
-                      <ImageUpload 
-                          label="Add Another Photo to Gallery" 
-                          onUploadSuccess={url => setCars(prev => prev.map((c, i) => i === idx ? { ...c, gallery: [...(c.gallery || []), url] } : c))} 
-                      />
-                  </div>
-              </div>
-            </div>
-          </div>
-        ))}
-        {cars.length === 0 && <div className="text-center py-10 text-zinc-600 italic">Your garage is currently empty.</div>}
-      </div>
-
-      <button onClick={handleSave} disabled={!name.trim()} className={`w-full font-black py-4 mt-6 rounded-xl flex items-center justify-center gap-2 text-lg shadow-lg transition-all transform active:scale-[0.98] ${saved ? 'bg-green-600' : 'bg-pink-600 hover:bg-pink-700 shadow-pink-500/20'} disabled:opacity-50 disabled:hover:bg-pink-600`}>
-        <Save className="w-6 h-6" /> {saved ? "Changes Saved Successfully!" : "Save Profile & Garage"}
-      </button>
-    </div>
-  );
-};
-
-const CharityView = () => (
-  <div className="space-y-6">
-    <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Charity Initiatives</h2>
-    <div className="grid gap-6 lg:grid-cols-2">
-      {STATIC_CHARITY.map(campaign => (
-        <div key={campaign.id} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 flex flex-col shadow-2xl">
-          <div className="h-48 w-full overflow-hidden">
-             <img src={campaign.image} alt="" className="h-full w-full object-cover hover:scale-105 transition-transform duration-700" />
-          </div>
-          <div className="p-5 space-y-4 flex-grow flex flex-col">
-            <h3 className="text-2xl font-bold text-white leading-tight">{campaign.title}</h3>
-            <p className="text-zinc-400 text-sm flex-grow">{campaign.description}</p>
-            <a href={campaign.link} target="_blank" rel="noopener noreferrer" className="bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-pink-500/10 uppercase tracking-widest mt-auto"><Heart className="w-5 h-5 fill-white" /> Support the Coastguard</a>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
 
 const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile, spotlightMemberId }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
@@ -1750,7 +1781,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [editingMember, setEditingMember] = useState(null);
   const [editingRaffle, setEditingRaffle] = useState(null);
   const [drawingRaffle, setDrawingRaffle] = useState(null);
-  const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', prize2Title: '' });
+  const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', image2: '', prize2Title: '', extraImages: [] });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
   const [editSpotlightId, setEditSpotlightId] = useState(spotlightMemberId || '');
@@ -1855,7 +1886,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const handlePublishRaffle = async () => {
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), newRaffle);
-      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', prize2Title: '' });
+      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', image2: '', prize2Title: '', extraImages: [] });
     } catch (err) {
       console.error("Error saving raffle:", err);
     }
@@ -2246,10 +2277,40 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <InputField label="Ticket Cost (£)" value={editingRaffle.ticketPrice || ''} onChange={e => setEditingRaffle({...editingRaffle, ticketPrice: e.target.value})} />
               <InputField label="Maximum Ticket Cap" type="number" value={editingRaffle.totalTickets || 100} onChange={e => setEditingRaffle({...editingRaffle, totalTickets: Number(e.target.value)})} />
               <InputField label="2nd Place Prize (Optional)" value={editingRaffle.prize2Title || ''} onChange={e => setEditingRaffle({...editingRaffle, prize2Title: e.target.value})} />
+              
               <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
-                 <ImageUpload label="Update Prize Image" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image: url})} />
+                 <ImageUpload label="Update 1st Prize Image" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image: url})} />
                  {editingRaffle.image && <img src={editingRaffle.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
               </div>
+              <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
+                 <ImageUpload label="Update 2nd Prize Image (Optional)" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image2: url})} />
+                 {editingRaffle.image2 && <img src={editingRaffle.image2} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
+              </div>
+
+              <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">
+                  Additional Gallery Images
+                </p>
+                <div className="flex flex-wrap gap-3 mb-3">
+                  {(editingRaffle.extraImages || []).map((img, i) => (
+                    <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-zinc-700 group">
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setEditingRaffle(prev => ({ ...prev, extraImages: prev.extraImages.filter((_, idx) => idx !== i) }))}
+                        className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <ImageUpload
+                  label="Add Gallery Image"
+                  onUploadSuccess={url => setEditingRaffle(prev => ({ ...prev, extraImages: [...(prev.extraImages || []), url] }))}
+                />
+              </div>
+              
               <div className="md:col-span-2 space-y-1">
                  <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
                  <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingRaffle.description || ''} onChange={e => setEditingRaffle({...editingRaffle, description: e.target.value})} rows={3} />
@@ -2265,10 +2326,40 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <InputField label="Ticket Cost (£)" value={newRaffle.ticketPrice} onChange={e => setNewRaffle({...newRaffle, ticketPrice: e.target.value})} />
               <InputField label="Maximum Ticket Cap" type="number" value={newRaffle.totalTickets} onChange={e => setNewRaffle({...newRaffle, totalTickets: Number(e.target.value)})} />
               <InputField label="2nd Place Prize (Optional)" value={newRaffle.prize2Title || ''} onChange={e => setNewRaffle({...newRaffle, prize2Title: e.target.value})} />
+              
               <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
-                 <ImageUpload label="Upload Prize Image" onUploadSuccess={url => setNewRaffle({...newRaffle, image: url})} />
-                 {newRaffle.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">Prize Photo Uploaded Successfully</p>}
+                 <ImageUpload label="Upload 1st Prize Image" onUploadSuccess={url => setNewRaffle({...newRaffle, image: url})} />
+                 {newRaffle.image && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">1st Prize Photo Uploaded</p>}
               </div>
+              <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
+                 <ImageUpload label="Upload 2nd Prize Image (Optional)" onUploadSuccess={url => setNewRaffle({...newRaffle, image2: url})} />
+                 {newRaffle.image2 && <p className="text-[10px] text-green-500 mt-2 font-bold uppercase tracking-widest">2nd Prize Photo Uploaded</p>}
+              </div>
+
+              <div className="md:col-span-2 bg-black/30 p-4 rounded-lg border border-zinc-800/50">
+                <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">
+                  Additional Gallery Images
+                </p>
+                <div className="flex flex-wrap gap-3 mb-3">
+                  {(newRaffle.extraImages || []).map((img, i) => (
+                    <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-zinc-700 group">
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setNewRaffle(prev => ({ ...prev, extraImages: prev.extraImages.filter((_, idx) => idx !== i) }))}
+                        className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <ImageUpload
+                  label="Add Gallery Image"
+                  onUploadSuccess={url => setNewRaffle(prev => ({ ...prev, extraImages: [...(prev.extraImages || []), url] }))}
+                />
+              </div>
+
               <div className="md:col-span-2 space-y-1">
                  <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
                  <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
@@ -2280,7 +2371,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               {raffles.map(r => {
                 const allReservedList = parseRaffleReservations(r, members);
                 const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-                const progress = (totalReserved / r.totalTickets) * 100;
                 
                 const form = offlineForms[r.id] || { selected: '', guestName: '', qty: 1 };
 
@@ -2410,7 +2500,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                               const w2 = raffleWinners[r.id]?.w2;
                               if (!w1) return;
                               try {
-                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: w1, winner2: w2 || null });
+                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id), { isEnded: true, winner: w1, winner2: w2 || null }, { merge: true });
                               } catch (err) { console.error(err); }
                             }} 
                             disabled={!raffleWinners[r.id]?.w1}
@@ -2621,124 +2711,6 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         </section>
 
       </div>
-    </div>
-  );
-};
-
-const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
-  const [current, setCurrent] = useState('READY');
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [winner1, setWinner1] = useState(null);
-  const [winner2, setWinner2] = useState(null);
-  const [drawPhase, setDrawPhase] = useState(1);
-  const [videoUrl, setVideoUrl] = useState(null);
-  const canvasRef = useRef(null);
-  const recorderRef = useRef(null);
-  const chunksRef = useRef([]);
-
-  const hasSecondPrize = !!raffle.prize2Title;
-
-  const initialPool = useMemo(() => {
-    const list = parseRaffleReservations(raffle, members);
-    const p = [];
-    list.forEach(item => {
-      for (let i = 0; i < item.ticketCount; i++) {
-        p.push(item.name);
-      }
-    });
-    return p.sort(() => 0.5 - Math.random());
-  }, [raffle, members]);
-
-  const activePool = useRef([...initialPool]);
-
-  const drawFrame = (name, isW, phaseText) => {
-    if (!canvasRef.current) return;
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.fillStyle = '#09090b'; ctx.fillRect(0,0,800,600);
-    ctx.fillStyle = '#ec4899'; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('DRS OFFICIAL DRAW', 400, 80);
-    ctx.fillStyle = '#a1a1aa'; ctx.font = 'bold 24px sans-serif'; ctx.fillText(phaseText, 400, 130);
-    ctx.fillStyle = isW ? '#422006' : '#18181b'; ctx.fillRect(100, 220, 600, 160);
-    ctx.fillStyle = isW ? '#eab308' : '#fff'; ctx.font = 'bold 50px sans-serif'; ctx.fillText(name.toUpperCase(), 400, 320);
-    if(isW) { ctx.fillStyle = '#eab308'; ctx.font = 'bold 40px sans-serif'; ctx.fillText('WINNER!', 400, 460); }
-  };
-
-  const spin = () => {
-    if(activePool.current.length === 0) return;
-    setIsDrawing(true); chunksRef.current = [];
-    const stream = canvasRef.current.captureStream(30);
-    recorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
-    recorderRef.current.ondataavailable = e => chunksRef.current.push(e.data);
-    recorderRef.current.onstop = () => setVideoUrl(URL.createObjectURL(new Blob(chunksRef.current, { type: 'video/webm' })));
-    recorderRef.current.start();
-
-    let ticks = 0; 
-    const targetIndex = Math.floor(Math.random() * activePool.current.length);
-    const target = activePool.current[targetIndex];
-    const phaseText = drawPhase === 1 ? `1ST PLACE: ${raffle.title.toUpperCase()}` : `2ND PLACE: ${raffle.prize2Title.toUpperCase()}`;
-
-    const go = (speed) => {
-      ticks++;
-      if (ticks < 40) {
-        const n = activePool.current[Math.floor(Math.random() * activePool.current.length)];
-        setCurrent(n); drawFrame(n, false, phaseText);
-        setTimeout(() => go(speed + 5), speed);
-      } else {
-        setCurrent(target); 
-        drawFrame(target, true, phaseText);
-        
-        if (drawPhase === 1) {
-            setWinner1(target);
-            activePool.current.splice(targetIndex, 1);
-        } else {
-            setWinner2(target);
-        }
-        
-        setTimeout(() => { recorderRef.current.stop(); setIsDrawing(false); }, 2500);
-      }
-    };
-    go(30);
-  };
-
-  const handleNextPhase = () => {
-      setDrawPhase(2);
-      setCurrent('READY');
-      setVideoUrl(null);
-  };
-
-  const currentWinner = drawPhase === 1 ? winner1 : winner2;
-
-  return (
-    <div className="fixed inset-0 z-[150] bg-zinc-950 flex flex-col items-center justify-center p-4">
-      <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
-      <canvas ref={canvasRef} width="800" height="600" className="hidden" />
-      <Trophy className={`w-20 h-20 mb-8 ${currentWinner ? 'text-yellow-500 scale-125' : 'text-pink-600'} transition-transform duration-500`} />
-      
-      <div className="mb-6 text-center">
-         <p className="text-pink-500 font-bold uppercase tracking-widest">{drawPhase === 1 ? '1st Place Draw' : '2nd Place Draw'}</p>
-         <p className="text-white font-black text-xl">{drawPhase === 1 ? raffle.title : raffle.prize2Title}</p>
-      </div>
-
-      <div className={`w-full py-16 px-4 rounded-3xl border ${currentWinner ? 'border-yellow-500 bg-zinc-900/80' : 'border-zinc-800 bg-black/50'} text-center mb-12 max-w-4xl transition-colors duration-500`}>
-        <h2 className="text-4xl md:text-6xl font-black text-white italic uppercase break-words">{current}</h2>
-      </div>
-      
-      {!currentWinner && (
-        <button onClick={spin} disabled={isDrawing || activePool.current.length === 0} className="bg-pink-600 text-white font-black py-5 px-12 rounded-2xl uppercase text-lg shadow-pink-500/20 disabled:opacity-50">
-          {isDrawing ? 'Drawing & Recording...' : 'Spin the Wheel'}
-        </button>
-      )}
-      
-      {currentWinner && (
-        <div className="flex flex-col gap-4 items-center w-full max-w-md">
-          {videoUrl && <a href={videoUrl} download={`DRS_Draw_Phase${drawPhase}_${Date.now()}.webm`} className="w-full bg-zinc-800 text-white py-4 px-8 rounded-xl font-black uppercase text-xs flex items-center justify-center gap-2 hover:bg-zinc-700 transition-colors"><Video className="w-4 h-4" /> Download Video</a>}
-          
-          {drawPhase === 1 && hasSecondPrize ? (
-              <button onClick={handleNextPhase} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors">Proceed to 2nd Place Draw</button>
-          ) : (
-              <button onClick={() => onSetWinner(winner1, winner2)} className="w-full bg-green-600 hover:bg-green-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors shadow-green-500/20 shadow-lg">Approve & Close All</button>
-          )}
-        </div>
-      )}
     </div>
   );
 };
@@ -2982,7 +2954,20 @@ const MainApp = () => {
       case 'charity': return <CharityView />;
       case 'admin': return <AdminView members={allAdminMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
       case 'admin_guide': return <AdminGuideView onBack={() => window.location.hash = 'admin'} />;
-      default: return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberModal} members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
+      default:
+        if (activeTab.startsWith('raffle_detail_')) {
+          const raffleId = activeTab.replace('raffle_detail_', '');
+          return (
+            <RaffleDetailPage
+              raffleId={raffleId}
+              raffles={combinedRaffles}
+              members={cloudMembers}
+              user={user}
+              onBack={() => window.location.hash = 'raffles'}
+            />
+          );
+        }
+        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberModal} members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
     }
   };
 
@@ -3073,6 +3058,14 @@ const MainApp = () => {
   );
 };
 
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  );
+}
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -3108,12 +3101,4 @@ class ErrorBoundary extends React.Component {
     }
     return this.props.children;
   }
-}
-
-export default function App() {
-  return (
-    <ErrorBoundary>
-      <MainApp />
-    </ErrorBoundary>
-  );
 }
