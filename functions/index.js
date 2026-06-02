@@ -1,9 +1,6 @@
 const functions = require("firebase-functions");
-const fetch = require("node-fetch"); 
+const fetch = require("node-fetch"); // Ensure you ran: npm install node-fetch@2
 const cors = require("cors")({ origin: true });
-
-// Your secret API key
-const SUMUP_API_KEY = "sup_sk_sV6JMO79rGPPlejRuYWkz4aBSC7hWPyUk";
 
 exports.createSumUpCheckout = functions.https.onRequest((req, res) => {
   cors(req, res, async () => {
@@ -14,23 +11,19 @@ exports.createSumUpCheckout = functions.https.onRequest((req, res) => {
     try {
       const { amount, description, reference } = req.body;
 
-      // The exact Merchant Code verified from your SumUp Dashboard
       const checkoutData = {
         checkout_reference: reference,
         amount: parseFloat(amount),
         currency: "GBP",
+        // Using the exact merchant code as defined in your dashboard
         merchant_code: "MRH0GKZC", 
-        description: description,
-        redirect_url: "https://dailyridesouth.vercel.app/#raffles", 
-        hosted_checkout: { 
-          enabled: true 
-        }
+        description: description
       };
 
       const sumupResponse = await fetch('https://api.sumup.com/v0.1/checkouts', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${SUMUP_API_KEY}`,
+          'Authorization': 'Bearer sup_sk_sV6JMO79rGPPlejRuYWkz4aBSC7hWPyUk',
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(checkoutData)
