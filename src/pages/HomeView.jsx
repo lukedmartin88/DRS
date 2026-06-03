@@ -1,5 +1,3 @@
-Please copy all the code below this line and paste it into your local src/pages/HomeView.jsx file, replacing everything currently in there.
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ticket, ChevronRight, Grid } from 'lucide-react';
