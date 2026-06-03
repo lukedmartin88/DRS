@@ -1792,7 +1792,79 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
     </div>
   );
 };
+const ProfileView = ({ user, userProfile }) => {
+  return (
+    <div className="space-y-6 animate-in fade-in duration-700">
+      <div className="border-b border-zinc-800 pb-4">
+        <h2 className="text-3xl font-bold text-white">My Garage Profile</h2>
+        <p className="text-zinc-500 text-sm mt-1 uppercase tracking-widest font-bold">
+          Manage your details and vehicles
+        </p>
+      </div>
+      <div className="bg-zinc-900 p-8 rounded-3xl border border-zinc-800 shadow-xl text-center max-w-2xl mx-auto mt-10">
+        <UserCircle className="w-20 h-20 text-pink-500 mx-auto mb-4" />
+        <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">
+          {userProfile?.name || 'Profile Setup Needed'}
+        </h3>
+        <p className="text-zinc-400 mt-2 font-medium">{userProfile?.email || user?.email}</p>
+        
+        <div className="mt-6 inline-block bg-zinc-950 px-6 py-2 rounded-full border border-zinc-800">
+          <p className="text-pink-500 text-xs font-black uppercase tracking-[0.2em]">
+            {userProfile?.role || 'Member'}
+          </p>
+        </div>
 
+        <div className="mt-10 p-6 bg-black/50 rounded-2xl border border-zinc-800/50">
+          <p className="text-zinc-500 italic text-sm">
+            Profile editing and vehicle management forms will be rendered here.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CharityView = () => {
+  return (
+    <div className="space-y-6 animate-in fade-in duration-700">
+      <div className="border-b border-zinc-800 pb-4">
+        <h2 className="text-3xl font-bold text-white">Club Charity</h2>
+        <p className="text-zinc-500 text-sm mt-1 uppercase tracking-widest font-bold">
+          Supporting our community
+        </p>
+      </div>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
+        {STATIC_CHARITY.map(charity => (
+          <div key={charity.id} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 shadow-xl flex flex-col group hover:border-pink-500 transition-colors">
+            <div className="h-48 overflow-hidden">
+              <img 
+                src={charity.image} 
+                alt={charity.title} 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              />
+            </div>
+            <div className="p-6 flex flex-col flex-grow">
+              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">
+                {charity.title}
+              </h3>
+              <p className="text-zinc-400 text-sm mb-6 flex-grow">
+                {charity.description}
+              </p>
+              <a 
+                href={charity.link} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="inline-block w-full text-center bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-pink-500/20 active:scale-[0.98]"
+              >
+                Support / Donate
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile, spotlightMemberId }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
   const [password, setPassword] = useState('');
