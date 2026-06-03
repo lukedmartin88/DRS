@@ -11,7 +11,9 @@ import {
 import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-// --- FIREBASE SETUP ---
+// -----------------------------------------------------------------------------
+// 1. FIREBASE & CONTEXT SETUP (Inlined here so the preview environment compiles)
+// -----------------------------------------------------------------------------
 const canvasConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : null;
 const firebaseConfig = canvasConfig && Object.keys(canvasConfig).length > 0 ? canvasConfig : {
   apiKey: "AIzaSyCZDpOOlu6CcBNG5mNd9qLO0w3UihBB3-g",
@@ -27,40 +29,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'daily-ride-south-live';
 
-// --- HELPERS ---
-const getOrdinalSuffix = (d) => {
-  if (d > 3 && d < 21) return 'th';
-  switch (d % 10) {
-    case 1:  return "st";
-    case 2:  return "nd";
-    case 3:  return "rd";
-    default: return "th";
-  }
-};
-
-const formatDate = (date) => {
-  const d = date.getDate();
-  const month = date.toLocaleDateString('en-GB', { month: 'long' });
-  const year = date.getFullYear();
-  return `${d}${getOrdinalSuffix(d)} ${month} ${year}`;
-};
-
-// --- SHARED COMPONENTS ---
-const InputField = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
-  <div className="w-full">
-    <label className="block text-sm font-medium text-zinc-400 mb-1">{label}</label>
-    <input 
-      type={type}
-      value={value} 
-      onChange={onChange} 
-      required={required}
-      className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition-all" 
-      placeholder={placeholder} 
-    />
-  </div>
-);
-
-// --- CONTEXT SETUP ---
 const AuthContext = createContext();
 
 function AuthProvider({ children }) {
@@ -101,7 +69,37 @@ function AuthProvider({ children }) {
 
 const useAuth = () => useContext(AuthContext);
 
-// --- SPLASH VIEW COMPONENT ---
+// -----------------------------------------------------------------------------
+// 2. SHARED COMPONENTS & HELPERS
+// -----------------------------------------------------------------------------
+const formatDate = (date) => {
+  const d = date.getDate();
+  let suffix = 'th';
+  if (d === 1 || d === 21 || d === 31) suffix = 'st';
+  else if (d === 2 || d === 22) suffix = 'nd';
+  else if (d === 3 || d === 23) suffix = 'rd';
+  const month = date.toLocaleDateString('en-GB', { month: 'long' });
+  const year = date.getFullYear();
+  return `${d}${suffix} ${month} ${year}`;
+};
+
+const InputField = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
+  <div className="w-full">
+    <label className="block text-sm font-medium text-zinc-400 mb-1">{label}</label>
+    <input 
+      type={type}
+      value={value} 
+      onChange={onChange} 
+      required={required}
+      className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition-all" 
+      placeholder={placeholder} 
+    />
+  </div>
+);
+
+// -----------------------------------------------------------------------------
+// 3. SPLASH VIEW
+// -----------------------------------------------------------------------------
 function SplashView() {
   const { user } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
@@ -112,7 +110,7 @@ function SplashView() {
   const [resetMsg, setResetMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Navigate away if fully authenticated (not anonymous)
+  // Directly redirect if logged in (this prevents the "Processing..." hang)
   if (user && !user.isAnonymous) {
     return <Navigate to="/home" replace />;
   }
@@ -168,17 +166,17 @@ function SplashView() {
             <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             {error && <p className="text-red-500 text-xs font-bold uppercase text-center">{error}</p>}
             {resetMsg && <p className="text-green-500 text-xs font-bold uppercase text-center">{resetMsg}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase">{loading ? 'Processing...' : 'Send Reset Link'}</button>
-            <button type="button" onClick={() => setIsResetMode(false)} className="text-zinc-400 text-xs font-bold uppercase w-full mt-4">Back to Login</button>
+            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase transition-all active:scale-95">{loading ? 'Processing...' : 'Send Reset Link'}</button>
+            <button type="button" onClick={() => setIsResetMode(false)} className="text-zinc-400 hover:text-white transition-colors text-xs font-bold uppercase w-full mt-4">Back to Login</button>
           </form>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <InputField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             {error && <p className="text-red-500 text-xs font-bold uppercase text-center">{error}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase">{loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}</button>
+            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase transition-all active:scale-95">{loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}</button>
             <div className="mt-8 text-center">
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-pink-500 font-bold uppercase text-xs">
+              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-pink-500 hover:text-pink-400 transition-colors font-bold uppercase text-xs">
                 {isLogin ? 'Sign up here' : 'Log in instead'}
               </button>
             </div>
@@ -189,28 +187,27 @@ function SplashView() {
   );
 }
 
-// --- MOCK HOME VIEW (To demonstrate redirection) ---
-function HomeMock() {
-  const { user } = useAuth();
-  return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
-       <div className="bg-zinc-900 p-8 rounded-3xl border border-pink-500/50 text-center text-white">
-         <h2 className="text-2xl font-black uppercase mb-4">Garage Home</h2>
-         <p className="text-zinc-400 mb-6">Successfully authenticated as: <br/><span className="text-pink-500">{user?.email}</span></p>
-         <button onClick={() => getAuth(initializeApp(firebaseConfig)).signOut()} className="bg-pink-600 px-6 py-2 rounded-xl font-bold uppercase tracking-widest text-xs">Sign Out</button>
-       </div>
-    </div>
-  );
-}
-
-// --- MAIN ENTRY POINT ---
-export default function App() {
+// -----------------------------------------------------------------------------
+// 4. PREVIEW WRAPPER
+// Note: This exists purely to make the preview function properly. 
+// -----------------------------------------------------------------------------
+export default function AppPreview() {
   return (
     <AuthProvider>
       <MemoryRouter>
         <Routes>
           <Route path="/" element={<SplashView />} />
-          <Route path="/home" element={<HomeMock />} />
+          <Route 
+            path="/home" 
+            element={
+              <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-8">
+                <div className="bg-zinc-900 border border-pink-500 p-8 rounded-3xl text-center">
+                  <h2 className="text-white text-2xl font-black uppercase mb-2">Login Successful!</h2>
+                  <p className="text-zinc-400 text-sm">In your local codebase, this routes to HomeView.jsx</p>
+                </div>
+              </div>
+            } 
+          />
         </Routes>
       </MemoryRouter>
     </AuthProvider>
