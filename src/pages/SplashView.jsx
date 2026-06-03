@@ -1,11 +1,109 @@
-import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, db, appId } from '../firebase/config';
-import { InputField } from '../components/Shared';
-import { formatDate } from '../utils/helpers';
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail,
+  onAuthStateChanged,
+  signInAnonymously
+} from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-export default function SplashView() {
+// --- FIREBASE SETUP ---
+const canvasConfig = typeof __firebase_config !== 'undefined' && __firebase_config ? JSON.parse(__firebase_config) : null;
+const firebaseConfig = canvasConfig && Object.keys(canvasConfig).length > 0 ? canvasConfig : {
+  apiKey: "AIzaSyCZDpOOlu6CcBNG5mNd9qLO0w3UihBB3-g",
+  authDomain: "daily-ride-south-v3.firebaseapp.com",
+  projectId: "daily-ride-south-v3",
+  storageBucket: "daily-ride-south-v3.firebasestorage.app",
+  messagingSenderId: "588312048393",
+  appId: "1:588312048393:web:94f43a144149d0e87159d8"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'daily-ride-south-live';
+
+// --- HELPERS ---
+const getOrdinalSuffix = (d) => {
+  if (d > 3 && d < 21) return 'th';
+  switch (d % 10) {
+    case 1:  return "st";
+    case 2:  return "nd";
+    case 3:  return "rd";
+    default: return "th";
+  }
+};
+
+const formatDate = (date) => {
+  const d = date.getDate();
+  const month = date.toLocaleDateString('en-GB', { month: 'long' });
+  const year = date.getFullYear();
+  return `${d}${getOrdinalSuffix(d)} ${month} ${year}`;
+};
+
+// --- SHARED COMPONENTS ---
+const InputField = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
+  <div className="w-full">
+    <label className="block text-sm font-medium text-zinc-400 mb-1">{label}</label>
+    <input 
+      type={type}
+      value={value} 
+      onChange={onChange} 
+      required={required}
+      className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition-all" 
+      placeholder={placeholder} 
+    />
+  </div>
+);
+
+// --- CONTEXT SETUP ---
+const AuthContext = createContext();
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        await signInAnonymously(auth);
+      } catch (err) {
+        console.error("Auth error:", err);
+      }
+    };
+    
+    const timeout = setTimeout(() => {
+        if (!auth.currentUser) initAuth();
+    }, 1000);
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      clearTimeout(timeout);
+      setUser(firebaseUser);
+      setLoading(false);
+    });
+
+    return () => {
+      clearTimeout(timeout);
+      unsubscribe();
+    };
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {!loading && children}
+    </AuthContext.Provider>
+  );
+}
+
+const useAuth = () => useContext(AuthContext);
+
+// --- SPLASH VIEW COMPONENT ---
+function SplashView() {
+  const { user } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [isResetMode, setIsResetMode] = useState(false);
   const [email, setEmail] = useState('');
@@ -13,6 +111,11 @@ export default function SplashView() {
   const [error, setError] = useState('');
   const [resetMsg, setResetMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Navigate away if fully authenticated (not anonymous)
+  if (user && !user.isAnonymous) {
+    return <Navigate to="/home" replace />;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,5 +186,33 @@ export default function SplashView() {
         )}
       </div>
     </div>
+  );
+}
+
+// --- MOCK HOME VIEW (To demonstrate redirection) ---
+function HomeMock() {
+  const { user } = useAuth();
+  return (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
+       <div className="bg-zinc-900 p-8 rounded-3xl border border-pink-500/50 text-center text-white">
+         <h2 className="text-2xl font-black uppercase mb-4">Garage Home</h2>
+         <p className="text-zinc-400 mb-6">Successfully authenticated as: <br/><span className="text-pink-500">{user?.email}</span></p>
+         <button onClick={() => getAuth(initializeApp(firebaseConfig)).signOut()} className="bg-pink-600 px-6 py-2 rounded-xl font-bold uppercase tracking-widest text-xs">Sign Out</button>
+       </div>
+    </div>
+  );
+}
+
+// --- MAIN ENTRY POINT ---
+export default function App() {
+  return (
+    <AuthProvider>
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<SplashView />} />
+          <Route path="/home" element={<HomeMock />} />
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>
   );
 }
