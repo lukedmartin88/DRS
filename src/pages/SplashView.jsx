@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, appId } from '../firebase/config';
-import { useAuth } from '../context/AuthContext';
-import { Navigate } from 'react-router-dom';
 import { InputField } from '../components/Shared';
 import { formatDate } from '../utils/helpers';
 
 export default function SplashView() {
-  const { user } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [isResetMode, setIsResetMode] = useState(false);
   const [email, setEmail] = useState('');
@@ -16,11 +13,6 @@ export default function SplashView() {
   const [error, setError] = useState('');
   const [resetMsg, setResetMsg] = useState('');
   const [loading, setLoading] = useState(false);
-
-  // Directly redirect if logged in (this prevents the "Processing..." hang)
-  if (user && !user.isAnonymous) {
-    return <Navigate to="/home" replace />;
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -73,17 +65,17 @@ export default function SplashView() {
             <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             {error && <p className="text-red-500 text-xs font-bold uppercase text-center">{error}</p>}
             {resetMsg && <p className="text-green-500 text-xs font-bold uppercase text-center">{resetMsg}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase transition-all active:scale-95">{loading ? 'Processing...' : 'Send Reset Link'}</button>
-            <button type="button" onClick={() => setIsResetMode(false)} className="text-zinc-400 hover:text-white transition-colors text-xs font-bold uppercase w-full mt-4">Back to Login</button>
+            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase">{loading ? 'Processing...' : 'Send Reset Link'}</button>
+            <button type="button" onClick={() => setIsResetMode(false)} className="text-zinc-400 text-xs font-bold uppercase w-full mt-4">Back to Login</button>
           </form>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <InputField label="Email Address" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <InputField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             {error && <p className="text-red-500 text-xs font-bold uppercase text-center">{error}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase transition-all active:scale-95">{loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}</button>
+            <button type="submit" disabled={loading} className="w-full bg-pink-600 text-white font-black py-4 rounded-xl uppercase">{loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}</button>
             <div className="mt-8 text-center">
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-pink-500 hover:text-pink-400 transition-colors font-bold uppercase text-xs">
+              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-pink-500 font-bold uppercase text-xs">
                 {isLogin ? 'Sign up here' : 'Log in instead'}
               </button>
             </div>

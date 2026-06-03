@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from './ProtectedRoute';
-import Layout from '../components/Layout';
 
 // Lazy load pages for better performance
 const SplashView = lazy(() => import('../pages/SplashView'));
@@ -26,18 +25,31 @@ export default function AppRoutes() {
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
-        {/* Splash screen has no Layout wrapper so it takes up the full screen */}
         <Route path="/" element={<SplashView />} />
         
-        {/* All protected routes sit inside the Layout component */}
-        <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route path="/home" element={<HomeView />} />
-          <Route path="/events" element={<EventsView />} />
-          <Route path="/members" element={<MembersView />} />
-          <Route path="/profile" element={<ProfileView />} />
-          <Route path="/raffles" element={<RafflesView />} />
-          <Route path="/admin" element={<AdminView />} />
-        </Route>
+        <Route path="/home" element={
+          <ProtectedRoute><HomeView /></ProtectedRoute>
+        } />
+        
+        <Route path="/events" element={
+          <ProtectedRoute><EventsView /></ProtectedRoute>
+        } />
+        
+        <Route path="/members" element={
+          <ProtectedRoute><MembersView /></ProtectedRoute>
+        } />
+        
+        <Route path="/profile" element={
+          <ProtectedRoute><ProfileView /></ProtectedRoute>
+        } />
+        
+        <Route path="/raffles" element={
+          <ProtectedRoute><RafflesView /></ProtectedRoute>
+        } />
+        
+        <Route path="/admin" element={
+          <ProtectedRoute><AdminView /></ProtectedRoute>
+        } />
       </Routes>
     </Suspense>
   );
