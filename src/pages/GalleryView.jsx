@@ -28,7 +28,12 @@ export default function GalleryView() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
         {allImages.map((img, i) => (
           <div key={i} onClick={() => setEnlargedImage(img)} className="aspect-square cursor-pointer overflow-hidden rounded-lg group">
-            <img src={img.url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="" />
+            <img 
+              src={img.url} 
+              alt={img.carName} 
+              title={img.carName}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+            />
           </div>
         ))}
       </div>
