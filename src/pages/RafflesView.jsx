@@ -3,17 +3,14 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db, appId } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { useMembers } from '../context/MembersContext';
-import { Eye, Clock, Ticket } from 'lucide-react';
+import { Ticket, History } from 'lucide-react';
 import { parseRaffleReservations, DEFAULT_CAR } from '../utils/helpers';
-
-// (Optional) Import your RaffleDetailPage component if you choose to split it further, 
-// otherwise keep the details view logic here.
 
 export default function RafflesView() {
   const { user } = useAuth();
   const { members } = useMembers();
   const [cloudRaffles, setCloudRaffles] = useState([]);
-  const [selectedRaffleId, setSelectedRaffleId] = useState(null); // Local routing state
+  const [selectedRaffleId, setSelectedRaffleId] = useState(null);
 
   useEffect(() => {
     const unsubRaffles = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), s => {
@@ -46,7 +43,9 @@ export default function RafflesView() {
       </div>
 
       <div className="space-y-5">
-        <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
+        <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2 flex items-center gap-3">
+           <Ticket className="w-8 h-8 text-pink-500" /> Active Raffles
+        </h2>
         {activeRaffles.length === 0 ? (
           <p className="text-zinc-500 py-12 text-center italic border border-dashed border-zinc-800 rounded-3xl">
             No active raffles right now. Check back soon!
@@ -76,6 +75,29 @@ export default function RafflesView() {
           </div>
         )}
       </div>
+
+      {pastRaffles.length > 0 && (
+        <div className="space-y-5 opacity-70 hover:opacity-100 transition-opacity">
+          <h2 className="text-2xl font-bold text-white border-b border-zinc-800 pb-2 flex items-center gap-3">
+             <History className="w-6 h-6 text-zinc-500" /> Past Draws
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {pastRaffles.map((r) => (
+                <div key={r.id} onClick={() => setSelectedRaffleId(r.id)} className="bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-zinc-500 transition-colors">
+                    <div className="h-32 overflow-hidden grayscale relative">
+                        <img src={r.image || DEFAULT_CAR} alt={r.title} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                            <span className="bg-zinc-800 text-zinc-300 text-[10px] font-black px-3 py-1 rounded uppercase tracking-widest">Draw Ended</span>
+                        </div>
+                    </div>
+                    <div className="p-3">
+                        <h3 className="text-zinc-300 font-bold uppercase text-xs truncate">{r.title}</h3>
+                    </div>
+                </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
