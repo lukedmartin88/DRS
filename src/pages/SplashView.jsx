@@ -1,4 +1,13 @@
-function SplashView() {
+import React, { useState } from 'react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db, appId } from '../firebase/config';
+import { useAuth } from '../context/AuthContext';
+import { Navigate } from 'react-router-dom';
+import { InputField } from '../components/Shared';
+import { formatDate } from '../utils/helpers';
+
+export default function SplashView() {
   const { user } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [isResetMode, setIsResetMode] = useState(false);
