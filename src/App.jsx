@@ -15,6 +15,7 @@ import {
   deleteField, updateDoc
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   Calendar, Users, Ticket, CarFront, MapPin, Clock, ChevronLeft, Award, Heart,
   ExternalLink, UserCircle, Save, Plus, Trash2, Lock, Shield, Edit3, Menu, X,
@@ -36,6 +37,7 @@ const firebaseConfig = canvasConfig && Object.keys(canvasConfig).length > 0 ? ca
 };
 
 const app = initializeApp(firebaseConfig);
+const functions = getFunctions(app);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
@@ -1360,7 +1362,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
         await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
       }
       const res = await fetch(
-        'https://us-central1-daily-ride-south-v3.cloudfunctions.net/createSumUpCheckout',
+        'https://createsumupcheckout-7hvlzmnlea-uc.a.run.app',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
