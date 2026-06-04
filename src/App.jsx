@@ -1370,10 +1370,10 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            reference: `drs_${user.uid}_${Date.now()}`,
-            amount: raffle.ticketPrice * reserveQuantity,
-            description: `DRS Raffle: ${raffle.title} (x${reserveQuantity})`,
-          }),
+  reference: `drs_${user.uid}_${Date.now()}`,
+  amount: raffle.ticketPrice * reserveQuantity,
+  description: `${membersById[user.uid]?.name || 'Unknown Member'} : ${raffle.title} (x${reserveQuantity})`,
+})  
         }
       );
       if (!res.ok) throw new Error(`Server error ${res.status}`);
