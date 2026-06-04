@@ -772,8 +772,7 @@ const EnlargedImageModal = ({ imageObj, onClose, onMemberClick }) => {
       <div className="relative max-w-full max-h-full flex flex-col items-center">
         <div className="relative group overflow-hidden rounded-2xl border border-zinc-800 shadow-2xl">
           <img src={imageObj.url} alt={imageObj.carName} className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
-          <div onClick={() => { onClose(); onMemberClick(imageObj.member); }} className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-pink-600 transition-all cursor-pointer group/member z-[130] shadow-2xl">
-            <img src={imageObj.member.avatar || DEFAULT_AVATAR} className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
+<div onClick={() => onMemberClick(imageObj.member)} className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-pink-600 transition-all cursor-pointer group/member z-[130] shadow-2xl">            <img src={imageObj.member.avatar || DEFAULT_AVATAR} className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
             <div className="flex flex-col">
               <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member.name || 'Pending Setup'}</span>
               <span className="text-white/60 group-hover/member:text-white/80 text-[8px] uppercase font-bold tracking-widest mt-1">View Garage</span>
@@ -810,8 +809,14 @@ const GalleryView = ({ members, onImageClick }) => {
       </div>
       <div className="columns-2 md:col-span-3 lg:columns-4 gap-4 space-y-4">
         {allImages.map((img, i) => (
-          <div key={i} onClick={() => onImageClick(img)} className="relative group rounded-2xl overflow-hidden cursor-pointer border border-zinc-800 hover:border-pink-500 transition-all shadow-lg inline-block w-full">
-            <img src={img.url} alt="" className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 block" />
+          <div key={img.url + i} onClick={() => onImageClick(img)} className="relative group rounded-2xl overflow-hidden cursor-pointer border border-zinc-800 hover:border-pink-500 transition-all shadow-lg inline-block w-full bg-zinc-900/40 min-h-[140px]">
+            <img 
+              src={img.url} 
+              alt="" 
+              loading="lazy"
+              decoding="async"
+              className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 block" 
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
               <p className="text-white font-black text-xs uppercase tracking-tighter">{img.carName}</p>
               <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest">{img.member.name || 'Pending Setup'}</p>
@@ -1027,8 +1032,12 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
           return (
             <div key={event.id} className="bg-zinc-900 rounded-2xl overflow-hidden shadow-xl border border-zinc-800 flex flex-col transition-all hover:shadow-pink-500/5">
               <div className="h-48 overflow-hidden shrink-0 relative group">
-                <img src={event.image} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
+<img 
+  src={event.image || DEFAULT_CAR} 
+  onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_CAR; }} 
+  alt={event.title} 
+  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+/>                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
               </div>
               <div className="p-6 flex flex-col flex-grow">
                 <h3 className="text-2xl font-black text-white mb-3 uppercase tracking-tighter leading-tight">{event.title}</h3>
@@ -2913,6 +2922,9 @@ const MainApp = () => {
   const [globalSelectedMember, setGlobalSelectedMember] = useState(null);
   const [globalViewingCar, setGlobalViewingCar] = useState(null);
   const [enlargedImage, setEnlargedImage] = useState(null);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
   
   // --- INACTIVITY TIMER ---
   useEffect(() => {

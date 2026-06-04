@@ -916,7 +916,9 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
 
   const [mosaicSlots, setMosaicSlots] = useState([]);
   const cycleRef = useRef({ slotIdx: 0, imgIdx: 8 });
-
+useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   useEffect(() => {
     if (allImages.length === 0) return;
     const initialSlots = Array(8).fill(null).map((_, i) => ({
