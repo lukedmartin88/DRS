@@ -1205,15 +1205,16 @@ const SumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
         id: 'raffle-sumup-container',
         checkoutId: checkoutId,
         onResponse: (type, body) => {
-          console.log('SumUp Response:', type, body);
-          if (type === 'success' || type === 'sent') {
-            onSuccess();
-          } else if (type === 'fail' || type === 'error') {
-            onFail(body);
-          }
-        },
-      });
-    }
+  console.log('SumUp Response:', type, body);
+  
+  // Only trigger success when the bank fully confirms the charge
+  if (type === 'success') {
+    onSuccess();
+  } else if (type === 'fail' || type === 'error') {
+    onFail(body);
+  }
+  // Ignore 'sent' and let the widget finish processing
+}
     return () => {
       if (instance && instance.unmount) {
         instance.unmount();

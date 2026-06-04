@@ -22,11 +22,11 @@ exports.createSumUpCheckout = onRequest({ secrets: [] }, async (req, res) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          checkout_reference: reference,
-          amount: amount,
+          checkout_reference: String(reference),
+          amount: Number(parseFloat(amount).toFixed(2)),
           currency: "GBP",
-          description: description,
-          merchant_code: process.env.MRH0GKZC
+          description: String(description),
+          merchant_code: "MRH0GKZC"
         }),
       });
 
