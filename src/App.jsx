@@ -2480,6 +2480,59 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         <div className="mt-4 space-y-2">
                           <div className="flex items-center justify-between bg-zinc-900/80 p-2 rounded-lg border border-pink-500/30">
                             <span className="text-pink-500 text-[10px] font-black uppercase tracking-[0.1em]">Total Taken:</span>
+                            {/* ADMIN TICKET MANAGEMENT UI */}
+  <div className="pt-2">
+    <p className="text-[10px] font-bold uppercase text-zinc-500 tracking-widest mb-2">Manage Tickets</p>
+    {allReservedList.length === 0 ? (
+      <p className="text-xs text-zinc-600 italic">No tickets reserved yet.</p>
+    ) : (
+      <div className="space-y-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+        {allReservedList.map((item) => (
+          <div key={item.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-zinc-800/50">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <img src={item.avatar || DEFAULT_AVATAR} alt="" className="w-6 h-6 rounded-full object-cover shrink-0 border border-zinc-700" />
+              <div className="min-w-0">
+                <p className="text-white text-[10px] font-bold truncate">{item.name}</p>
+                <p className="text-pink-500 text-[8px] uppercase tracking-widest">
+                  {item.ticketCount} Ticket{item.ticketCount !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <button 
+                type="button"
+                onClick={(e) => item.type === 'app' ? handleUpdateReservation(e, r, item.id, -1) : handleUpdateOfflineReservation(e, r, item.id, -1)} 
+                className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-white rounded flex items-center justify-center transition-colors"
+                title="Remove 1 Ticket"
+              >
+                -
+              </button>
+              <button 
+                type="button"
+                onClick={(e) => item.type === 'app' ? handleUpdateReservation(e, r, item.id, 1) : handleUpdateOfflineReservation(e, r, item.id, 1)} 
+                className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 text-white rounded flex items-center justify-center transition-colors"
+                title="Add 1 Ticket"
+              >
+                +
+              </button>
+              <button 
+                type="button"
+                onClick={(e) => {
+                  if(window.confirm(`Delete all tickets for ${item.name}?`)) {
+                    item.type === 'app' ? handleUpdateReservation(e, r, item.id, -item.ticketCount) : handleUpdateOfflineReservation(e, r, item.id, -item.ticketCount);
+                  }
+                }} 
+                className="w-6 h-6 bg-red-900/40 hover:bg-red-600 text-white rounded flex items-center justify-center transition-colors ml-1"
+                title="Delete All Tickets"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
                             <span className="text-pink-500 font-black text-sm">{totalReserved} / {r.totalTickets}</span>
                           </div>
                         </div>
