@@ -1663,7 +1663,7 @@ const RafflesView = ({ raffles, user, members }) => {
   const activeRaffles = raffles.filter((r) => !r.isEnded);
   const pastRaffles = raffles.filter((r) => r.isEnded);
   
-  useEffect(() => {
+ useEffect(() => {
     if (!document.getElementById('sumup-card-sdk')) {
       const script = document.createElement('script');
       script.id = 'sumup-card-sdk';
@@ -2931,6 +2931,21 @@ const MainApp = () => {
     window.scrollTo(0, 0);
   }, [activeTab]);
   
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
+
+  // --- SUMUP GLOBAL SCRIPT ---
+  useEffect(() => {
+    if (!document.getElementById('sumup-card-sdk')) {
+      const script = document.createElement('script');
+      script.id = 'sumup-card-sdk';
+      script.src = 'https://gateway.sumup.com/gateway/ecom/card/v2/sdk.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   // --- INACTIVITY TIMER ---
   useEffect(() => {
     let inactivityTimer;
