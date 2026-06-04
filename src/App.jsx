@@ -1352,39 +1352,40 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
   ].filter(Boolean);
   
   const submitReservation = async () => {
-    if (!user || user.isAnonymous || !membersById[user.uid]?.name) {
-      setLoginPrompt(true);
-      return;
-    }
-    setIsSubmitting(true);
-    setSubmitError('');
-    try {
-      if (!raffle.id.startsWith('mock-')) {
-        const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
-        const currentVal = (raffle.reservations || {})[user.uid] || 0;
-        await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
+  if (!user || user.isAnonymous || !membersById[user.uid]?.name) {
+    setLoginPrompt(true);
+    return;
+  }
+  setIsSubmitting(true);
+  setSubmitError('');
+  
+  try {
+    const res = await fetch(
+      'https://createsumupcheckout-7hvlzmnlea-uc.a.run.app',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reference: `drs_${user.uid}_${Date.now()}`,
+          amount: raffle.ticketPrice * reserveQuantity,
+          description: `${membersById[user.uid]?.name || 'Unknown Member'} : ${raffle.title} (x${reserveQuantity})`,
+        })  
       }
-      const res = await fetch(
-        'https://createsumupcheckout-7hvlzmnlea-uc.a.run.app',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-  reference: `drs_${user.uid}_${Date.now()}`,
-  amount: raffle.ticketPrice * reserveQuantity,
-  description: `${membersById[user.uid]?.name || 'Unknown Member'} : ${raffle.title} (x${reserveQuantity})`,
-})  
-        }
-      );
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const { checkoutId } = await res.json();
-      if (checkoutId) setSumupCheckoutId(checkoutId);
-      else throw new Error('No checkout ID returned');
-    } catch (e) {
-      setSubmitError(e.message.includes('fetch') ? 'Connection error. Please try again.' : e.message);
-      setIsSubmitting(false);
+    );
+    
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    const { checkoutId } = await res.json();
+    
+    if (checkoutId) {
+      setSumupCheckoutId(checkoutId);
+    } else {
+      throw new Error('No checkout ID returned');
     }
-  };
+  } catch (e) {
+    setSubmitError(e.message.includes('fetch') ? 'Connection error. Please try again.' : e.message);
+    setIsSubmitting(false);
+  }
+};
   
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -1566,10 +1567,31 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
               </div>
             ) : sumupCheckoutId ? (
               <SumUpWidget 
-                checkoutId={sumupCheckoutId} 
-                onSuccess={handlePaymentSuccess} 
-                onFail={handlePaymentFail} 
-              />
+  checkoutId={sumupCheckoutId} 
+  onSuccess={async () => {
+    try {
+      // 1. Assign tickets ONLY after successful payment
+      if (!raffle.id.startsWith('mock-')) {
+        const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
+        const currentVal = (raffle.reservations || {})[user.uid] || 0;
+        await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
+      }
+
+      // 2. Add email receipt logic here if using the Firebase extension
+      // await addDoc(collection(db, 'mail'), { ... });
+
+      // 3. Show success screen
+      setPaymentComplete(true);
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error("Database update failed after payment:", error);
+    }
+  }} 
+  onFail={(error) => {
+    console.error("Payment failed or cancelled:", error);
+    setIsSubmitting(false); // Unfreeze the button so they can try again
+  }} 
+/>
             ) : (
               <div className="space-y-5">
                 <div>
