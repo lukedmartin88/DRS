@@ -1198,9 +1198,17 @@ const CountdownTimer = ({ drawDate }) => {
 };
 
 const SumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
+  // 1. Create a ref to store our callbacks without triggering re-renders
+  const callbacks = useRef({ onSuccess, onFail });
+
+  // 2. Keep the ref updated silently in the background
+  useEffect(() => {
+    callbacks.current = { onSuccess, onFail };
+  }, [onSuccess, onFail]);
+
   useEffect(() => {
     let instance = null;
-    
+
     if (checkoutId && window.SumUpCard) {
       instance = window.SumUpCard.mount({
         id: 'raffle-sumup-container',
@@ -1209,12 +1217,12 @@ const SumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
           console.log('SumUp Response:', type, body);
           
           if (type === 'success') {
-            onSuccess();
+            callbacks.current.onSuccess();
           } else if (type === 'fail' || type === 'error') {
-            onFail(body);
+            callbacks.current.onFail(body);
           }
         }
-      }); // These are the closing brackets that were missing
+      });
     }
 
     return () => {
@@ -1222,7 +1230,7 @@ const SumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
         instance.unmount();
       }
     };
-  }, [checkoutId, onSuccess, onFail]);
+  }, [checkoutId]); // 3. ONLY depend on checkoutId. This stops the looping!
 
   return <div className="bg-white rounded-xl p-4 min-h-[350px] animate-in fade-in duration-500" id="raffle-sumup-container" />;
 });
