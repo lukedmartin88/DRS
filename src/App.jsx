@@ -1207,41 +1207,46 @@ const CountdownTimer = ({ drawDate }) => {
 };
 
 const SumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
-  // 1. Create a ref to store our callbacks without triggering re-renders
   const callbacks = useRef({ onSuccess, onFail });
 
-  // 2. Keep the ref updated silently in the background
   useEffect(() => {
     callbacks.current = { onSuccess, onFail };
   }, [onSuccess, onFail]);
 
   useEffect(() => {
     let instance = null;
+    
+    const uniqueContainerId = `sumup-container-${checkoutId}`;
 
     if (checkoutId && window.SumUpCard) {
-      instance = window.SumUpCard.mount({
-        id: 'raffle-sumup-container',
-        checkoutId: checkoutId,
-        onResponse: (type, body) => {
-          console.log('SumUp Response:', type, body);
-          
-          if (type === 'success') {
-            callbacks.current.onSuccess();
-          } else if (type === 'fail' || type === 'error') {
-            callbacks.current.onFail(body);
-          }
+      const timer = setTimeout(() => {
+        const container = document.getElementById(uniqueContainerId);
+        if (container) {
+          instance = window.SumUpCard.mount({
+            id: uniqueContainerId,
+            checkoutId: checkoutId,
+            onResponse: (type, body) => {
+              console.log('SumUp Response:', type, body);
+              if (type === 'success') {
+                callbacks.current.onSuccess();
+              } else if (type === 'fail' || type === 'error') {
+                callbacks.current.onFail(body);
+              }
+            }
+          });
         }
-      });
+      }, 50);
+
+      return () => {
+        clearTimeout(timer);
+        if (instance && instance.unmount) {
+          instance.unmount();
+        }
+      };
     }
+  }, [checkoutId]);
 
-    return () => {
-      if (instance && instance.unmount) {
-        instance.unmount();
-      }
-    };
-  }, [checkoutId]); // 3. ONLY depend on checkoutId. This stops the looping!
-
-  return <div className="bg-white rounded-xl p-4 min-h-[350px] animate-in fade-in duration-500" id="raffle-sumup-container" />;
+  return <div className="bg-white rounded-xl p-4 min-h-[350px] animate-in fade-in duration-500" id={`sumup-container-${checkoutId}`} />;
 });
 
 const RafflePreviewCard = ({ raffle, members, onClick }) => {
