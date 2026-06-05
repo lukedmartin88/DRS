@@ -1842,32 +1842,130 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
   );
 };
 const ProfileView = ({ user, userProfile }) => {
+  const [profileData, setProfileData] = useState(userProfile || { name: '', nickname: '', location: '', bio: '', instagram: '', avatar: '', cars: [] });
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (userProfile) setProfileData(prev => ({ ...prev, ...userProfile }));
+  }, [userProfile]);
+
+  const handleSave = async () => {
+    if (!profileData.name || profileData.name.trim() === '') {
+      alert('Please enter your full name to continue.');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', user.uid), profileData, { merge: true });
+      alert('Profile and garage updated successfully!');
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      alert('Failed to save changes.');
+    }
+    setIsSaving(false);
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-700">
-      <div className="border-b border-zinc-800 pb-4">
-        <h2 className="text-3xl font-bold text-white">My Garage Profile</h2>
-        <p className="text-zinc-500 text-sm mt-1 uppercase tracking-widest font-bold">
-          Manage your details and vehicles
-        </p>
-      </div>
-      <div className="bg-zinc-900 p-8 rounded-3xl border border-zinc-800 shadow-xl text-center max-w-2xl mx-auto mt-10">
-        <UserCircle className="w-20 h-20 text-pink-500 mx-auto mb-4" />
-        <h3 className="text-3xl font-black text-white uppercase italic tracking-tighter">
-          {userProfile?.name || 'Profile Setup Needed'}
-        </h3>
-        <p className="text-zinc-400 mt-2 font-medium">{userProfile?.email || user?.email}</p>
-        
-        <div className="mt-6 inline-block bg-zinc-950 px-6 py-2 rounded-full border border-zinc-800">
-          <p className="text-pink-500 text-xs font-black uppercase tracking-[0.2em]">
-            {userProfile?.role || 'Member'}
+    <div className="space-y-8 animate-in fade-in duration-700 max-w-4xl mx-auto pb-10">
+      <div className="border-b border-zinc-800 pb-4 flex justify-between items-end">
+        <div>
+          <h2 className="text-3xl font-bold text-white">My Garage Profile</h2>
+          <p className="text-zinc-500 text-sm mt-1 uppercase tracking-widest font-bold">
+            Manage your details and vehicles
           </p>
+        </div>
+        <button onClick={handleSave} disabled={isSaving} className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 transition-all disabled:opacity-50">
+          <Save className="w-4 h-4" /> {isSaving ? 'Saving...' : 'Save Profile'}
+        </button>
+      </div>
+
+      <div className="bg-zinc-900 p-6 md:p-8 rounded-3xl border border-zinc-800 shadow-xl space-y-6">
+        <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2"><UserCircle className="w-6 h-6 text-pink-500" /> Driver Details</h3>
+        
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          <div className="w-full md:w-1/3 space-y-4 shrink-0">
+            <div className="aspect-square rounded-2xl overflow-hidden border-2 border-zinc-800 bg-black relative group">
+              <img src={profileData.avatar || DEFAULT_AVATAR} className="w-full h-full object-cover" alt="Profile" />
+            </div>
+            <ImageUpload label="Update Profile Picture" onUploadSuccess={(url) => setProfileData({...profileData, avatar: url})} />
+          </div>
+          
+          <div className="w-full flex-grow space-y-4">
+            <InputField label="Full Name (Required)" value={profileData.name || ''} onChange={e => setProfileData({...profileData, name: e.target.value})} required={true} />
+            <div className="grid grid-cols-2 gap-4">
+              <InputField label="Nickname" value={profileData.nickname || ''} onChange={e => setProfileData({...profileData, nickname: e.target.value})} />
+              <InputField label="Location" value={profileData.location || ''} onChange={e => setProfileData({...profileData, location: e.target.value})} />
+            </div>
+            <InputField label="Instagram Profile Link" value={profileData.instagram || ''} onChange={e => setProfileData({...profileData, instagram: e.target.value})} placeholder="https://instagram.com/..." />
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-zinc-400">Bio / About Me</label>
+              <textarea value={profileData.bio || ''} onChange={e => setProfileData({...profileData, bio: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" rows={3} placeholder="Tell the club about yourself..." />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-zinc-900 p-6 md:p-8 rounded-3xl border border-zinc-800 shadow-xl space-y-6">
+        <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
+          <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2"><CarFront className="w-6 h-6 text-pink-500" /> My Garage</h3>
+          <button onClick={() => setProfileData(prev => ({...prev, cars: [...(prev.cars || []), { make: '', model: '', year: '', specs: '', mods: '', image: '', gallery: [] }]}))} className="text-pink-500 hover:text-white flex items-center gap-1 text-xs font-bold uppercase tracking-widest transition-colors">
+            <Plus className="w-4 h-4" /> Add Vehicle
+          </button>
         </div>
 
-        <div className="mt-10 p-6 bg-black/50 rounded-2xl border border-zinc-800/50">
-          <p className="text-zinc-500 italic text-sm">
-            Profile editing and vehicle management forms will be rendered here.
-          </p>
-        </div>
+        {(profileData.cars || []).length === 0 ? (
+          <p className="text-zinc-500 text-center py-8 italic">Your garage is currently empty. Add a vehicle to feature in the club gallery.</p>
+        ) : (
+          <div className="space-y-10">
+            {(profileData.cars || []).map((car, idx) => (
+              <div key={idx} className="bg-black/50 p-6 rounded-2xl border border-zinc-800 relative">
+                <button onClick={() => { if(window.confirm('Remove this vehicle?')) { const c = [...profileData.cars]; c.splice(idx, 1); setProfileData({...profileData, cars: c}); } }} className="absolute top-4 right-4 text-zinc-600 hover:text-red-500 transition-colors p-2">
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <h4 className="text-white font-bold mb-4 uppercase tracking-wider">Vehicle #{idx + 1}</h4>
+                
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                  <InputField label="Make" value={car.make || ''} onChange={e => { const c = [...profileData.cars]; c[idx].make = e.target.value; setProfileData({...profileData, cars: c}); }} placeholder="e.g. Ford" />
+                  <InputField label="Model" value={car.model || ''} onChange={e => { const c = [...profileData.cars]; c[idx].model = e.target.value; setProfileData({...profileData, cars: c}); }} placeholder="e.g. Focus RS" />
+                  <InputField label="Year" value={car.year || ''} onChange={e => { const c = [...profileData.cars]; c[idx].year = e.target.value; setProfileData({...profileData, cars: c}); }} placeholder="e.g. 2017" />
+                </div>
+                
+                <div className="grid md:grid-cols-2 gap-4 mb-6">
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-zinc-400">Specs (Engine / Power)</label>
+                    <textarea value={car.specs || ''} onChange={e => { const c = [...profileData.cars]; c[idx].specs = e.target.value; setProfileData({...profileData, cars: c}); }} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-pink-500" rows={2} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-zinc-400">Modifications</label>
+                    <textarea value={car.mods || ''} onChange={e => { const c = [...profileData.cars]; c[idx].mods = e.target.value; setProfileData({...profileData, cars: c}); }} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-pink-500" rows={2} />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-8 border-t border-zinc-800 pt-6">
+                  <div>
+                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Main Cover Image</p>
+                    {car.image && <img src={car.image} className="w-full h-40 object-cover rounded-xl mb-3 border border-zinc-800" alt="Main Car" />}
+                    <ImageUpload label="Upload Main Image" onUploadSuccess={url => { const c = [...profileData.cars]; c[idx].image = url; setProfileData({...profileData, cars: c}); }} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Additional Gallery Images</p>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {(car.gallery || []).map((img, gIdx) => (
+                        <div key={gIdx} className="relative group aspect-square rounded-lg overflow-hidden border border-zinc-800">
+                          <img src={img} className="w-full h-full object-cover" alt="Gallery" />
+                          <button onClick={() => { const c = [...profileData.cars]; c[idx].gallery.splice(gIdx, 1); setProfileData({...profileData, cars: c}); }} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 className="w-5 h-5 text-red-500" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <ImageUpload label="Add Gallery Image" onUploadSuccess={url => { const c = [...profileData.cars]; if(!c[idx].gallery) c[idx].gallery = []; c[idx].gallery.push(url); setProfileData({...profileData, cars: c}); }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3145,7 +3243,7 @@ const MainApp = () => {
       );
     }
     
-    if (requiresProfileSetup) {
+    if (requiresProfileSetup && activeTab !== 'profile') {
       return (
         <div className="bg-zinc-900 p-10 rounded-3xl border border-pink-500/50 text-center max-w-md mx-auto shadow-2xl animate-in zoom-in-95 duration-500">
           <UserCircle className="w-16 h-16 text-pink-500 mx-auto mb-6" />
