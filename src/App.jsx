@@ -534,7 +534,7 @@ const SplashView = () => {
         <div className="flex flex-col items-center mb-8">
           <img 
             src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" 
-            className="w-40 h-40 rounded-3xl object-cover border-2 border-lime-500/40 shadow-2xl shadow-lime-500/25" 
+            className="w-36 h-36 md:w-40 md:h-40 rounded-3xl object-cover border-2 border-lime-500/40 shadow-2xl shadow-lime-500/25" 
             alt="Daily Ride South Logo" 
           />
         </div>
@@ -623,12 +623,10 @@ const AdminGuideView = ({ onBack }) => {
       </button>
       <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex items-center gap-4">
-          <Shield className="w-8 h-8 text-lime-400" />
+          <Shield className="w-8 h-8 text-lime-400 shrink-0" />
           <div>
-            <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic">
-              <span className="text-white">Daily</span> <span className="text-pink-500 not-italic">Ride</span> <span className="text-lime-400 not-italic">South</span>
-            </h1>
-            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">Interactive Admin Manual</p>
+            <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic">Admin Manual</h1>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em] mt-0.5">Interactive Operations Guide</p>
           </div>
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto">
@@ -3302,9 +3300,8 @@ const MainApp = () => {
     <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-lime-500/30 selection:text-lime-200 relative">
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 h-full flex justify-between items-center">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.hash = 'home'}>
-            <img src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 shadow-lg" alt="Daily Ride South Logo" />
-            <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Daily <span className="text-pink-500 not-italic">Ride</span> <span className="text-lime-400 not-italic">South</span></h1>
+          <div className="flex items-center cursor-pointer select-none" onClick={() => window.location.hash = 'home'}>
+            <img src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" className="h-12 w-12 rounded-2xl object-cover border border-zinc-800 shadow-lg shrink-0 hover:border-lime-500/40 transition-colors" alt="Daily Ride South Logo" />
           </div>
           {!requiresProfileSetup && (
             <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-lime-400 hover:text-white transition-all active:scale-95 shadow-xl">
