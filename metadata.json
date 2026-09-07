@@ -1,0 +1,8 @@
+{
+  "name": "Daily Ride South",
+  "description": "Automotive community platform for car meets, member showcases, event tickets, and photo galleries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

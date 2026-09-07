@@ -168,6 +168,7 @@ const compressImageFromUrl = async (url, maxWidth = 1080, maxHeight = 1080, qual
       img.src = localUrl;
     });
   } catch (err) {
+    console.error("compressImageFromUrl failed:", err);
     throw err;
   }
 };
@@ -1603,7 +1604,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
       // await addDoc(collection(db, 'mail'), { ... });
 
       // 3. Show success screen
-      setPaymentComplete(true);
+      setPaymentSuccess(true);
       setIsSubmitting(false);
     } catch (error) {
       console.error("Database update failed after payment:", error);
