@@ -19,8 +19,9 @@ import {
   Calendar, Users, Ticket, CarFront, MapPin, Clock, ChevronLeft, Award, Heart,
   ExternalLink, UserCircle, Save, Plus, Trash2, Lock, Shield, Edit3, Menu, X,
   LogOut, ImageIcon, History, Home, Eye, EyeOff, UserCog, Download, ChevronRight,
-  CheckCircle2, Grid, Trophy, Video
+  CheckCircle2, Grid, Trophy, Video, ShoppingBag
 } from 'lucide-react';
+import { MerchStoreView, AdminMerchSection } from './components/MerchView';
 
 // --- FIREBASE SETUP ---
 const canvasConfig = typeof __firebase_config !== 'undefined' && __firebase_config 
@@ -251,6 +252,7 @@ const navItems = [
   { id: 'members', label: 'Members', icon: Users },
   { id: 'profile', label: 'My Profile', icon: UserCircle },
   { id: 'raffles', label: 'Raffles', icon: Ticket },
+  { id: 'merch', label: 'Merch', icon: ShoppingBag },
   { id: 'charity', label: 'Charity', icon: Heart },
 ];
 
@@ -2025,7 +2027,7 @@ const CharityView = () => {
     </div>
   );
 };
-const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile, spotlightMemberId }) => {
+const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProfile, spotlightMemberId, isMerchActive, onToggleMerchActive }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(userProfile?.role === 'Admin');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -2426,6 +2428,13 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           <span className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase hidden sm:block">Verified Admin</span>
         </div>
       </div>
+
+      <AdminMerchSection
+        isMerchActive={isMerchActive}
+        onToggleMerchActive={onToggleMerchActive}
+        db={db}
+        appId={appId}
+      />
       
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-lime-500"></div>
@@ -3034,6 +3043,7 @@ const MainApp = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.");
   const [spotlightMemberId, setSpotlightMemberId] = useState(null);
+  const [isMerchActive, setIsMerchActive] = useState(false);
   const [birthdayIndex, setBirthdayIndex] = useState(0);
   const [globalSelectedMember, setGlobalSelectedMember] = useState(null);
   const [globalViewingCar, setGlobalViewingCar] = useState(null);
@@ -3153,6 +3163,9 @@ const MainApp = () => {
       if (d.exists()) {
         if (d.data().description) setClubDescription(d.data().description);
         if (d.data().spotlightMemberId) setSpotlightMemberId(d.data().spotlightMemberId);
+        if (typeof d.data().isMerchActive === 'boolean') {
+          setIsMerchActive(d.data().isMerchActive);
+        }
       }
     });
     
@@ -3225,6 +3238,26 @@ const MainApp = () => {
     } catch (err) { console.error(err); }
   };
 
+  const toggleMerchActive = async (newStatus) => {
+    setIsMerchActive(newStatus);
+    try {
+      await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), {
+        isMerchActive: newStatus
+      }, { merge: true });
+    } catch (err) {
+      console.error("Failed to update merch active status:", err);
+    }
+  };
+
+  const visibleNavItems = useMemo(() => {
+    return navItems.filter(item => {
+      if (item.id === 'merch') {
+        return isMerchActive || currentUserProfile?.role === 'Admin';
+      }
+      return true;
+    });
+  }, [isMerchActive, currentUserProfile]);
+
   const handleMemberModal = (m) => {
     window.history.pushState({modal:'member'}, '');
     setGlobalSelectedMember(m);
@@ -3276,8 +3309,30 @@ const MainApp = () => {
       case 'members': return <MembersView members={sortedMembers} onMemberClick={handleMemberModal} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
       case 'raffles': return <RafflesView raffles={combinedRaffles} user={user} members={cloudMembers} />;
+      case 'merch': return (
+        <MerchStoreView
+          isMerchActive={isMerchActive}
+          isAdmin={currentUserProfile?.role === 'Admin'}
+          user={user}
+          userProfile={currentUserProfile}
+          db={db}
+          appId={appId}
+          onNavigateToAdmin={() => { window.location.hash = 'admin'; }}
+        />
+      );
       case 'charity': return <CharityView />;
-      case 'admin': return <AdminView members={allAdminMembers} combinedEvents={combinedEvents} raffles={combinedRaffles} clubDescription={clubDescription} userProfile={currentUserProfile} spotlightMemberId={spotlightMemberId} />;
+      case 'admin': return (
+        <AdminView
+          members={allAdminMembers}
+          combinedEvents={combinedEvents}
+          raffles={combinedRaffles}
+          clubDescription={clubDescription}
+          userProfile={currentUserProfile}
+          spotlightMemberId={spotlightMemberId}
+          isMerchActive={isMerchActive}
+          onToggleMerchActive={toggleMerchActive}
+        />
+      );
       case 'admin_guide': return <AdminGuideView onBack={() => window.location.hash = 'admin'} />;
       default:
         if (activeTab.startsWith('raffle_detail_')) {
@@ -3318,7 +3373,7 @@ const MainApp = () => {
           <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <nav className="space-y-3 mb-10">
-          {navItems.map(item => (
+          {visibleNavItems.map(item => (
             <NavLink key={item.id} item={item} mobile isActive={activeTab === item.id || (activeTab === 'past_events' && item.id === 'events')} onClick={() => { window.location.hash = item.id; setIsMenuOpen(false); }} />
           ))}
         </nav>
