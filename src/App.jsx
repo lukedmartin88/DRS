@@ -240,7 +240,7 @@ const TikTokIcon = ({ className }) => (
 const InputField = ({ label, value, onChange, placeholder, type = "text", required = false }) => (
   <div className="w-full">
     <label className="block text-sm font-medium text-zinc-400 mb-1">{label}</label>
-    <input type={type} value={value} onChange={onChange} required={required} className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition-all" placeholder={placeholder} />
+    <input type={type} value={value} onChange={onChange} required={required} className="w-full bg-black border border-zinc-800 text-white rounded-lg p-3 focus:border-lime-500 focus:ring-1 focus:ring-lime-500 outline-none transition-all" placeholder={placeholder} />
   </div>
 );
 
@@ -257,15 +257,15 @@ const navItems = [
 const NavLink = ({ item, mobile = false, isActive, onClick }) => {
   const Icon = item.icon;
   return (
-    <button onClick={onClick} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} ${mobile ? 'w-full' : ''}`}>
-      <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-pink-500'}`} />
+    <button onClick={onClick} className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all ${isActive ? 'bg-lime-500 text-black font-black shadow-lg shadow-lime-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'} ${mobile ? 'w-full' : ''}`}>
+      <Icon className={`w-5 h-5 ${isActive ? 'text-black' : 'text-lime-400'}`} />
       <span className="font-black uppercase tracking-widest text-xs">{item.label}</span>
     </button>
   );
 };
 
 const EventListTile = ({ event, onEdit }) => (
-  <div onClick={() => onEdit(event)} className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-500 transition-colors cursor-pointer shadow-lg">
+  <div onClick={() => onEdit(event)} className="bg-black p-5 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-lime-500 transition-colors cursor-pointer shadow-lg">
     <div>
       <div className="flex justify-between items-start mb-2">
         <p className="text-white font-bold text-sm truncate uppercase tracking-wider flex-grow">{event.title}</p>
@@ -273,7 +273,7 @@ const EventListTile = ({ event, onEdit }) => (
       </div>
       <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-2"><Calendar className="w-3 h-3"/> {event.date}</p>
     </div>
-    <p className="text-pink-600 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
+    <p className="text-lime-400 text-[9px] uppercase font-black tracking-widest mt-4 opacity-0 group-hover:opacity-100 transition-opacity">Edit Details</p>
   </div>
 );
 
@@ -330,10 +330,10 @@ const ImageUpload = ({ label, onUploadSuccess, className }) => {
     <div className={`flex flex-col gap-2 ${className || ''}`}>
       <label className="block text-sm font-medium text-zinc-400">{label}</label>
       <div className="relative">
-        <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-pink-600 file:text-white hover:file:bg-pink-700 bg-black border border-zinc-800 rounded-lg p-1 cursor-pointer" />
+        <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} className="block w-full text-sm text-zinc-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-lime-500 file:text-black font-bold hover:file:bg-lime-400 bg-black border border-zinc-800 rounded-lg p-1 cursor-pointer" />
         {uploading && (
-          <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center z-10 border border-pink-500">
-            <span className="text-pink-500 text-sm font-bold animate-pulse">
+          <div className="absolute inset-0 bg-black/80 rounded-lg flex items-center justify-center z-10 border border-lime-500">
+            <span className="text-lime-400 text-sm font-bold animate-pulse">
               {statusText} {progress > 0 && statusText === 'Uploading...' ? `${Math.round(progress)}%` : ''}
             </span>
           </div>
@@ -527,14 +527,14 @@ const SplashView = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30 selection:text-pink-200">
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden selection:bg-lime-500/30 selection:text-lime-200">
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center opacity-20 blur-sm scale-105"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-zinc-950/40"></div>
-      <div className="relative z-10 w-full max-w-md bg-black/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl shadow-pink-500/5 animate-in zoom-in-95 duration-700">
+      <div className="relative z-10 w-full max-w-md bg-black/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl shadow-lime-500/10 animate-in zoom-in-95 duration-700">
         <div className="flex flex-col items-center mb-8">
           <img 
             src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" 
-            className="w-40 h-40 rounded-3xl object-cover border border-zinc-700 shadow-2xl shadow-pink-500/20" 
+            className="w-40 h-40 rounded-3xl object-cover border-2 border-lime-500/40 shadow-2xl shadow-lime-500/25" 
             alt="Daily Ride South Logo" 
           />
         </div>
@@ -552,7 +552,7 @@ const SplashView = () => {
                 <p className="text-green-500 text-xs font-bold uppercase tracking-widest text-center">{resetMsg}</p>
               </div>
             )}
-            <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
+            <button type="submit" disabled={loading} className="w-full bg-lime-500 hover:bg-lime-400 disabled:opacity-50 disabled:hover:bg-lime-500 text-black font-black py-4 rounded-xl transition-all shadow-lg shadow-lime-500/20 uppercase tracking-widest active:scale-[0.98]">
               {loading ? 'Processing...' : 'Send Reset Link'}
             </button>
             <div className="mt-6 text-center border-t border-zinc-800/50 pt-6">
@@ -580,7 +580,7 @@ const SplashView = () => {
                   <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">{error}</p>
                 </div>
               )}
-              <button type="submit" disabled={loading} className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 disabled:hover:bg-pink-600 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest active:scale-[0.98]">
+              <button type="submit" disabled={loading} className="w-full bg-lime-500 hover:bg-lime-400 disabled:opacity-50 disabled:hover:bg-lime-500 text-black font-black py-4 rounded-xl transition-all shadow-lg shadow-lime-500/20 uppercase tracking-widest active:scale-[0.98]">
                 {loading ? 'Processing...' : (isLogin ? 'Enter Garage' : 'Join Club')}
               </button>
             </form>
@@ -588,7 +588,7 @@ const SplashView = () => {
               <p className="text-zinc-400 text-sm">
                 {isLogin ? "Don't have an account yet?" : "Already part of the club?"}
               </p>
-              <button onClick={() => { setIsLogin(!isLogin); setError(''); setResetMsg(''); }} className="text-pink-500 hover:text-pink-400 font-bold uppercase text-xs tracking-widest mt-2 transition-colors">
+              <button onClick={() => { setIsLogin(!isLogin); setError(''); setResetMsg(''); }} className="text-lime-400 hover:text-lime-300 font-bold uppercase text-xs tracking-widest mt-2 transition-colors">
                 {isLogin ? 'Sign up here' : 'Log in instead'}
               </button>
             </div>
@@ -623,49 +623,49 @@ const AdminGuideView = ({ onBack }) => {
       </button>
       <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex items-center gap-4">
-          <Shield className="w-8 h-8 text-pink-500" />
+          <Shield className="w-8 h-8 text-lime-400" />
           <div>
             <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic">
-              Daily Ride <span className="text-pink-600 not-italic">South</span>
+              <span className="text-white">Daily</span> <span className="text-pink-500 not-italic">Ride</span> <span className="text-lime-400 not-italic">South</span>
             </h1>
             <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.3em]">Interactive Admin Manual</p>
           </div>
         </div>
         <div className="flex items-center gap-4 w-full md:w-auto">
           <div className="flex-1 md:w-48 bg-black border border-zinc-800 rounded-full h-3 p-0.5">
-            <div className="bg-pink-500 h-full rounded-full transition-all duration-500" style={{ width: `${progressPercentage}%` }}></div>
+            <div className="bg-lime-500 h-full rounded-full transition-all duration-500" style={{ width: `${progressPercentage}%` }}></div>
           </div>
-          <span className="text-xs font-bold text-pink-500 w-24 text-right">{progressPercentage}% Mastered</span>
+          <span className="text-xs font-bold text-lime-400 w-24 text-right">{progressPercentage}% Mastered</span>
         </div>
       </div>
       <div className="grid lg:grid-cols-3 gap-8">
         <aside className="space-y-2">
           {guideSections.map(s => (
-            <button key={s.id} onClick={() => setActiveSection(s)} className={`w-full text-left p-4 rounded-2xl border transition-all ${activeSection.id === s.id ? 'bg-zinc-900 border-pink-500 shadow-lg' : 'bg-black border-zinc-800'}`}>
+            <button key={s.id} onClick={() => setActiveSection(s)} className={`w-full text-left p-4 rounded-2xl border transition-all ${activeSection.id === s.id ? 'bg-zinc-900 border-lime-500 shadow-lg shadow-lime-500/10' : 'bg-black border-zinc-800'}`}>
               <h3 className="font-bold text-white">{s.title}</h3>
               <p className="text-[10px] text-zinc-500 uppercase tracking-wider">{s.steps.length} Steps</p>
             </button>
           ))}
         </aside>
         <section className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
+          <div className="absolute top-0 left-0 w-1 h-full bg-lime-500"></div>
           <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-8 flex items-center gap-3">
-            <activeSection.icon className="w-8 h-8 text-pink-500" /> {activeSection.title}
+            <activeSection.icon className="w-8 h-8 text-lime-400" /> {activeSection.title}
           </h2>
           <div className="space-y-4">
             {activeSection.steps.map((step, i) => {
               const isCompleted = completedSteps.includes(step.title);
               return (
-                <div key={i} className={`p-6 rounded-xl border transition-all ${isCompleted ? 'border-pink-500/30 bg-black/50' : 'border-zinc-800 bg-black'}`}>
+                <div key={i} className={`p-6 rounded-xl border transition-all ${isCompleted ? 'border-lime-500/30 bg-black/50' : 'border-zinc-800 bg-black'}`}>
                   <div className="flex justify-between gap-4">
                     <div className="flex items-start gap-4">
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 font-black text-xs border ${isCompleted ? 'bg-pink-600 border-pink-500 text-white' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}`}>{i + 1}</div>
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 font-black text-xs border ${isCompleted ? 'bg-lime-500 border-lime-400 text-black font-black' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}`}>{i + 1}</div>
                       <div>
-                        <h4 className={`font-bold ${isCompleted ? 'text-pink-500' : 'text-white'}`}>{step.title}</h4>
+                        <h4 className={`font-bold ${isCompleted ? 'text-lime-400' : 'text-white'}`}>{step.title}</h4>
                         <p className="text-zinc-400 text-sm mt-1">{step.content}</p>
                       </div>
                     </div>
-                    <button onClick={() => toggleStepCompletion(step.title)} className={`p-2 rounded-full ${isCompleted ? 'text-pink-500' : 'text-zinc-600'}`}>
+                    <button onClick={() => toggleStepCompletion(step.title)} className={`p-2 rounded-full ${isCompleted ? 'text-lime-400' : 'text-zinc-600'}`}>
                       <CheckCircle2 className="w-6 h-6" />
                     </button>
                   </div>
@@ -692,10 +692,10 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
             {member.name || 'Pending Setup'}
             {member.nickname && <span className="text-zinc-500 text-xl font-normal italic">"{member.nickname}"</span>}
-            {member.role === "Admin" && <Shield className="w-6 h-6 text-pink-500" />}
+            {member.role === "Admin" && <Shield className="w-6 h-6 text-lime-400" />}
             {member.role === "Club President" && <Award className="w-6 h-6 text-yellow-500" />}
           </h2>
-          <p className="text-pink-500 font-medium text-lg">{member.role || 'Member'}</p>
+          <p className="text-lime-400 font-bold text-lg">{member.role || 'Member'}</p>
           <p className="text-zinc-400 mt-2 max-w-2xl">{member.bio || 'No bio provided.'}</p>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 mt-4 flex-wrap">
             <p className="text-zinc-500 text-sm flex items-center gap-2">
@@ -720,7 +720,7 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
       </p>
       <div className="grid gap-6 md:grid-cols-2">
         {cars.map((car, idx) => (
-          <div key={idx} onClick={() => onCarClick(car)} className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-pink-500 transition-all transform hover:-translate-y-1 group">
+          <div key={idx} onClick={() => onCarClick(car)} className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-lime-500 transition-all transform hover:-translate-y-1 group">
             <div className="h-64 overflow-hidden relative">
               <img src={car.image || DEFAULT_CAR} alt={`${car.make} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
@@ -730,10 +730,10 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
                 </div>
                 <p className="text-zinc-300 font-medium">{car.year} • {car.specs}</p>
                 {car.mods && (
-                  <p className="text-pink-400 text-sm font-medium mt-2 line-clamp-2">Mods: <span className="text-zinc-300 font-normal">{car.mods}</span></p>
+                  <p className="text-lime-400 text-sm font-medium mt-2 line-clamp-2">Mods: <span className="text-zinc-300 font-normal">{car.mods}</span></p>
                 )}
                 {car.gallery && car.gallery.length > 0 && (
-                  <div className="mt-3 flex items-center gap-1 text-[10px] text-white font-bold uppercase tracking-widest bg-pink-600/80 w-fit px-2 py-1 rounded backdrop-blur-md">
+                  <div className="mt-3 flex items-center gap-1 text-[10px] text-black font-black uppercase tracking-widest bg-lime-500/90 w-fit px-2 py-1 rounded backdrop-blur-md">
                     <ImageIcon className="w-3 h-3" /> +{car.gallery.length} More Images
                   </div>
                 )}
@@ -752,16 +752,16 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
 const CarGalleryModal = ({ viewingCar, onClose }) => {
   return (
     <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col p-4 md:p-8 overflow-y-auto custom-scrollbar animate-in fade-in duration-300">
-      <button onClick={onClose} className="fixed top-6 right-6 bg-zinc-800 hover:bg-pink-600 text-white p-3 rounded-full transition-all z-[110] shadow-lg">
+      <button onClick={onClose} className="fixed top-6 right-6 bg-zinc-800 hover:bg-lime-500 hover:text-black text-white p-3 rounded-full transition-all z-[110] shadow-lg">
         <X className="w-6 h-6"/>
       </button>
       <div className="w-full max-w-4xl mx-auto mt-10 md:mt-4 mb-20 flex flex-col">
         <div className="mb-8 shrink-0 text-center">
           <h3 className="text-4xl md:text-5xl font-black text-white uppercase italic tracking-tighter">
-            {viewingCar.make} <span className="text-pink-600 not-italic">{viewingCar.model}</span>
+            {viewingCar.make} <span className="text-lime-400 not-italic">{viewingCar.model}</span>
           </h3>
           <p className="text-zinc-400 mt-6 text-sm md:text-base font-medium max-w-2xl mx-auto leading-relaxed">{viewingCar.specs}</p>
-          {viewingCar.mods && <p className="text-pink-400 mt-4 text-sm font-medium">Mods: <span className="text-zinc-300 font-normal">{viewingCar.mods}</span></p>}
+          {viewingCar.mods && <p className="text-lime-400 mt-4 text-sm font-medium">Mods: <span className="text-zinc-300 font-normal">{viewingCar.mods}</span></p>}
         </div>
         <div className="space-y-8">
           <img src={viewingCar.image || DEFAULT_CAR} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt="Main vehicle profile" />
@@ -781,13 +781,13 @@ const EnlargedImageModal = ({ imageObj, onClose, onMemberClick }) => {
   if (!imageObj) return null;
   return (
     <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-10 animate-in fade-in duration-300">
-      <button onClick={onClose} className="fixed top-6 right-6 bg-zinc-800 hover:bg-pink-600 text-white p-3 rounded-full transition-all z-[120] shadow-lg">
+      <button onClick={onClose} className="fixed top-6 right-6 bg-zinc-800 hover:bg-lime-500 hover:text-black text-white p-3 rounded-full transition-all z-[120] shadow-lg">
         <X className="w-6 h-6" />
       </button>
       <div className="relative max-w-full max-h-full flex flex-col items-center">
         <div className="relative group overflow-hidden rounded-2xl border border-zinc-800 shadow-2xl">
           <img src={imageObj.url} alt={imageObj.carName} className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
-<div onClick={() => onMemberClick(imageObj.member)} className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-pink-600 transition-all cursor-pointer group/member z-[130] shadow-2xl">            <img src={imageObj.member.avatar || DEFAULT_AVATAR} className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
+<div onClick={() => onMemberClick(imageObj.member)} className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-lime-500 hover:text-black transition-all cursor-pointer group/member z-[130] shadow-2xl">            <img src={imageObj.member.avatar || DEFAULT_AVATAR} className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
             <div className="flex flex-col">
               <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member.name || 'Pending Setup'}</span>
               <span className="text-white/60 group-hover/member:text-white/80 text-[8px] uppercase font-bold tracking-widest mt-1">View Garage</span>
@@ -824,7 +824,7 @@ const GalleryView = ({ members, onImageClick }) => {
       </div>
       <div className="columns-2 md:col-span-3 lg:columns-4 gap-4 space-y-4">
         {allImages.map((img, i) => (
-          <div key={img.url + i} onClick={() => onImageClick(img)} className="relative group rounded-2xl overflow-hidden cursor-pointer border border-zinc-800 hover:border-pink-500 transition-all shadow-lg inline-block w-full bg-zinc-900/40 min-h-[140px]">
+          <div key={img.url + i} onClick={() => onImageClick(img)} className="relative group rounded-2xl overflow-hidden cursor-pointer border border-zinc-800 hover:border-lime-500 transition-all shadow-lg inline-block w-full bg-zinc-900/40 min-h-[140px]">
             <img 
               src={img.url} 
               alt="" 
@@ -834,7 +834,7 @@ const GalleryView = ({ members, onImageClick }) => {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
               <p className="text-white font-black text-xs uppercase tracking-tighter">{img.carName}</p>
-              <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest">{img.member.name || 'Pending Setup'}</p>
+              <p className="text-lime-400 text-[10px] font-bold uppercase tracking-widest">{img.member.name || 'Pending Setup'}</p>
             </div>
           </div>
         ))}
@@ -921,29 +921,29 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
         </div>
       </div>
       
-      <div onClick={() => window.location.hash = 'raffles'} className="bg-gradient-to-r from-pink-600 to-pink-900 rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-pink-500/20 mb-10 group border border-pink-500/50">
+      <div onClick={() => window.location.hash = 'raffles'} className="bg-gradient-to-r from-lime-500 via-lime-600 to-emerald-600 text-black rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-lime-500/25 mb-10 group border border-lime-400/60">
         <div className="flex items-center gap-4 md:gap-6">
           <div className="bg-white/20 p-3 md:p-4 rounded-full shadow-inner">
-            <Ticket className="w-8 h-8 md:w-10 md:h-10 text-white" />
+            <Ticket className="w-8 h-8 md:w-10 md:h-10 text-black" />
           </div>
           <div>
-            <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter">Live Club Raffles</h3>
-            <p className="text-pink-200 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Win premium prizes & support the club</p>
+            <h3 className="text-xl md:text-3xl font-black text-black uppercase tracking-tighter">Live Club Raffles</h3>
+            <p className="text-black/80 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Win premium prizes & support the club</p>
           </div>
         </div>
-        <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-white group-hover:translate-x-2 transition-transform shrink-0" />
+        <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-black group-hover:translate-x-2 transition-transform shrink-0" />
       </div>
       
       {spotlightMember && (
         <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => onMemberClick(spotlightMember)}>
           <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt="" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
-          <div className="absolute top-4 right-4 bg-pink-600 text-white text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">{isBirthdaySpotlight ? '🎉 Happy Birthday! 🎂' : 'Member Spotlight'}</div>
+          <div className="absolute top-4 right-4 bg-lime-500 text-black text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">{isBirthdaySpotlight ? '🎉 Happy Birthday! 🎂' : 'Member Spotlight'}</div>
           <div className="absolute bottom-6 left-6 flex items-center gap-4">
             <img src={spotlightMember.avatar || DEFAULT_AVATAR} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" alt="" />
             <div>
               <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name || 'Pending Setup'} {isBirthdaySpotlight && '🎂'}</h3>
-              {spotlightMember.nickname && <p className="text-pink-500 italic text-lg md:text-xl font-medium mt-1">"{spotlightMember.nickname}"</p>}
+              {spotlightMember.nickname && <p className="text-lime-400 italic text-lg md:text-xl font-medium mt-1">"{spotlightMember.nickname}"</p>}
               <p className="text-zinc-300 font-bold text-xs uppercase tracking-widest mt-2">{spotlightMember.role || 'Member'}</p>
             </div>
           </div>
@@ -952,12 +952,12 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
       
       <div className="mt-12 space-y-4">
         <div className="flex justify-between items-center">
-          <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2"><Grid className="w-5 h-5 text-pink-500" /> Live Club Mosaic</h3>
-          <button onClick={() => window.location.hash = 'gallery'} className="text-pink-500 hover:text-pink-400 text-xs font-bold uppercase tracking-widest">View Full Gallery</button>
+          <h3 className="text-xl font-black text-white uppercase tracking-tighter flex items-center gap-2"><Grid className="w-5 h-5 text-lime-400" /> Live Club Mosaic</h3>
+          <button onClick={() => window.location.hash = 'gallery'} className="text-lime-400 hover:text-lime-300 text-xs font-bold uppercase tracking-widest">View Full Gallery</button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {mosaicSlots.map((slot, i) => (
-            <div key={i} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-pink-500 transition-colors group relative bg-zinc-900 shadow-inner">
+            <div key={i} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-lime-500 transition-colors group relative bg-zinc-900 shadow-inner">
               {slot.previous && (
                 <img src={slot.previous.url} className="absolute inset-0 w-full h-full object-cover" alt="" />
               )}
@@ -1025,7 +1025,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-zinc-800 pb-2">
         <h2 className="text-3xl font-bold text-white">{title}</h2>
-        <button onClick={() => window.location.hash = isPast ? 'events' : 'past_events'} className="text-pink-500 hover:text-pink-400 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors">
+        <button onClick={() => window.location.hash = isPast ? 'events' : 'past_events'} className="text-lime-400 hover:text-lime-300 flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors">
           {isPast ? <><Calendar className="w-4 h-4" /> View Upcoming Events</> : <><History className="w-4 h-4" /> View Past Events Gallery</>}
         </button>
       </div>
@@ -1045,7 +1045,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
           const attendeeMembers = rsvpList.map(uid => membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR });
           
           return (
-            <div key={event.id} className="bg-zinc-900 rounded-2xl overflow-hidden shadow-xl border border-zinc-800 flex flex-col transition-all hover:shadow-pink-500/5">
+            <div key={event.id} className="bg-zinc-900 rounded-2xl overflow-hidden shadow-xl border border-zinc-800 flex flex-col transition-all hover:shadow-lime-500/10 hover:border-zinc-700">
               <div className="h-48 overflow-hidden shrink-0 relative group">
 <img 
   src={event.image || DEFAULT_CAR} 
@@ -1058,15 +1058,15 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                 <h3 className="text-2xl font-black text-white mb-3 uppercase tracking-tighter leading-tight">{event.title}</h3>
                 <div className="space-y-2 text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-pink-500" />
+                    <Calendar className="w-4 h-4 text-lime-400" />
                     <span className="text-zinc-300">{event.date}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-pink-500" />
+                    <Clock className="w-4 h-4 text-lime-400" />
                     <span>{event.time}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-pink-500" />
+                    <MapPin className="w-4 h-4 text-lime-400" />
                     <span className="truncate">{event.location}</span>
                   </div>
                 </div>
@@ -1076,14 +1076,14 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                     <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Pre-Meet Details</p>
                     {event.meetingTime && (
                       <div className="flex items-center gap-2 text-xs">
-                        <Clock className="w-3 h-3 text-pink-500" />
+                        <Clock className="w-3 h-3 text-lime-400" />
                         <span className="text-zinc-300">Meet at {event.meetingTime}</span>
                       </div>
                     )}
                     {event.meetingPoint && (
                       <div className="flex items-center gap-2 text-xs">
-                        <MapPin className="w-3 h-3 text-pink-500" />
-                        <a href={`https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(event.meetingPoint)}`} target="_blank" rel="noopener noreferrer" className="text-pink-500 hover:text-pink-400 transition-colors underline decoration-pink-500/30 underline-offset-2 truncate">
+                        <MapPin className="w-3 h-3 text-lime-400" />
+                        <a href={`https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(event.meetingPoint)}`} target="_blank" rel="noopener noreferrer" className="text-lime-400 hover:text-lime-300 transition-colors underline decoration-lime-500/30 underline-offset-2 truncate">
                           {event.meetingPoint}
                         </a>
                       </div>
@@ -1122,7 +1122,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                   </div>
                   
                   <div className="space-y-3">
-                    <button onClick={() => toggleRsvp(event.id, isPast)} className={`w-full font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] text-[10px] shadow-lg active:scale-[0.98] ${isMarked ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-500/20' : 'bg-pink-600 hover:bg-pink-700 text-white shadow-pink-500/20'}`}>
+                    <button onClick={() => toggleRsvp(event.id, isPast)} className={`w-full font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] text-[10px] shadow-lg active:scale-[0.98] ${isMarked ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-500/20' : 'bg-lime-500 hover:bg-lime-400 text-black font-black shadow-lime-500/20'}`}>
                       {isMarked ? (isPast ? 'Attended ✓' : 'Attending ✓') : (isPast ? 'Mark as Attended' : 'Mark as Attending')}
                     </button>
                     <div className="grid grid-cols-2 gap-3">
@@ -1140,7 +1140,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                       )}
                     </div>
                     {isAdmin && (
-                      <button onClick={() => downloadGuestList(event, attendeeMembers)} className="w-full bg-zinc-950 hover:bg-black text-pink-500 font-bold py-2 rounded-xl transition-colors border border-zinc-800 hover:border-pink-500/50 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                      <button onClick={() => downloadGuestList(event, attendeeMembers)} className="w-full bg-zinc-950 hover:bg-black text-lime-400 font-bold py-2 rounded-xl transition-colors border border-zinc-800 hover:border-lime-500/50 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
                         <Download className="w-3 h-3" /> Download Guest List
                       </button>
                     )}
@@ -1161,14 +1161,14 @@ const MembersView = ({ members, onMemberClick }) => {
       <h2 className="text-3xl font-bold text-white mb-6 border-b border-zinc-800 pb-2">Members Directory</h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {members.map(member => (
-          <div key={member.id} onClick={() => onMemberClick(member)} className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 hover:border-pink-500 hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-4">
+          <div key={member.id} onClick={() => onMemberClick(member)} className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 hover:border-lime-500 hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-4">
             <img src={member.avatar || DEFAULT_AVATAR} alt={member.name} className="w-16 h-16 rounded-full object-cover" />
             <div>
               <h3 className="text-lg font-bold text-white leading-tight">
                 {member.name || 'Pending Setup'}
               </h3>
               {member.nickname && <p className="text-zinc-500 text-xs italic">"{member.nickname}"</p>}
-              <p className="text-pink-500 text-xs font-semibold uppercase tracking-wider mt-1">{member.role || 'Member'}</p>
+              <p className="text-lime-400 text-xs font-bold uppercase tracking-wider mt-1">{member.role || 'Member'}</p>
             </div>
           </div>
         ))}
@@ -1205,12 +1205,12 @@ const CountdownTimer = ({ drawDate }) => {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
       <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-        <Clock className="w-3.5 h-3.5 text-pink-500" /> Draw Countdown
+        <Clock className="w-3.5 h-3.5 text-lime-400" /> Draw Countdown
       </p>
       <div className="grid grid-cols-4 gap-3">
         {[['Days', timeLeft.days], ['Hours', timeLeft.hours], ['Mins', timeLeft.mins], ['Secs', timeLeft.secs]].map(([label, val]) => (
           <div key={label} className="bg-black rounded-xl p-3 text-center border border-zinc-800">
-            <span className="text-2xl font-black text-pink-500 tabular-nums">
+            <span className="text-2xl font-black text-lime-400 tabular-nums">
               {String(val).padStart(2, '0')}
             </span>
             <p className="text-zinc-600 text-[9px] font-bold uppercase tracking-widest mt-1">{label}</p>
@@ -1272,7 +1272,7 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className="group relative bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-pink-500 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-pink-500/10 hover:-translate-y-1 flex flex-col"
+      className="group relative bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-lime-500 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-lime-500/10 hover:-translate-y-1 flex flex-col"
     >
       <div className="relative h-52 overflow-hidden shrink-0">
         <img
@@ -1286,7 +1286,7 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
         </div>
         {raffle.isEnded && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-            <span className="bg-black/90 text-pink-500 font-black text-sm uppercase tracking-[0.3em] px-5 py-2 border border-pink-500/50 -rotate-3 shadow-2xl">
+            <span className="bg-black/90 text-pink-500 font-black text-sm uppercase tracking-[0.3em] px-5 py-2 border border-lime-500/50 -rotate-3 shadow-2xl">
               Concluded
             </span>
           </div>
@@ -1332,11 +1332,11 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
         <div>
           <div className="w-full bg-zinc-800 rounded-full h-1.5 shadow-inner">
             <div
-              className="bg-pink-500 h-1.5 rounded-full transition-all duration-1000 shadow-[0_0_6px_rgba(236,72,153,0.6)]"
+              className="bg-lime-500 h-1.5 rounded-full transition-all duration-1000 shadow-[0_0_6px_rgba(125,220,9,0.6)]"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <button className="w-full mt-4 bg-zinc-800 group-hover:bg-pink-600 text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-colors duration-300 flex items-center justify-center gap-2">
+          <button className="w-full mt-4 bg-zinc-800 group-hover:bg-lime-500 group-hover:text-black text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-colors duration-300 flex items-center justify-center gap-2">
             <Eye className="w-3.5 h-3.5" />
             {raffle.isEnded ? 'View Results' : 'View Draw'}
           </button>
@@ -1374,7 +1374,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
   if (!raffle) return (
     <div className="text-center py-20 text-zinc-500">
       <p className="font-bold uppercase tracking-widest">Raffle not found.</p>
-      <button onClick={onBack} className="mt-4 text-pink-500 underline text-sm">Go back</button>
+      <button onClick={onBack} className="mt-4 text-lime-400 underline text-sm">Go back</button>
     </div>
   );
   
@@ -1454,13 +1454,13 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                 <>
                   <button
                     onClick={() => setActiveImg((p) => (p - 1 + galleryImages.length) % galleryImages.length)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-pink-600 text-white p-2 rounded-full transition-colors"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-lime-500 hover:text-black text-white p-2 rounded-full transition-colors"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => setActiveImg((p) => (p + 1) % galleryImages.length)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-pink-600 text-white p-2 rounded-full transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-lime-500 hover:text-black text-white p-2 rounded-full transition-colors"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -1484,7 +1484,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                     key={i}
                     onClick={() => setActiveImg(i)}
                     className={`shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all ${
-                      activeImg === i ? 'border-pink-500 opacity-100' : 'border-zinc-700 opacity-50 hover:opacity-75'
+                      activeImg === i ? 'border-lime-500 opacity-100' : 'border-zinc-700 opacity-50 hover:opacity-75'
                     }`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
@@ -1550,7 +1550,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
             <div className="flex justify-between items-center pb-5 border-b border-zinc-800">
               <div>
-                <span className="text-pink-500 font-black text-3xl">£{raffle.ticketPrice}</span>
+                <span className="text-lime-400 font-black text-3xl">£{raffle.ticketPrice}</span>
                 <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest ml-2">/ Ticket</span>
               </div>
               <div className="text-right">
@@ -1565,7 +1565,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
               </div>
               <div className="w-full bg-zinc-800 rounded-full h-2.5 shadow-inner">
                 <div
-                  className="bg-pink-500 h-2.5 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(236,72,153,0.5)]"
+                  className="bg-lime-500 h-2.5 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(125,220,9,0.5)]"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -1584,12 +1584,12 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
               </div>
             ) : loginPrompt ? (
               <div className="text-center space-y-4">
-                <UserCircle className="w-12 h-12 text-pink-500 mx-auto" />
+                <UserCircle className="w-12 h-12 text-lime-400 mx-auto" />
                 <p className="text-white font-bold uppercase tracking-widest text-sm">Member Access Required</p>
                 <p className="text-zinc-400 text-xs">Log in or complete your profile to buy tickets.</p>
                 <button
                   onClick={() => { window.location.hash = 'profile'; }}
-                  className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all"
+                  className="w-full bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20"
                 >
                   Go to Profile
                 </button>
@@ -1638,14 +1638,14 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                   <div className="flex items-center justify-between bg-black border border-zinc-800 rounded-2xl p-2">
                     <button
                       onClick={() => setReserveQuantity((q) => Math.max(1, q - 1))}
-                      className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors"
+                      className="w-12 h-12 flex items-center justify-center text-lime-400 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors"
                     >
                       -
                     </button>
                     <span className="text-white font-black text-4xl tabular-nums">{reserveQuantity}</span>
                     <button
                       onClick={() => setReserveQuantity((q) => q + 1)}
-                      className="w-12 h-12 flex items-center justify-center text-pink-500 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors"
+                      className="w-12 h-12 flex items-center justify-center text-lime-400 hover:bg-zinc-900 rounded-xl font-black text-2xl transition-colors"
                     >
                       +
                     </button>
@@ -1653,12 +1653,12 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                 </div>
                 <div className="bg-black/50 p-4 rounded-xl border border-zinc-800/50 text-center">
                   <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total</p>
-                  <p className="text-pink-500 font-black text-3xl">£{raffle.ticketPrice * reserveQuantity}</p>
+                  <p className="text-lime-400 font-black text-3xl">£{raffle.ticketPrice * reserveQuantity}</p>
                 </div>
                 <button
                   onClick={submitReservation}
                   disabled={isSubmitting}
-                  className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
+                  className="w-full bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-lime-500/20 active:scale-[0.98]"
                 >
                   {isSubmitting ? 'Loading Checkout...' : 'Confirm & Pay via SumUp'}
                 </button>
@@ -1813,7 +1813,7 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
     <div className="fixed inset-0 z-[150] bg-zinc-950 flex flex-col items-center justify-center p-4">
       <button onClick={onClose} disabled={isDrawing} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors"><X className="w-8 h-8" /></button>
       <canvas ref={canvasRef} width="800" height="600" className="hidden" />
-      <Trophy className={`w-20 h-20 mb-8 ${currentWinner ? 'text-yellow-500 scale-125' : 'text-pink-600'} transition-transform duration-500`} />
+      <Trophy className={`w-20 h-20 mb-8 ${currentWinner ? 'text-yellow-500 scale-125' : 'text-lime-400'} transition-transform duration-500`} />
       
       <div className="mb-6 text-center">
         <p className="text-pink-500 font-bold uppercase tracking-widest">{drawPhase === 1 ? '1st Place Draw' : '2nd Place Draw'}</p>
@@ -1825,7 +1825,7 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
       </div>
       
       {!currentWinner && (
-        <button onClick={spin} disabled={isDrawing || activePool.current.length === 0} className="bg-pink-600 text-white font-black py-5 px-12 rounded-2xl uppercase text-lg shadow-pink-500/20 disabled:opacity-50">
+        <button onClick={spin} disabled={isDrawing || activePool.current.length === 0} className="bg-lime-500 hover:bg-lime-400 text-black font-black py-5 px-12 rounded-2xl uppercase text-lg shadow-lime-500/20 disabled:opacity-50 transition-all">
           {isDrawing ? 'Drawing & Recording...' : 'Spin the Wheel'}
         </button>
       )}
@@ -1847,7 +1847,7 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
           </button>
           
           {drawPhase === 1 && hasSecondPrize ? (
-            <button onClick={handleNextPhase} className="w-full bg-pink-600 hover:bg-pink-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors">Proceed to 2nd Place Draw</button>
+            <button onClick={handleNextPhase} className="w-full bg-lime-500 hover:bg-lime-400 text-black py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors shadow-lg shadow-lime-500/20">Proceed to 2nd Place Draw</button>
           ) : (
             <button onClick={() => onSetWinner(winner1, winner2)} className="w-full bg-green-600 hover:bg-green-500 text-white py-4 px-8 rounded-xl font-black uppercase text-xs transition-colors shadow-green-500/20 shadow-lg">Approve & Close All</button>
           )}
@@ -1889,13 +1889,13 @@ const ProfileView = ({ user, userProfile }) => {
             Manage your details and vehicles
           </p>
         </div>
-        <button onClick={handleSave} disabled={isSaving} className="bg-pink-600 hover:bg-pink-700 text-white px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 transition-all disabled:opacity-50">
+        <button onClick={handleSave} disabled={isSaving} className="bg-lime-500 hover:bg-lime-400 text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-xs flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg shadow-lime-500/20">
           <Save className="w-4 h-4" /> {isSaving ? 'Saving...' : 'Save Profile'}
         </button>
       </div>
 
       <div className="bg-zinc-900 p-6 md:p-8 rounded-3xl border border-zinc-800 shadow-xl space-y-6">
-        <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2"><UserCircle className="w-6 h-6 text-pink-500" /> Driver Details</h3>
+        <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2"><UserCircle className="w-6 h-6 text-lime-400" /> Driver Details</h3>
         
         <div className="flex flex-col md:flex-row gap-8 items-start">
           <div className="w-full md:w-1/3 space-y-4 shrink-0">
@@ -1914,7 +1914,7 @@ const ProfileView = ({ user, userProfile }) => {
             <InputField label="Instagram Profile Link" value={profileData.instagram || ''} onChange={e => setProfileData({...profileData, instagram: e.target.value})} placeholder="https://instagram.com/..." />
             <div className="space-y-1">
               <label className="block text-sm font-medium text-zinc-400">Bio / About Me</label>
-              <textarea value={profileData.bio || ''} onChange={e => setProfileData({...profileData, bio: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" rows={3} placeholder="Tell the club about yourself..." />
+              <textarea value={profileData.bio || ''} onChange={e => setProfileData({...profileData, bio: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" rows={3} placeholder="Tell the club about yourself..." />
             </div>
           </div>
         </div>
@@ -1922,8 +1922,8 @@ const ProfileView = ({ user, userProfile }) => {
 
       <div className="bg-zinc-900 p-6 md:p-8 rounded-3xl border border-zinc-800 shadow-xl space-y-6">
         <div className="flex justify-between items-center border-b border-zinc-800 pb-4">
-          <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2"><CarFront className="w-6 h-6 text-pink-500" /> My Garage</h3>
-          <button onClick={() => setProfileData(prev => ({...prev, cars: [...(prev.cars || []), { make: '', model: '', year: '', specs: '', mods: '', image: '', gallery: [] }]}))} className="text-pink-500 hover:text-white flex items-center gap-1 text-xs font-bold uppercase tracking-widest transition-colors">
+          <h3 className="text-xl font-black text-white uppercase tracking-widest flex items-center gap-2"><CarFront className="w-6 h-6 text-lime-400" /> My Garage</h3>
+          <button onClick={() => setProfileData(prev => ({...prev, cars: [...(prev.cars || []), { make: '', model: '', year: '', specs: '', mods: '', image: '', gallery: [] }]}))} className="text-lime-400 hover:text-white flex items-center gap-1 text-xs font-bold uppercase tracking-widest transition-colors">
             <Plus className="w-4 h-4" /> Add Vehicle
           </button>
         </div>
@@ -1948,11 +1948,11 @@ const ProfileView = ({ user, userProfile }) => {
                 <div className="grid md:grid-cols-2 gap-4 mb-6">
                   <div className="space-y-1">
                     <label className="block text-sm font-medium text-zinc-400">Specs (Engine / Power)</label>
-                    <textarea value={car.specs || ''} onChange={e => { const c = [...profileData.cars]; c[idx].specs = e.target.value; setProfileData({...profileData, cars: c}); }} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-pink-500" rows={2} />
+                    <textarea value={car.specs || ''} onChange={e => { const c = [...profileData.cars]; c[idx].specs = e.target.value; setProfileData({...profileData, cars: c}); }} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-lime-500" rows={2} />
                   </div>
                   <div className="space-y-1">
                     <label className="block text-sm font-medium text-zinc-400">Modifications</label>
-                    <textarea value={car.mods || ''} onChange={e => { const c = [...profileData.cars]; c[idx].mods = e.target.value; setProfileData({...profileData, cars: c}); }} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-pink-500" rows={2} />
+                    <textarea value={car.mods || ''} onChange={e => { const c = [...profileData.cars]; c[idx].mods = e.target.value; setProfileData({...profileData, cars: c}); }} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-lime-500" rows={2} />
                   </div>
                 </div>
 
@@ -1997,7 +1997,7 @@ const CharityView = () => {
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-8">
         {STATIC_CHARITY.map(charity => (
-          <div key={charity.id} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 shadow-xl flex flex-col group hover:border-pink-500 transition-colors">
+          <div key={charity.id} className="bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 shadow-xl flex flex-col group hover:border-lime-500 transition-colors">
             <div className="h-48 overflow-hidden">
               <img 
                 src={charity.image} 
@@ -2016,7 +2016,7 @@ const CharityView = () => {
                 href={charity.link} 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="inline-block w-full text-center bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-pink-500/20 active:scale-[0.98]"
+                className="inline-block w-full text-center bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20 active:scale-[0.98]"
               >
                 Support / Donate
               </a>
@@ -2389,14 +2389,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
     <div className="max-w-md mx-auto mt-20 animate-in fade-in zoom-in-95 duration-500">
       <div className="bg-zinc-900 p-10 rounded-2xl border border-zinc-800 shadow-2xl">
         <div className="text-center mb-8">
-          <Shield className="w-16 h-16 text-pink-500 mx-auto mb-4" />
+          <Shield className="w-16 h-16 text-lime-400 mx-auto mb-4" />
           <h2 className="text-2xl font-black text-white text-center uppercase tracking-tight">Admin Gateway</h2>
           <p className="text-zinc-500 text-xs mt-2 uppercase font-bold tracking-widest">DRS CLUB STAFF ONLY</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 text-center font-bold tracking-widest transition-all" placeholder="MASTER KEY" />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 text-center font-bold tracking-widest transition-all" placeholder="MASTER KEY" />
           {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest animate-bounce">{error}</p>}
-          <button type="submit" className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-pink-500/20 uppercase tracking-widest">Authorize Access</button>
+          <button type="submit" className="w-full bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all shadow-lg shadow-lime-500/20 uppercase tracking-widest">Authorize Access</button>
         </form>
       </div>
     </div>
@@ -2420,9 +2420,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       )}
       
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 pb-6 gap-4">
-        <h2 className="text-3xl font-black text-white flex items-center gap-3 uppercase tracking-tighter"><Shield className="w-8 h-8 text-pink-500" /> Club Control Panel</h2>
+        <h2 className="text-3xl font-black text-white flex items-center gap-3 uppercase tracking-tighter"><Shield className="w-8 h-8 text-lime-400" /> Club Control Panel</h2>
         <div className="flex items-center gap-3">
-          <button onClick={() => window.location.hash = 'admin_guide'} className="bg-pink-600/10 hover:bg-pink-600/20 text-pink-500 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2 border border-pink-500/30">
+          <button onClick={() => window.location.hash = 'admin_guide'} className="bg-lime-500/10 hover:bg-lime-500/20 text-lime-400 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2 border border-lime-500/30">
             <CheckCircle2 className="w-4 h-4" /> Admin Guide
           </button>
           <span className="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase hidden sm:block">Verified Admin</span>
@@ -2430,8 +2430,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       </div>
       
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
-        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Plus className="w-5 h-5 text-pink-500" /> Deploy New Event</h3>
+        <div className="absolute top-0 left-0 w-1 h-full bg-lime-500"></div>
+        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Plus className="w-5 h-5 text-lime-400" /> Deploy New Event</h3>
         <div className="grid md:grid-cols-2 gap-6">
           <InputField label="Event Title" value={newEvent.title} onChange={e => setNewEvent({...newEvent, title: e.target.value})} />
           <InputField label="Date (e.g. Sunday, 1st Oct)" value={newEvent.date} onChange={e => setNewEvent({...newEvent, date: e.target.value})} />
@@ -2447,18 +2447,18 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           </div>
           <div className="md:col-span-2 space-y-1">
             <label className="block text-sm font-medium text-zinc-400">Event Description</label>
-            <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})} placeholder="Detailed brief for club members..." rows={3} />
+            <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" value={newEvent.description} onChange={e => setNewEvent({...newEvent, description: e.target.value})} placeholder="Detailed brief for club members..." rows={3} />
           </div>
-          <button onClick={handleDeployEvent} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Publish to Public Board</button>
+          <button onClick={handleDeployEvent} className="md:col-span-2 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-lime-500/20">Publish to Public Board</button>
         </div>
       </section>
 
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
-        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Edit3 className="w-5 h-5 text-pink-500" /> Manage Existing Events</h3>
+        <div className="absolute top-0 left-0 w-1 h-full bg-lime-500"></div>
+        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Edit3 className="w-5 h-5 text-lime-400" /> Manage Existing Events</h3>
         
         {editingEvent ? (
-          <div className="grid md:grid-cols-2 gap-6 bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300">
+          <div className="grid md:grid-cols-2 gap-6 bg-black/50 p-6 rounded-2xl border border-lime-500/50 animate-in zoom-in-95 duration-300">
             <div className="md:col-span-2 flex justify-between items-center border-b border-zinc-800 pb-4">
               <div>
                 <h4 className="font-bold text-white uppercase tracking-wider">Editing: {editingEvent.title}</h4>
@@ -2480,10 +2480,10 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             </div>
             <div className="md:col-span-2 space-y-1">
               <label className="block text-sm font-medium text-zinc-400">Event Description</label>
-              <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingEvent.description || ''} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} rows={3} />
+              <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" value={editingEvent.description || ''} onChange={e => setEditingEvent({...editingEvent, description: e.target.value})} rows={3} />
             </div>
             <div className="md:col-span-2 flex gap-4 mt-2">
-              <button onClick={handleUpdateEvent} className="flex-1 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Changes</button>
+              <button onClick={handleUpdateEvent} className="flex-1 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-lime-500/20">Save Changes</button>
               {!editingEvent.isStatic && (
                 <button onClick={handleDeleteEvent} className="flex-1 bg-red-900/50 hover:bg-red-600 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest">Delete Event</button>
               )}
@@ -2493,7 +2493,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
           <div className="space-y-10">
             {editableUpcoming.length > 0 && (
               <div>
-                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-pink-500 pl-3">Upcoming Events</p>
+                <p className="text-xs font-black text-zinc-500 uppercase tracking-[0.3em] mb-4 border-l-2 border-lime-500 pl-3">Upcoming Events</p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {editableUpcoming.map(e => <EventListTile key={e.id} event={e} onEdit={handleEditEvent} />)}
                 </div>
@@ -2513,11 +2513,11 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
       </section>
 
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full bg-pink-500"></div>
-        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Ticket className="w-5 h-5 text-pink-500" /> Raffle Administration</h3>
+        <div className="absolute top-0 left-0 w-1 h-full bg-lime-500"></div>
+        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Ticket className="w-5 h-5 text-lime-400" /> Raffle Administration</h3>
         
         {editingRaffle ? (
-          <div className="bg-black/50 p-6 rounded-2xl border border-pink-500/50 animate-in zoom-in-95 duration-300 mt-6">
+          <div className="bg-black/50 p-6 rounded-2xl border border-lime-500/50 animate-in zoom-in-95 duration-300 mt-6">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-4 mb-4">
               <h4 className="font-bold text-white uppercase tracking-wider">Editing Raffle: {editingRaffle.title}</h4>
               <button type="button" onClick={(e) => { e.preventDefault(); setEditingRaffle(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
@@ -2564,9 +2564,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               
               <div className="md:col-span-2 space-y-1">
                 <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
-                <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingRaffle.description || ''} onChange={e => setEditingRaffle({...editingRaffle, description: e.target.value})} rows={3} />
+                <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" value={editingRaffle.description || ''} onChange={e => setEditingRaffle({...editingRaffle, description: e.target.value})} rows={3} />
               </div>
-              <button type="button" onClick={handleUpdateRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20">Save Raffle Changes</button>
+              <button type="button" onClick={handleUpdateRaffle} className="md:col-span-2 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-lime-500/20">Save Raffle Changes</button>
             </div>
           </div>
         ) : (
@@ -2613,9 +2613,9 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               
               <div className="md:col-span-2 space-y-1">
                 <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
-                <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
+                <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
               </div>
-              <button type="button" onClick={handlePublishRaffle} className="md:col-span-2 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-pink-500/20">Go Live with Raffle</button>
+              <button type="button" onClick={handlePublishRaffle} className="md:col-span-2 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-lime-500/20">Go Live with Raffle</button>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
@@ -2626,7 +2626,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 const form = offlineForms[r.id] || { selected: '', guestName: '', qty: 1 };
                 
                 return (
-                  <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-pink-900 transition-colors">
+                  <div key={r.id} className="bg-black p-4 rounded-xl border border-zinc-800 flex flex-col justify-between group hover:border-lime-500/50 transition-colors">
                     <div>
                       <p className="text-white font-bold text-sm truncate uppercase tracking-wider">{r.title}</p>
                       {r.isEnded ? (
@@ -2723,7 +2723,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                             <select 
                               value={form.selected} 
                               onChange={e => updateOfflineForm(r.id, { selected: e.target.value })}
-                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-pink-500"
+                              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-lime-500"
                             >
                               <option value="">-- Select Member --</option>
                               <option value="guest">Not Registered (Manual Entry)</option>
@@ -2736,7 +2736,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                                 placeholder="Guest Full Name" 
                                 value={form.guestName}
                                 onChange={e => updateOfflineForm(r.id, { guestName: e.target.value })}
-                                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-pink-500"
+                                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-lime-500"
                               />
                             )}
                             
@@ -2746,13 +2746,13 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                                 min="1" 
                                 value={form.qty} 
                                 onChange={e => updateOfflineForm(r.id, { qty: parseInt(e.target.value) || 1 })}
-                                className="w-20 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-pink-500"
+                                className="w-20 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-xs text-white outline-none focus:border-lime-500"
                               />
                               <button 
                                 type="button"
                                 onClick={(e) => handleAddOffline(e, r.id)}
                                 disabled={!form.selected || (form.selected === 'guest' && !form.guestName.trim())}
-                                className="flex-grow bg-zinc-800 hover:bg-pink-600 disabled:opacity-50 text-white font-bold rounded-lg text-[10px] uppercase tracking-widest transition-colors"
+                                className="flex-grow bg-zinc-800 hover:bg-lime-500 hover:text-black disabled:opacity-50 text-white font-bold rounded-lg text-[10px] uppercase tracking-widest transition-colors"
                               >
                                 Add Tickets
                               </button>
@@ -2767,7 +2767,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         <button 
                           type="button"
                           onClick={(e) => { e.preventDefault(); window.history.pushState({ modal: 'drawRaffle' }, ''); setDrawingRaffle(r); }}
-                          className="w-full bg-pink-600 hover:bg-pink-500 text-white font-black py-3 rounded-lg text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(219,39,119,0.3)]"
+                          className="w-full bg-lime-500 hover:bg-lime-400 text-black font-black py-3 rounded-lg text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(125,220,9,0.3)]"
                         >
                           <Trophy className="w-4 h-4" /> Launch Draw Machine
                         </button>
@@ -2778,7 +2778,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                             placeholder="1st Place Winner Name..." 
                             value={raffleWinners[r.id]?.w1 || ''} 
                             onChange={e => setRaffleWinners({...raffleWinners, [r.id]: { ...raffleWinners[r.id], w1: e.target.value }})} 
-                            className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                            className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-lime-500 transition-colors" 
                           />
                           {r.prize2Title && (
                             <input 
@@ -2786,7 +2786,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                               placeholder="2nd Place Winner Name..." 
                               value={raffleWinners[r.id]?.w2 || ''} 
                               onChange={e => setRaffleWinners({...raffleWinners, [r.id]: { ...raffleWinners[r.id], w2: e.target.value }})} 
-                              className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-pink-500 transition-colors" 
+                              className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg p-2 text-xs outline-none focus:border-lime-500 transition-colors" 
                             />
                           )}
                           <button 
@@ -2827,7 +2827,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         <button
                           type="button"
                           onClick={(e) => { e.preventDefault(); window.history.pushState({ modal: 'editRaffle' }, ''); setEditingRaffle(r); }}
-                          className="text-pink-500 group-hover:text-pink-400 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
+                          className="text-lime-400 group-hover:text-lime-300 font-bold uppercase text-[9px] flex items-center gap-1 transition-colors tracking-widest"
                         >
                           <Edit3 className="w-3 h-3" /> Edit
                         </button>
@@ -2857,11 +2857,11 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
       <div className="grid grid-cols-1 gap-8">
         <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
-          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><Edit3 className="w-4 h-4 text-pink-500" /> Club Homepage Settings</h3>
+          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><Edit3 className="w-4 h-4 text-lime-400" /> Club Homepage Settings</h3>
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="block text-xs font-medium text-zinc-400 uppercase tracking-widest">Spotlight Member</label>
-              <select value={editSpotlightId} onChange={e => setEditSpotlightId(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-pink-500 transition-all appearance-none cursor-pointer">
+              <select value={editSpotlightId} onChange={e => setEditSpotlightId(e.target.value)} className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 outline-none focus:border-lime-500 transition-all appearance-none cursor-pointer">
                 <option value="">None</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
               </select>
@@ -2871,12 +2871,12 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               <textarea 
                 value={editDescription} 
                 onChange={e => setEditDescription(e.target.value)} 
-                className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all h-32 whitespace-pre-wrap"
+                className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all h-32 whitespace-pre-wrap"
               />
             </div>
             <button 
               onClick={handleUpdateSettings}
-              className="w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-pink-500/20 active:scale-[0.98]"
+              className="w-full bg-lime-500 hover:bg-lime-400 text-black font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-lime-500/20 active:scale-[0.98]"
             >
               Update Homepage Settings
             </button>
@@ -2886,7 +2886,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-zinc-800 pb-3 mb-4 gap-4">
             <div className="flex items-center gap-3">
-              <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4 text-pink-500" /> Member Moderation Hub</h3>
+              <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest"><Users className="w-4 h-4 text-lime-400" /> Member Moderation Hub</h3>
               {members.filter(m => !m.name).length > 0 && (
                 <span className="bg-orange-500/20 text-orange-500 border border-orange-500/50 px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest animate-pulse">
                   {members.filter(m => !m.name).length} Pending
@@ -2895,16 +2895,16 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             </div>
             <div className="flex items-center gap-4">
               <span className="text-[10px] text-zinc-500 font-bold uppercase italic hidden lg:inline">Rank members 1-5 to show them first</span>
-              <button onClick={handleDownloadMembers} className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-pink-500 px-3 py-1.5 rounded border border-zinc-700 transition-colors uppercase tracking-widest font-bold flex items-center gap-2">
+              <button onClick={handleDownloadMembers} className="text-[10px] bg-zinc-800 hover:bg-zinc-700 text-lime-400 px-3 py-1.5 rounded border border-zinc-700 transition-colors uppercase tracking-widest font-bold flex items-center gap-2">
                 <Download className="w-3 h-3" /> Download Roster PDF
               </button>
             </div>
           </div>
           
           {editingMember && (
-            <div className="bg-black/50 p-6 rounded-2xl border border-pink-500/50 mb-6">
+            <div className="bg-black/50 p-6 rounded-2xl border border-lime-500/50 mb-6">
               <div className="flex justify-between items-center border-b border-zinc-800 pb-4 mb-4">
-                <h4 className="font-bold text-white uppercase tracking-wider flex items-center gap-2"><UserCog className="w-5 h-5 text-pink-500" /> Editing Profile: {editingMember.name || editingMember.email}</h4>
+                <h4 className="font-bold text-white uppercase tracking-wider flex items-center gap-2"><UserCog className="w-5 h-5 text-lime-400" /> Editing Profile: {editingMember.name || editingMember.email}</h4>
                 <button onClick={() => setEditingMember(null)} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
@@ -2914,7 +2914,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 <InputField label="Instagram Link" value={editingMember.instagram || ''} onChange={e => setEditingMember({...editingMember, instagram: e.target.value})} />
                 <div className="sm:col-span-2 space-y-1">
                   <label className="block text-sm font-medium text-zinc-400">Bio</label>
-                  <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-pink-500 transition-all" value={editingMember.bio || ''} onChange={e => setEditingMember({...editingMember, bio: e.target.value})} rows={3} />
+                  <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" value={editingMember.bio || ''} onChange={e => setEditingMember({...editingMember, bio: e.target.value})} rows={3} />
                 </div>
               </div>
               <button 
@@ -2924,7 +2924,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                     setEditingMember(null);
                   } catch (err) { console.error(err); }
                 }}
-                className="w-full mt-6 bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-pink-500/20"
+                className="w-full mt-6 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-lime-500/20"
               >
                 Save Profile Changes
               </button>
@@ -2942,7 +2942,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         <span className="bg-orange-600/20 text-orange-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-orange-500/30 tracking-widest">INCOMPLETE</span>
                       )}
                       {m.rank && (
-                        <span className="bg-pink-600/20 text-pink-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-pink-500/30">#{m.rank}</span>
+                        <span className="bg-lime-500/20 text-lime-400 text-[9px] font-black px-1.5 py-0.5 rounded border border-lime-500/30">#{m.rank}</span>
                       )}
                       {m.isHidden && (
                         <span className="bg-red-600/20 text-red-500 text-[9px] font-black px-1.5 py-0.5 rounded border border-red-500/30">BANNED</span>
@@ -2952,7 +2952,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                     <span className="text-zinc-500 text-[9px] lowercase tracking-wider truncate max-w-[150px]">{m.email || 'no email'}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setEditingMember(m)} className="text-zinc-500 hover:text-pink-500 transition-colors p-1" title="Edit Profile"><UserCog className="w-4 h-4" /></button>
+                    <button onClick={() => setEditingMember(m)} className="text-zinc-500 hover:text-lime-400 transition-colors p-1" title="Edit Profile"><UserCog className="w-4 h-4" /></button>
                     <button onClick={() => handleToggleHide(m)} className={`p-1 transition-colors ${m.isHidden ? 'text-red-500 hover:text-green-500' : 'text-zinc-500 hover:text-red-500'}`} title={m.isHidden ? "Unban Member" : "Ban/Hide Member"}>
                       {m.isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -2969,14 +2969,14 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                         placeholder="#"
                         value={memberRanks[m.id] !== undefined ? memberRanks[m.id] : (m.rank || '')} 
                         onChange={e => setMemberRanks({...memberRanks, [m.id]: e.target.value})} 
-                        className="w-full bg-zinc-900 border border-zinc-800 text-pink-500 rounded p-2 text-[10px] uppercase font-bold text-center outline-none focus:border-pink-500"
+                        className="w-full bg-zinc-900 border border-zinc-800 text-lime-400 rounded p-2 text-[10px] uppercase font-bold text-center outline-none focus:border-lime-500"
                       />
                     </div>
                     <input 
                       type="text" 
                       value={memberRoles[m.id] !== undefined ? memberRoles[m.id] : (m.role || 'Member')} 
                       onChange={e => setMemberRoles({...memberRoles, [m.id]: e.target.value})} 
-                      className="flex-grow w-full bg-zinc-900 border border-zinc-800 text-pink-500 rounded p-2 text-[10px] uppercase font-bold tracking-wider outline-none focus:border-pink-500"
+                      className="flex-grow w-full bg-zinc-900 border border-zinc-800 text-lime-400 rounded p-2 text-[10px] uppercase font-bold tracking-wider outline-none focus:border-lime-500"
                     />
                   </div>
                   <button 
@@ -2992,7 +2992,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         </section>
         
         <section className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 shadow-xl overflow-hidden flex flex-col">
-          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><ImageIcon className="w-4 h-4 text-pink-500" /> Database Maintenance (Temporary)</h3>
+          <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest border-b border-zinc-800 pb-3 mb-4"><ImageIcon className="w-4 h-4 text-lime-400" /> Database Maintenance (Temporary)</h3>
           <div className="space-y-4">
             <p className="text-zinc-400 text-sm">
               Run this tool to automatically scan the database, download all legacy uncompressed images, compress them to WebP format, and re-upload them. This will save significant bandwidth for your users.
@@ -3005,7 +3005,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                   <span>{Math.round((compressProgress.current / compressProgress.total) * 100)}%</span>
                 </div>
                 <div className="w-full bg-zinc-800 rounded-full h-2 shadow-inner">
-                  <div className="bg-pink-500 h-2 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(236,72,153,0.5)]" style={{ width: `${(compressProgress.current / compressProgress.total) * 100}%` }}></div>
+                  <div className="bg-lime-500 h-2 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(125,220,9,0.5)]" style={{ width: `${(compressProgress.current / compressProgress.total) * 100}%` }}></div>
                 </div>
               </div>
             )}
@@ -3013,7 +3013,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             <button 
               onClick={handleCompressAll}
               disabled={compressing}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-pink-500 font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg border border-zinc-700 active:scale-[0.98] flex items-center justify-center gap-2"
+              className="w-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-lime-400 font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg border border-zinc-700 active:scale-[0.98] flex items-center justify-center gap-2"
             >
               {compressing ? <span className="animate-pulse">Compressing...</span> : <><Download className="w-4 h-4" /> Run Bulk Compression Tool</>}
             </button>
@@ -3240,7 +3240,7 @@ const MainApp = () => {
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-zinc-500 font-bold uppercase tracking-widest text-sm">
         <div className="relative w-20 h-20 mb-4">
           <div className="absolute inset-0 rounded-full border-4 border-zinc-800"></div>
-          <div className="absolute inset-0 rounded-full border-4 border-pink-500 border-t-transparent animate-spin"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-lime-500 border-t-transparent animate-spin"></div>
         </div>
         Establishing secure connection...
       </div>
@@ -3253,7 +3253,7 @@ const MainApp = () => {
     if (isLoadingMembers && isRegisteredUser) {
       return (
         <div className="min-h-[400px] flex flex-col items-center justify-center text-zinc-500 font-bold uppercase tracking-widest text-sm animate-pulse">
-          <CarFront className="w-12 h-12 text-pink-500 animate-bounce mb-4" />
+          <CarFront className="w-12 h-12 text-lime-400 animate-bounce mb-4" />
           Synchronising Garage Profile...
         </div>
       );
@@ -3261,11 +3261,11 @@ const MainApp = () => {
     
     if (requiresProfileSetup && activeTab !== 'profile') {
       return (
-        <div className="bg-zinc-900 p-10 rounded-3xl border border-pink-500/50 text-center max-w-md mx-auto shadow-2xl animate-in zoom-in-95 duration-500">
-          <UserCircle className="w-16 h-16 text-pink-500 mx-auto mb-6" />
+        <div className="bg-zinc-900 p-10 rounded-3xl border border-lime-500/50 text-center max-w-md mx-auto shadow-2xl animate-in zoom-in-95 duration-500">
+          <UserCircle className="w-16 h-16 text-lime-400 mx-auto mb-6" />
           <h2 className="text-2xl font-black text-white uppercase italic">Complete Your Profile</h2>
           <p className="text-zinc-400 mt-4 text-sm">Welcome to DRS! Please add your full name in the Profile section to unlock the rest of the application.</p>
-          <button onClick={() => window.location.hash = 'profile'} className="mt-8 w-full bg-pink-600 hover:bg-pink-700 text-white font-black py-4 rounded-xl uppercase shadow-lg shadow-pink-500/20 active:scale-95 transition-all">Go to Profile Setup</button>
+          <button onClick={() => window.location.hash = 'profile'} className="mt-8 w-full bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl uppercase shadow-lg shadow-lime-500/20 active:scale-95 transition-all">Go to Profile Setup</button>
         </div>
       );
     }
@@ -3299,15 +3299,15 @@ const MainApp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-pink-500/30 selection:text-pink-200 relative">
+    <div className="min-h-screen bg-zinc-950 font-sans pb-32 text-zinc-200 selection:bg-lime-500/30 selection:text-lime-200 relative">
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 h-full flex justify-between items-center">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.hash = 'home'}>
             <img src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 shadow-lg" alt="Daily Ride South Logo" />
-            <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
+            <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Daily <span className="text-pink-500 not-italic">Ride</span> <span className="text-lime-400 not-italic">South</span></h1>
           </div>
           {!requiresProfileSetup && (
-            <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-pink-500 hover:text-white transition-all active:scale-95 shadow-xl">
+            <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-lime-400 hover:text-white transition-all active:scale-95 shadow-xl">
               <Menu className="w-6 h-6" />
             </button>
           )}
@@ -3317,7 +3317,7 @@ const MainApp = () => {
       {isMenuOpen && <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] animate-in fade-in duration-300" onClick={() => setIsMenuOpen(false)} />}
       <div className={`fixed top-0 right-0 h-full w-80 bg-zinc-950 z-[70] border-l border-zinc-800 transform transition-all duration-500 p-8 shadow-[0_0_50px_rgba(0,0,0,1)] ${isMenuOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'} overflow-y-auto`}>
         <div className="flex justify-between items-center mb-10">
-          <span className="text-white font-black uppercase text-xl tracking-tighter">DRS <span className="text-pink-600 italic">Menu</span></span>
+          <span className="text-white font-black uppercase text-xl tracking-tighter">DRS <span className="text-lime-400 italic">Menu</span></span>
           <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <nav className="space-y-3 mb-10">
@@ -3333,7 +3333,7 @@ const MainApp = () => {
           </div>
           <button onClick={() => signOut(auth)} className="w-full flex items-center justify-center gap-2 py-4 rounded-xl border border-zinc-800 text-zinc-400 hover:text-white transition-colors uppercase tracking-widest text-xs font-bold"><LogOut className="w-4 h-4" /> Sign Out</button>
           <div className="flex justify-center pt-4">
-            <button onClick={() => { window.location.hash = 'admin'; setIsMenuOpen(false); window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
+            <button onClick={() => { window.location.hash = 'admin'; setIsMenuOpen(false); window.scrollTo(0,0); }} className="text-zinc-700 hover:text-lime-400 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-lime-900/30 transition-all active:scale-95 shadow-inner">
               <Lock className="w-3 h-3" /> Staff Entry
             </button>
           </div>
@@ -3358,7 +3358,7 @@ const MainApp = () => {
             <a href="https://www.tiktok.com/@dailyridesouth?_r=1&_t=ZN-96GvaNt02b9" target="_blank" rel="noopener noreferrer" className="hover:text-pink-500 transition-colors"><TikTokIcon className="w-5 h-5" /></a>
           </div>
           {!requiresProfileSetup && (
-            <button onClick={() => { window.location.hash = 'admin'; window.scrollTo(0,0); }} className="text-zinc-700 hover:text-pink-500 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-pink-900/30 transition-all active:scale-95 shadow-inner">
+            <button onClick={() => { window.location.hash = 'admin'; window.scrollTo(0,0); }} className="text-zinc-700 hover:text-lime-400 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] border border-zinc-900 px-6 py-3 rounded-full hover:border-lime-900/30 transition-all active:scale-95 shadow-inner">
               <Lock className="w-3 h-3" /> Staff Entry
             </button>
           )}
@@ -3371,7 +3371,7 @@ const MainApp = () => {
             const Icon = item.icon;
             const isActive = activeTab === item.id || (activeTab === 'past_events' && item.id === 'events');
             return (
-              <button key={item.id} onClick={() => window.location.hash = item.id} className={`flex flex-col items-center transition-all ${isActive ? 'text-pink-500 scale-110' : 'text-zinc-600'}`}>
+              <button key={item.id} onClick={() => window.location.hash = item.id} className={`flex flex-col items-center transition-all ${isActive ? 'text-lime-400 scale-110' : 'text-zinc-600'}`}>
                 <Icon className="w-5 h-5" />
               </button>
             );
@@ -3403,16 +3403,16 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center text-white">
-          <Shield className="w-16 h-16 text-pink-500 mb-6" />
-          <h1 className="text-3xl font-black uppercase tracking-tighter italic mb-2">Pit Stop <span className="text-pink-600 not-italic">Required</span></h1>
+          <Shield className="w-16 h-16 text-lime-400 mb-6" />
+          <h1 className="text-3xl font-black uppercase tracking-tighter italic mb-2">Pit Stop <span className="text-lime-400 not-italic">Required</span></h1>
           <p className="text-zinc-400 text-sm max-w-md mx-auto mb-8">
             Your device is struggling to load the latest club update. This usually happens when an old version of the app is stuck in your browser's cache.
           </p>
           <div className="bg-black border border-zinc-800 p-4 rounded-xl text-left w-full max-w-md overflow-auto mb-8">
-            <p className="text-pink-500 text-[10px] font-bold uppercase tracking-widest mb-2">Error Log for Admin:</p>
+            <p className="text-lime-400 text-[10px] font-bold uppercase tracking-widest mb-2">Error Log for Admin:</p>
             <code className="text-zinc-500 text-xs break-words">{this.state.error?.toString()}</code>
           </div>
-          <button onClick={() => window.location.reload(true)} className="bg-pink-600 hover:bg-pink-700 text-white font-black py-4 px-8 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg active:scale-[0.98]">
+          <button onClick={() => window.location.reload(true)} className="bg-lime-500 hover:bg-lime-400 text-black font-black py-4 px-8 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-lime-500/20 active:scale-[0.98]">
             Force Refresh App
           </button>
         </div>
