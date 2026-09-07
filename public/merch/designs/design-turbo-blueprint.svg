@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="100%" height="100%">
+  <defs>
+    <radialGradient id="bp-bg" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#0f2b48" />
+      <stop offset="70%" stop-color="#07172b" />
+      <stop offset="100%" stop-color="#030b15" />
+    </radialGradient>
+  </defs>
+
+  <rect width="600" height="600" rx="32" fill="url(#bp-bg)" />
+  <rect x="8" y="8" width="584" height="584" rx="26" fill="none" stroke="#1e3a8a" stroke-width="2" />
+
+  <!-- Technical Blueprint Grid -->
+  <g stroke="#1d4ed8" stroke-width="0.8" opacity="0.35">
+    <!-- Grid 20px -->
+    <path d="M 40 100 H 560 M 40 140 H 560 M 40 180 H 560 M 40 220 H 560 M 40 260 H 560 M 40 300 H 560 M 40 340 H 560 M 40 380 H 560" />
+    <path d="M 80 80 V 400 M 120 80 V 400 M 160 80 V 400 M 200 80 V 400 M 240 80 V 400 M 280 80 V 400 M 320 80 V 400 M 360 80 V 400 M 400 80 V 400 M 440 80 V 400 M 480 80 V 400 M 520 80 V 400" />
+  </g>
+
+  <!-- Technical Blueprint Schematic Diagram -->
+  <g transform="translate(140, 110)" stroke="#60a5fa" stroke-width="2.5" fill="none">
+    <!-- Engine block wireframe -->
+    <rect x="40" y="40" width="240" height="150" rx="8" stroke-dasharray="8 4" />
+    <!-- 4 Cylinders -->
+    <circle cx="80" cy="115" r="22" stroke="#93c5fd" />
+    <circle cx="130" cy="115" r="22" stroke="#93c5fd" />
+    <circle cx="180" cy="115" r="22" stroke="#93c5fd" />
+    <circle cx="230" cy="115" r="22" stroke="#93c5fd" />
+    <!-- Intake runners -->
+    <path d="M 80 93 V 55 M 130 93 V 55 M 180 93 V 55 M 230 93 V 55" stroke-width="3" />
+    <line x1="60" y1="55" x2="250" y2="55" stroke-width="4" stroke="#60a5fa" />
+    <!-- Intercooler pipe & Turbo -->
+    <path d="M 250 55 C 290 55 300 90 290 120 L 275 140" stroke="#38bdf8" stroke-width="3.5" />
+    <!-- Dimension arrows -->
+    <line x1="20" y1="40" x2="20" y2="190" stroke="#f59e0b" stroke-width="1.5" />
+    <line x1="15" y1="40" x2="25" y2="40" stroke="#f59e0b" stroke-width="1.5" />
+    <line x1="15" y1="190" x2="25" y2="190" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="15" y="120" fill="#f59e0b" font-family="monospace" font-size="9" stroke="none" transform="rotate(-90 15 120)">1.6L ECOBOOST</text>
+  </g>
+
+  <!-- Typography -->
+  <g text-anchor="middle">
+    <text x="300" y="75" fill="#60a5fa" font-family="monospace" font-size="13" font-weight="900" letter-spacing="4">
+      [TECH SPEC BLUEPRINT // 005]
+    </text>
+    <text x="300" y="430" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="900" font-style="italic" letter-spacing="2">
+      ENGINE BLUEPRINT
+    </text>
+    <rect x="180" y="455" width="240" height="26" rx="5" fill="#3b82f6" />
+    <text x="300" y="472" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="900" letter-spacing="4">
+      SCHEMATIC WIREFRAME
+    </text>
+    <text x="300" y="525" fill="#93c5fd" font-family="monospace" font-size="12" font-weight="700" letter-spacing="2">
+      BOOST &amp; CAM SPECS • VARIATION #05
+    </text>
+  </g>
+</svg>

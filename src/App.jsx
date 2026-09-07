@@ -2476,7 +2476,10 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         isMerchActive={isMerchActive}
         onToggleMerchActive={onToggleMerchActive}
         db={db}
+        storage={storage}
+        auth={auth}
         appId={appId}
+        ImageUploadComponent={ImageUpload}
       />
       
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
@@ -3359,7 +3362,10 @@ const MainApp = () => {
           user={user}
           userProfile={currentUserProfile}
           db={db}
+          storage={storage}
+          auth={auth}
           appId={appId}
+          ImageUploadComponent={ImageUpload}
           onNavigateToAdmin={() => { window.location.hash = 'admin'; }}
         />
       );

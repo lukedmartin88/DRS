@@ -1,200 +1,217 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
   <defs>
-    <!-- Background Gradient -->
-    <radialGradient id="bg-glow" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#1c1f24" />
-      <stop offset="100%" stop-color="#090a0c" />
+    <!-- Studio Background -->
+    <radialGradient id="slate-bg" cx="50%" cy="50%" r="65%">
+      <stop offset="0%" stop-color="#1a1d24" />
+      <stop offset="60%" stop-color="#0f1116" />
+      <stop offset="100%" stop-color="#07080a" />
     </radialGradient>
 
-    <!-- Brushed Metal Gradient -->
-    <linearGradient id="metal-base" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#d4d7dc" />
-      <stop offset="15%" stop-color="#f0f2f5" />
-      <stop offset="30%" stop-color="#b0b5be" />
-      <stop offset="50%" stop-color="#e2e5eb" />
-      <stop offset="70%" stop-color="#9aa0ab" />
-      <stop offset="85%" stop-color="#ced2d9" />
-      <stop offset="100%" stop-color="#888e99" />
+    <!-- Brushed Titanium / Steel Gradient -->
+    <linearGradient id="metal-titanium" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dce1e8" />
+      <stop offset="20%" stop-color="#f5f7fa" />
+      <stop offset="40%" stop-color="#b4bcc7" />
+      <stop offset="60%" stop-color="#e2e6ec" />
+      <stop offset="80%" stop-color="#9ea7b4" />
+      <stop offset="100%" stop-color="#c5cbd4" />
     </linearGradient>
 
-    <!-- Metal Chamfer Edge -->
-    <linearGradient id="metal-bevel" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
-      <stop offset="50%" stop-color="#646b77" stop-opacity="0.8" />
-      <stop offset="100%" stop-color="#1a1d22" stop-opacity="0.95" />
+    <!-- Brushed Gold / Brass for Keyring Accent -->
+    <linearGradient id="metal-brass" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="40%" stop-color="#ca8a04" />
+      <stop offset="70%" stop-color="#fef9c3" />
+      <stop offset="100%" stop-color="#a16207" />
     </linearGradient>
 
-    <!-- Laser Engraved Inset Shadow & Dark Carbonized Depth -->
-    <linearGradient id="engrave-depth" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#141619" />
-      <stop offset="50%" stop-color="#22252a" />
-      <stop offset="100%" stop-color="#323740" />
+    <!-- Laser Engraved Charcoal Inset Depth -->
+    <linearGradient id="laser-etch" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111317" />
+      <stop offset="50%" stop-color="#1f232b" />
+      <stop offset="100%" stop-color="#2d333e" />
     </linearGradient>
 
-    <filter id="engrave-shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.85" />
-      <feDropShadow dx="-0.8" dy="-0.8" stdDeviation="0.8" flood-color="#fff" flood-opacity="0.4" />
+    <filter id="laser-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="1" dy="1.5" stdDeviation="1" flood-color="#000" flood-opacity="0.8" />
+      <feDropShadow dx="-0.6" dy="-0.6" stdDeviation="0.6" flood-color="#fff" flood-opacity="0.35" />
     </filter>
 
-    <filter id="plate-drop" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#000" flood-opacity="0.9" />
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.6" />
+    <filter id="item-drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity="0.85" />
     </filter>
-
-    <!-- Brushed Texture Pattern -->
-    <pattern id="brushed-texture" width="100" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
-      <line x1="0" y1="1" x2="100" y2="1" stroke="#ffffff" stroke-opacity="0.08" stroke-width="0.8" />
-      <line x1="0" y1="3" x2="100" y2="3" stroke="#000000" stroke-opacity="0.09" stroke-width="0.8" />
-    </pattern>
   </defs>
 
-  <!-- Studio Surface Background -->
-  <rect width="800" height="800" fill="url(#bg-glow)" />
+  <!-- Studio Surface -->
+  <rect width="800" height="800" fill="url(#slate-bg)" />
 
-  <!-- Grid Vignette / Subtle Floor Grid -->
-  <g opacity="0.12" stroke="#4ade80" stroke-width="0.5">
-    <line x1="100" y1="0" x2="100" y2="800" stroke-dasharray="4 8" />
-    <line x1="700" y1="0" x2="700" y2="800" stroke-dasharray="4 8" />
-    <line x1="0" y1="100" x2="800" y2="100" stroke-dasharray="4 8" />
-    <line x1="0" y1="700" x2="800" y2="700" stroke-dasharray="4 8" />
+  <!-- Subtle Studio Grid -->
+  <g opacity="0.1" stroke="#a3e635" stroke-width="0.5">
+    <line x1="100" y1="0" x2="100" y2="800" stroke-dasharray="3 6" />
+    <line x1="700" y1="0" x2="700" y2="800" stroke-dasharray="3 6" />
+    <line x1="0" y1="100" x2="800" y2="100" stroke-dasharray="3 6" />
+    <line x1="0" y1="700" x2="800" y2="700" stroke-dasharray="3 6" />
   </g>
 
-  <!-- Metal Plaque Body with Shadow -->
-  <g transform="translate(140, 140)" filter="url(#plate-drop)">
-    <!-- Base Plate Outer Bevel (520x520) -->
-    <rect x="0" y="0" width="520" height="520" rx="42" ry="42" fill="url(#metal-bevel)" />
-    
-    <!-- Inset Brushed Metal Face -->
-    <rect x="6" y="6" width="508" height="508" rx="38" ry="38" fill="url(#metal-base)" />
-    <rect x="6" y="6" width="508" height="508" rx="38" ry="38" fill="url(#brushed-texture)" />
+  <!-- ITEM 1: MAIN CUSTOM LASER ENGRAVED METAL PLAQUE (Center) -->
+  <g transform="translate(180, 150)" filter="url(#item-drop)">
+    <!-- Metal Plaque Base (440x360) -->
+    <rect x="0" y="0" width="440" height="340" rx="24" fill="#64748b" opacity="0.3" />
+    <rect x="4" y="4" width="432" height="332" rx="20" fill="url(#metal-titanium)" />
+    <rect x="18" y="18" width="404" height="304" rx="14" fill="none" stroke="#2c333e" stroke-width="1.5" opacity="0.4" />
 
-    <!-- Corner Precision Screws / CNC Recesses -->
-    <circle cx="36" cy="36" r="6" fill="#323740" opacity="0.6" />
-    <circle cx="36" cy="36" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
-    <circle cx="484" cy="36" r="6" fill="#323740" opacity="0.6" />
-    <circle cx="484" cy="36" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
-    <circle cx="36" cy="484" r="6" fill="#323740" opacity="0.6" />
-    <circle cx="36" cy="484" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
-    <circle cx="484" cy="484" r="6" fill="#323740" opacity="0.6" />
-    <circle cx="484" cy="484" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
+    <!-- Corner Screw Details -->
+    <circle cx="28" cy="28" r="4" fill="#334155" opacity="0.6" />
+    <circle cx="412" cy="28" r="4" fill="#334155" opacity="0.6" />
+    <circle cx="28" cy="312" r="4" fill="#334155" opacity="0.6" />
+    <circle cx="412" cy="312" r="4" fill="#334155" opacity="0.6" />
 
-    <!-- Subtle Outer Border Engraving Line -->
-    <rect x="24" y="24" width="472" height="472" rx="28" ry="28" fill="none" stroke="#252a30" stroke-width="1.5" opacity="0.45" />
+    <!-- Generic Laser Engraved Graphic & Text -->
+    <g filter="url(#laser-shadow)">
+      <!-- Geometric Crest / Shield Outline -->
+      <path d="M 180 50 L 260 50 L 275 80 L 220 120 L 165 80 Z" fill="none" stroke="url(#laser-etch)" stroke-width="4" stroke-linejoin="round" />
+      <polygon points="220,60 230,80 250,80 235,92 240,112 220,100 200,112 205,92 190,80 210,80" fill="url(#laser-etch)" />
 
-    <!-- LASER ENGRAVED ARTWORK -->
-    <g filter="url(#engrave-shadow)">
-      <!-- Outer Hexagonal / Racing Frame -->
-      <path d="M 80 160
-               L 110 130
-               L 410 130
-               L 440 160
-               L 440 290
-               L 410 320
-               L 110 320
-               L 80 290
-               Z"
-            fill="none"
-            stroke="url(#engrave-depth)"
-            stroke-width="9"
-            stroke-linejoin="round" />
-
-      <path d="M 64 225 L 80 225" stroke="url(#engrave-depth)" stroke-width="9" stroke-linecap="square" />
-      <path d="M 440 225 L 456 225" stroke="url(#engrave-depth)" stroke-width="9" stroke-linecap="square" />
-
-      <!-- DRS Stylized Letters -->
-      <!-- D -->
-      <path d="M 112 165
-               L 175 165
-               C 200 165 214 178 214 200
-               L 214 250
-               C 214 272 200 285 175 285
-               L 112 285
-               Z
-               M 144 192
-               L 144 258
-               L 168 258
-               C 178 258 184 252 184 242
-               L 184 208
-               C 184 198 178 192 168 192
-               Z"
-            fill="url(#engrave-depth)" />
-
-      <!-- R -->
-      <path d="M 226 165
-               L 282 165
-               C 305 165 318 176 318 195
-               C 318 209 308 218 294 222
-               L 322 285
-               L 290 285
-               L 266 230
-               L 256 230
-               L 256 285
-               L 226 285
-               Z
-               M 256 190
-               L 256 210
-               L 276 210
-               C 284 210 288 206 288 200
-               C 288 194 284 190 276 190
-               Z"
-            fill="url(#engrave-depth)" />
-
-      <!-- S -->
-      <path d="M 334 260
-               L 358 260
-               C 368 260 376 256 376 248
-               C 376 240 370 236 352 232
-               C 334 227 325 220 325 204
-               C 325 180 342 165 372 165
-               L 404 165
-               L 404 190
-               L 374 190
-               C 364 190 357 194 357 201
-               C 357 207 363 211 380 215
-               C 400 220 408 230 408 246
-               C 408 270 390 285 360 285
-               L 334 285
-               Z"
-            fill="url(#engrave-depth)" />
-
-      <!-- Underline Divider -->
-      <line x1="86" y1="344" x2="434" y2="344" stroke="url(#engrave-depth)" stroke-width="4.5" stroke-linecap="round" />
-
-      <!-- DAILY.RIDE.SOUTH Laser Subtitle -->
-      <text x="260" y="388"
+      <!-- Title / Header -->
+      <text x="220" y="160"
             font-family="'Montserrat', 'Arial Black', sans-serif"
-            font-size="25"
+            font-size="20"
             font-weight="900"
-            font-style="italic"
-            letter-spacing="5"
+            letter-spacing="3"
             text-anchor="middle"
-            fill="url(#engrave-depth)">
-        DAILY.RIDE.SOUTH
+            fill="url(#laser-etch)">
+        CUSTOM LASER ENGRAVING
       </text>
 
-      <text x="260" y="424"
+      <line x1="80" y1="180" x2="360" y2="180" stroke="url(#laser-etch)" stroke-width="2" stroke-linecap="round" />
+
+      <text x="220" y="210"
+            font-family="'Montserrat', sans-serif"
+            font-size="16"
+            font-weight="800"
+            letter-spacing="4"
+            text-anchor="middle"
+            fill="url(#laser-etch)">
+        YOUR DESIGN &amp; TEXT HERE
+      </text>
+
+      <text x="220" y="240"
             font-family="monospace"
             font-size="11"
             font-weight="700"
-            letter-spacing="3"
+            letter-spacing="2"
             text-anchor="middle"
-            fill="#3a404a"
-            opacity="0.8">
-        BRUSHED TITANIUM ALLOY • FIBER LASER ETCH
+            fill="#475569">
+        PERSONALIZED LOGOS • QUOTES • ARTWORK
+      </text>
+
+      <rect x="110" y="260" width="220" height="24" rx="6" fill="#1e242d" opacity="0.8" />
+      <text x="220" y="276"
+            font-family="monospace"
+            font-size="9"
+            font-weight="800"
+            letter-spacing="1.5"
+            text-anchor="middle"
+            fill="#f8fafc">
+        PRECISION CNC FIBER LASER
       </text>
     </g>
   </g>
 
-  <!-- Tag Pill Top Left -->
-  <g transform="translate(60, 50)">
-    <rect width="180" height="34" rx="17" fill="#000" stroke="#a3e635" stroke-width="1.5" opacity="0.9" />
-    <circle cx="20" cy="17" r="5" fill="#a3e635" />
-    <text x="36" y="22" font-family="'Montserrat', sans-serif" font-size="11" font-weight="900" fill="#a3e635" letter-spacing="1.5">LASER ENGRAVING</text>
+  <!-- ITEM 2: CUSTOM LASER ENGRAVED DOG TAG (Left) -->
+  <g transform="translate(60, 420)" filter="url(#item-drop)">
+    <!-- Dog Tag Chain Link -->
+    <circle cx="60" cy="15" r="14" fill="none" stroke="#94a3b8" stroke-width="3" />
+    <circle cx="60" cy="40" r="10" fill="none" stroke="#64748b" stroke-width="2.5" />
+
+    <!-- Dog Tag Plate (130x210) -->
+    <rect x="0" y="45" width="120" height="190" rx="30" fill="url(#metal-titanium)" stroke="#475569" stroke-width="1.5" />
+    <circle cx="60" cy="65" r="6" fill="#0f172a" />
+    <circle cx="60" cy="65" r="8" fill="none" stroke="#fff" stroke-width="1" opacity="0.6" />
+
+    <!-- Dog Tag Engraved Paw & Details -->
+    <g filter="url(#laser-shadow)">
+      <!-- Paw Print -->
+      <ellipse cx="60" cy="110" rx="14" ry="11" fill="url(#laser-etch)" />
+      <ellipse cx="43" cy="94" rx="5" ry="7" fill="url(#laser-etch)" />
+      <ellipse cx="54" cy="90" rx="5" ry="7" fill="url(#laser-etch)" />
+      <ellipse cx="66" cy="90" rx="5" ry="7" fill="url(#laser-etch)" />
+      <ellipse cx="77" cy="94" rx="5" ry="7" fill="url(#laser-etch)" />
+
+      <text x="60" y="145" font-family="'Montserrat', sans-serif" font-size="12" font-weight="900" fill="url(#laser-etch)" text-anchor="middle" letter-spacing="1">BUDDY</text>
+      <text x="60" y="165" font-family="monospace" font-size="8" font-weight="700" fill="url(#laser-etch)" text-anchor="middle">07123 456789</text>
+      <text x="60" y="182" font-family="monospace" font-size="7" font-weight="700" fill="#475569" text-anchor="middle">CHIPPED &amp; REWARD</text>
+      <rect x="25" y="198" width="70" height="16" rx="4" fill="#1e242d" opacity="0.85" />
+      <text x="60" y="210" font-family="monospace" font-size="7" font-weight="800" fill="#a3e635" text-anchor="middle">PET DOG TAG</text>
+    </g>
   </g>
 
-  <!-- Precision Badge Bottom Right -->
-  <g transform="translate(560, 720)">
-    <rect width="180" height="30" rx="8" fill="#181a1e" stroke="#2b3038" stroke-width="1" />
-    <text x="90" y="19" font-family="monospace" font-size="10" font-weight="700" fill="#8b94a0" text-anchor="middle" letter-spacing="1.5">DRS MOTORSPORT CO.</text>
+  <!-- ITEM 3: CUSTOM LASER ENGRAVED METAL BOOKMARK (Center Right) -->
+  <g transform="translate(320, 520)" filter="url(#item-drop)">
+    <!-- Bookmark Plate (110x220) with Tassel Ring -->
+    <circle cx="55" cy="10" r="10" fill="none" stroke="#e2e8f0" stroke-width="2" />
+    <path d="M 55 20 L 55 45" stroke="#ec4899" stroke-width="3" stroke-linecap="round" />
+    
+    <rect x="0" y="40" width="110" height="190" rx="12" fill="url(#metal-brass)" stroke="#78350f" stroke-width="1.5" />
+    
+    <g filter="url(#laser-shadow)">
+      <!-- Ornate Floral / Geometric Cutout Pattern -->
+      <polygon points="55,60 65,75 55,90 45,75" fill="none" stroke="url(#laser-etch)" stroke-width="2" />
+      <circle cx="55" cy="75" r="3" fill="url(#laser-etch)" />
+
+      <text x="55" y="115" font-family="'Playfair Display', serif" font-size="11" font-weight="900" fill="url(#laser-etch)" text-anchor="middle" font-style="italic">Chapter One</text>
+      <line x1="25" y1="125" x2="85" y2="125" stroke="url(#laser-etch)" stroke-width="1" />
+      <text x="55" y="142" font-family="monospace" font-size="7" font-weight="700" fill="url(#laser-etch)" text-anchor="middle">YOUR CUSTOM</text>
+      <text x="55" y="154" font-family="monospace" font-size="7" font-weight="700" fill="url(#laser-etch)" text-anchor="middle">QUOTE OR NAME</text>
+
+      <rect x="15" y="195" width="80" height="16" rx="4" fill="#1e242d" opacity="0.85" />
+      <text x="55" y="206" font-family="monospace" font-size="7" font-weight="800" fill="#facc15" text-anchor="middle">BOOKMARK</text>
+    </g>
+  </g>
+
+  <!-- ITEM 4: CUSTOM LASER ENGRAVED KEYRING (Right) -->
+  <g transform="translate(560, 440)" filter="url(#item-drop)">
+    <!-- Split Ring Keyring -->
+    <circle cx="80" cy="25" r="24" fill="none" stroke="#cbd5e1" stroke-width="4.5" />
+    <circle cx="80" cy="25" r="16" fill="none" stroke="#475569" stroke-width="1.5" />
+    <path d="M 80 50 L 80 75" stroke="#94a3b8" stroke-width="4" stroke-linecap="round" />
+
+    <!-- Leather / Titanium Fob -->
+    <rect x="20" y="70" width="120" height="160" rx="18" fill="url(#metal-titanium)" stroke="#334155" stroke-width="2" />
+    <circle cx="80" cy="88" r="5" fill="#0f172a" />
+
+    <!-- Keyring Custom Engraving -->
+    <g filter="url(#laser-shadow)">
+      <!-- Custom Initials / Monogram -->
+      <circle cx="80" cy="135" r="28" fill="none" stroke="url(#laser-etch)" stroke-width="2" />
+      <text x="80" y="142" font-family="'Montserrat', sans-serif" font-size="16" font-weight="900" fill="url(#laser-etch)" text-anchor="middle">A &amp; M</text>
+      <text x="80" y="156" font-family="monospace" font-size="7" font-weight="700" fill="#475569" text-anchor="middle">24.08.2024</text>
+      
+      <text x="80" y="180" font-family="monospace" font-size="7.5" font-weight="700" fill="url(#laser-etch)" text-anchor="middle">CUSTOM KEYRING</text>
+
+      <rect x="35" y="195" width="90" height="16" rx="4" fill="#1e242d" opacity="0.85" />
+      <text x="80" y="206" font-family="monospace" font-size="7" font-weight="800" fill="#38bdf8" text-anchor="middle">KEYRING / FOB</text>
+    </g>
+  </g>
+
+  <!-- Tag Pill Top Left -->
+  <g transform="translate(50, 45)">
+    <rect width="180" height="34" rx="17" fill="#000" stroke="#a3e635" stroke-width="1.5" opacity="0.95" />
+    <circle cx="18" cy="17" r="5" fill="#a3e635" />
+    <text x="34" y="22" font-family="'Montserrat', sans-serif" font-size="11" font-weight="900" fill="#a3e635" letter-spacing="1.5">LASER ENGRAVING</text>
+  </g>
+
+  <!-- POA Badge Top Right -->
+  <g transform="translate(620, 45)">
+    <rect width="130" height="34" rx="17" fill="#000" stroke="#f59e0b" stroke-width="1.5" opacity="0.95" />
+    <text x="65" y="22" font-family="'Montserrat', sans-serif" font-size="11" font-weight="900" fill="#f59e0b" text-anchor="middle" letter-spacing="1.5">POA / QUOTE</text>
+  </g>
+
+  <!-- Feature Strip Bottom -->
+  <g transform="translate(100, 745)">
+    <rect width="600" height="28" rx="8" fill="#111317" stroke="#242b35" stroke-width="1" />
+    <text x="300" y="18" font-family="monospace" font-size="9.5" font-weight="700" fill="#94a3b8" text-anchor="middle" letter-spacing="2">
+      KEYRINGS • BOOKMARKS • DOG TAGS • COASTERS • PLAQUES • MADE TO YOUR DESIGN
+    </text>
   </g>
 </svg>
