@@ -7,8 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail,
-  signInAnonymously
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import {
   getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, addDoc,
@@ -483,12 +482,25 @@ const SplashView = () => {
         });
       }
     } catch (err) {
-      console.error(err);
-      const message = err.message?.includes('auth/invalid-credential') 
-        ? 'Invalid email or password.'
-        : err.message?.includes('auth/email-already-in-use')
-          ? 'An account with this email already exists.'
-          : err.message?.replace('Firebase: ', '') || 'An authentication error occurred.';
+      const code = err?.code || '';
+      const rawMsg = err?.message || '';
+      let message;
+
+      if (code === 'auth/invalid-credential' || rawMsg.includes('auth/invalid-credential')) {
+        message = 'Invalid email or password.';
+      } else if (code === 'auth/email-already-in-use' || rawMsg.includes('auth/email-already-in-use')) {
+        message = 'An account with this email already exists.';
+      } else if (code === 'auth/weak-password' || rawMsg.includes('auth/weak-password')) {
+        message = 'Password should be at least 6 characters.';
+      } else if (code === 'auth/user-not-found' || rawMsg.includes('auth/user-not-found')) {
+        message = 'No account found with this email.';
+      } else if (code === 'auth/wrong-password' || rawMsg.includes('auth/wrong-password')) {
+        message = 'Incorrect password.';
+      } else if (code === 'auth/invalid-email' || rawMsg.includes('auth/invalid-email')) {
+        message = 'Please enter a valid email address.';
+      } else {
+        message = rawMsg.replace('Firebase: ', '') || 'An authentication error occurred.';
+      }
       setError(message);
     } finally {
       setLoading(false);
@@ -520,9 +532,11 @@ const SplashView = () => {
       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-zinc-950/40"></div>
       <div className="relative z-10 w-full max-w-md bg-black/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl shadow-pink-500/5 animate-in zoom-in-95 duration-700">
         <div className="flex flex-col items-center mb-8">
-          <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-20 w-20 rounded-2xl object-cover border border-zinc-700 shadow-lg shadow-pink-500/20 mb-4" alt="DRS Logo" />
-          <h1 className="text-3xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">Petrolhead Community</p>
+          <img 
+            src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" 
+            className="w-40 h-40 rounded-3xl object-cover border border-zinc-700 shadow-2xl shadow-pink-500/20" 
+            alt="Daily Ride South Logo" 
+          />
         </div>
         {isResetMode ? (
           <form onSubmit={handlePasswordReset} className="space-y-5">
@@ -895,7 +909,7 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
       <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center">
         <img src="https://i.ibb.co/dwGFSkDT/Whats-App-Image-2026-05-10-at-4.jpg" alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-black/40 to-black/20"></div>
-        <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-2xl" alt="" />
+        <img src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-2xl" alt="Daily Ride South Logo" />
       </div>
       
       <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-10">
@@ -3098,11 +3112,12 @@ const MainApp = () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
         }
-      } catch (err) { console.error("Auth error:", err); }
-      setAuthLoading(false);
+      } catch (err) {
+        console.warn("Auth initialization notice:", err?.message || err);
+      } finally {
+        setAuthLoading(false);
+      }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -3288,7 +3303,7 @@ const MainApp = () => {
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 h-full flex justify-between items-center">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.location.hash = 'home'}>
-            <img src="https://i.ibb.co/xnqpNZV/Whats-App-Image-2026-05-10-at-4-19-50-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 shadow-lg" alt="" />
+            <img src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" className="h-10 w-10 rounded-xl object-cover border border-zinc-800 shadow-lg" alt="Daily Ride South Logo" />
             <h1 className="text-xl font-black text-white uppercase tracking-tighter italic">Daily Ride <span className="text-pink-600 not-italic">South</span></h1>
           </div>
           {!requiresProfileSetup && (
