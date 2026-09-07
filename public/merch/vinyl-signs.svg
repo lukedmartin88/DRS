@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <!-- Dark Architectural Corrugated Wall Gradient -->
+    <linearGradient id="wall-base" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0c0e12" />
+      <stop offset="50%" stop-color="#14171d" />
+      <stop offset="100%" stop-color="#08090c" />
+    </linearGradient>
+
+    <!-- Corrugated Cladding Pattern -->
+    <pattern id="cladding" width="40" height="800" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="20" height="800" fill="#14181f" />
+      <rect x="20" y="0" width="20" height="800" fill="#0d1015" />
+      <line x1="20" y1="0" x2="20" y2="800" stroke="#06070a" stroke-width="1.5" />
+      <line x1="40" y1="0" x2="40" y2="800" stroke="#252c38" stroke-width="0.75" />
+    </pattern>
+
+    <!-- Signboard Frame Gradient -->
+    <linearGradient id="sign-face" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#111317" />
+      <stop offset="100%" stop-color="#07080a" />
+    </linearGradient>
+
+    <!-- Neon Glow Filters -->
+    <filter id="neon-green-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur1" />
+      <feGaussianBlur stdDeviation="8" result="blur2" />
+      <feGaussianBlur stdDeviation="18" result="blur3" />
+      <feGaussianBlur stdDeviation="35" result="blur4" />
+      <feMerge>
+        <feMergeNode in="blur4" />
+        <feMergeNode in="blur3" />
+        <feMergeNode in="blur2" />
+        <feMergeNode in="blur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="neon-pink-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="pblur1" />
+      <feGaussianBlur stdDeviation="9" result="pblur2" />
+      <feGaussianBlur stdDeviation="20" result="pblur3" />
+      <feGaussianBlur stdDeviation="40" result="pblur4" />
+      <feMerge>
+        <feMergeNode in="pblur4" />
+        <feMergeNode in="pblur3" />
+        <feMergeNode in="pblur2" />
+        <feMergeNode in="pblur1" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="ambient-wall-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="50" result="glow" />
+    </filter>
+
+    <!-- Drop Shadow for Sign Mount -->
+    <filter id="mount-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="25" stdDeviation="35" flood-color="#000000" flood-opacity="0.95" />
+    </filter>
+  </defs>
+
+  <!-- Wall Background -->
+  <rect width="800" height="800" fill="url(#wall-base)" />
+  <rect width="800" height="800" fill="url(#cladding)" opacity="0.6" />
+
+  <!-- Ambient Light Reflection on Wall -->
+  <ellipse cx="400" cy="400" rx="360" ry="320" fill="#22c55e" opacity="0.12" filter="url(#ambient-wall-glow)" />
+  <ellipse cx="400" cy="380" rx="200" ry="180" fill="#ec4899" opacity="0.1" filter="url(#ambient-wall-glow)" />
+
+  <!-- Signboard Enclosure (Tilted / 3D Look or Crisp Frontal) -->
+  <g transform="translate(100, 110)" filter="url(#mount-shadow)">
+    <!-- Mounting Frame / Bezel -->
+    <rect x="0" y="0" width="600" height="580" rx="28" fill="#181c22" stroke="#2a303a" stroke-width="3" />
+    <!-- Matte Black Sign Acrylic Face -->
+    <rect x="10" y="10" width="580" height="560" rx="20" fill="url(#sign-face)" stroke="#090a0d" stroke-width="2" />
+
+    <!-- Neon Boundary Outline Frame (Lime Green) -->
+    <path d="M 60 170
+             L 100 130
+             L 480 130
+             L 520 170
+             L 520 330
+             L 480 370
+             L 100 370
+             L 60 330
+             Z"
+          fill="none"
+          stroke="#4ade80"
+          stroke-width="8"
+          stroke-linejoin="round"
+          filter="url(#neon-green-glow)" />
+
+    <!-- Pure Core Line for Frame -->
+    <path d="M 60 170
+             L 100 130
+             L 480 130
+             L 520 170
+             L 520 330
+             L 480 370
+             L 100 370
+             L 60 330
+             Z"
+          fill="none"
+          stroke="#f0fdf4"
+          stroke-width="2"
+          stroke-linejoin="round" />
+
+    <!-- DRS LETTERS IN NEON -->
+    <!-- D - Neon Lime Green -->
+    <g filter="url(#neon-green-glow)">
+      <path d="M 95 165
+               L 190 165
+               C 230 165 250 185 250 215
+               L 250 285
+               C 250 315 230 335 190 335
+               L 95 335
+               Z
+               M 145 205
+               L 145 295
+               L 180 295
+               C 198 295 206 288 206 270
+               L 206 230
+               C 206 212 198 205 180 205
+               Z"
+            fill="#4ade80" />
+      <!-- D White Core -->
+      <path d="M 120 185 L 180 185 C 215 185 228 198 228 225 L 228 275 C 228 302 215 315 180 315 L 120 315 Z"
+            fill="none" stroke="#f0fdf4" stroke-width="4" opacity="0.8" />
+    </g>
+
+    <!-- R - Vibrant Hot Magenta Pink -->
+    <g filter="url(#neon-pink-glow)">
+      <path d="M 245 165
+               L 330 165
+               C 365 165 385 182 385 210
+               C 385 230 370 244 350 250
+               L 395 335
+               L 345 335
+               L 310 260
+               L 295 260
+               L 295 335
+               L 245 335
+               Z
+               M 295 202
+               L 295 228
+               L 325 228
+               C 335 228 342 222 342 215
+               C 342 208 335 202 325 202
+               Z"
+            fill="#ec4899" />
+      <!-- R White Core -->
+      <path d="M 270 185 L 325 185 C 348 185 360 195 360 215 C 360 232 345 240 325 240 L 270 240 Z M 270 240 L 270 320 M 325 250 L 370 320"
+            fill="none" stroke="#fff1f2" stroke-width="4" opacity="0.8" />
+    </g>
+
+    <!-- S - Neon Lime Green -->
+    <g filter="url(#neon-green-glow)">
+      <path d="M 390 300
+               L 430 300
+               C 446 300 455 292 455 280
+               C 455 268 444 260 416 254
+               C 390 246 376 236 376 210
+               C 376 180 400 165 444 165
+               L 485 165
+               L 485 202
+               L 446 202
+               C 430 202 422 208 422 216
+               C 422 224 430 228 456 234
+               C 485 242 500 255 500 280
+               C 500 312 475 335 435 335
+               L 390 335
+               Z"
+            fill="#4ade80" />
+      <!-- S White Core -->
+      <path d="M 465 185 C 445 185 400 190 400 215 C 400 240 478 235 478 280 C 478 305 450 315 415 315"
+            fill="none" stroke="#f0fdf4" stroke-width="4" opacity="0.8" />
+    </g>
+
+    <!-- "DAILY RIDE SOUTH" NEON SUBTITLE -->
+    <g filter="url(#neon-green-glow)">
+      <text x="300" y="445"
+            font-family="'Montserrat', 'Arial Black', sans-serif"
+            font-size="36"
+            font-weight="900"
+            font-style="italic"
+            letter-spacing="5"
+            text-anchor="middle"
+            fill="#4ade80">
+        DAILY <tspan fill="#ec4899" filter="url(#neon-pink-glow)">RIDE</tspan> SOUTH
+      </text>
+
+      <!-- Neon Underline Brackets -->
+      <path d="M 80 480 L 260 480 L 275 490" stroke="#4ade80" stroke-width="5" fill="none" stroke-linecap="round" />
+      <path d="M 520 480 L 340 480 L 325 490" stroke="#4ade80" stroke-width="5" fill="none" stroke-linecap="round" />
+    </g>
+
+    <!-- White Cores for Text -->
+    <text x="300" y="445"
+          font-family="'Montserrat', 'Arial Black', sans-serif"
+          font-size="36"
+          font-weight="900"
+          font-style="italic"
+          letter-spacing="5"
+          text-anchor="middle"
+          fill="#f0fdf4"
+          opacity="0.9">
+      DAILY <tspan fill="#fff1f2">RIDE</tspan> SOUTH
+    </text>
+
+    <!-- Power & Hardware Tag -->
+    <g transform="translate(180, 520)">
+      <rect width="240" height="26" rx="6" fill="#0c0e12" stroke="#252a32" stroke-width="1" />
+      <circle cx="20" cy="13" r="3.5" fill="#4ade80" />
+      <text x="32" y="17" font-family="monospace" font-size="9" font-weight="700" fill="#9ca3af" letter-spacing="1.5">ILLUMINATED LED SIGN • 12V</text>
+    </g>
+  </g>
+
+  <!-- Product Badge Top Left -->
+  <g transform="translate(50, 45)">
+    <rect width="150" height="34" rx="17" fill="#000000" stroke="#ec4899" stroke-width="1.5" opacity="0.95" />
+    <circle cx="18" cy="17" r="5" fill="#ec4899" />
+    <text x="34" y="22" font-family="'Montserrat', sans-serif" font-size="11" font-weight="900" fill="#ec4899" letter-spacing="1.5">VINYL SIGNS</text>
+  </g>
+
+  <!-- Wall Sconce / Atmospheric Shadow Gradient Bottom -->
+  <rect x="0" y="720" width="800" height="80" fill="url(#sign-face)" opacity="0.7" />
+</svg>

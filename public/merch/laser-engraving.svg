@@ -1,0 +1,200 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bg-glow" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#1c1f24" />
+      <stop offset="100%" stop-color="#090a0c" />
+    </radialGradient>
+
+    <!-- Brushed Metal Gradient -->
+    <linearGradient id="metal-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d4d7dc" />
+      <stop offset="15%" stop-color="#f0f2f5" />
+      <stop offset="30%" stop-color="#b0b5be" />
+      <stop offset="50%" stop-color="#e2e5eb" />
+      <stop offset="70%" stop-color="#9aa0ab" />
+      <stop offset="85%" stop-color="#ced2d9" />
+      <stop offset="100%" stop-color="#888e99" />
+    </linearGradient>
+
+    <!-- Metal Chamfer Edge -->
+    <linearGradient id="metal-bevel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#646b77" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#1a1d22" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Laser Engraved Inset Shadow & Dark Carbonized Depth -->
+    <linearGradient id="engrave-depth" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#141619" />
+      <stop offset="50%" stop-color="#22252a" />
+      <stop offset="100%" stop-color="#323740" />
+    </linearGradient>
+
+    <filter id="engrave-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.85" />
+      <feDropShadow dx="-0.8" dy="-0.8" stdDeviation="0.8" flood-color="#fff" flood-opacity="0.4" />
+    </filter>
+
+    <filter id="plate-drop" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#000" flood-opacity="0.9" />
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.6" />
+    </filter>
+
+    <!-- Brushed Texture Pattern -->
+    <pattern id="brushed-texture" width="100" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+      <line x1="0" y1="1" x2="100" y2="1" stroke="#ffffff" stroke-opacity="0.08" stroke-width="0.8" />
+      <line x1="0" y1="3" x2="100" y2="3" stroke="#000000" stroke-opacity="0.09" stroke-width="0.8" />
+    </pattern>
+  </defs>
+
+  <!-- Studio Surface Background -->
+  <rect width="800" height="800" fill="url(#bg-glow)" />
+
+  <!-- Grid Vignette / Subtle Floor Grid -->
+  <g opacity="0.12" stroke="#4ade80" stroke-width="0.5">
+    <line x1="100" y1="0" x2="100" y2="800" stroke-dasharray="4 8" />
+    <line x1="700" y1="0" x2="700" y2="800" stroke-dasharray="4 8" />
+    <line x1="0" y1="100" x2="800" y2="100" stroke-dasharray="4 8" />
+    <line x1="0" y1="700" x2="800" y2="700" stroke-dasharray="4 8" />
+  </g>
+
+  <!-- Metal Plaque Body with Shadow -->
+  <g transform="translate(140, 140)" filter="url(#plate-drop)">
+    <!-- Base Plate Outer Bevel (520x520) -->
+    <rect x="0" y="0" width="520" height="520" rx="42" ry="42" fill="url(#metal-bevel)" />
+    
+    <!-- Inset Brushed Metal Face -->
+    <rect x="6" y="6" width="508" height="508" rx="38" ry="38" fill="url(#metal-base)" />
+    <rect x="6" y="6" width="508" height="508" rx="38" ry="38" fill="url(#brushed-texture)" />
+
+    <!-- Corner Precision Screws / CNC Recesses -->
+    <circle cx="36" cy="36" r="6" fill="#323740" opacity="0.6" />
+    <circle cx="36" cy="36" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
+    <circle cx="484" cy="36" r="6" fill="#323740" opacity="0.6" />
+    <circle cx="484" cy="36" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
+    <circle cx="36" cy="484" r="6" fill="#323740" opacity="0.6" />
+    <circle cx="36" cy="484" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
+    <circle cx="484" cy="484" r="6" fill="#323740" opacity="0.6" />
+    <circle cx="484" cy="484" r="5" fill="none" stroke="#fff" stroke-width="0.75" opacity="0.5" />
+
+    <!-- Subtle Outer Border Engraving Line -->
+    <rect x="24" y="24" width="472" height="472" rx="28" ry="28" fill="none" stroke="#252a30" stroke-width="1.5" opacity="0.45" />
+
+    <!-- LASER ENGRAVED ARTWORK -->
+    <g filter="url(#engrave-shadow)">
+      <!-- Outer Hexagonal / Racing Frame -->
+      <path d="M 80 160
+               L 110 130
+               L 410 130
+               L 440 160
+               L 440 290
+               L 410 320
+               L 110 320
+               L 80 290
+               Z"
+            fill="none"
+            stroke="url(#engrave-depth)"
+            stroke-width="9"
+            stroke-linejoin="round" />
+
+      <path d="M 64 225 L 80 225" stroke="url(#engrave-depth)" stroke-width="9" stroke-linecap="square" />
+      <path d="M 440 225 L 456 225" stroke="url(#engrave-depth)" stroke-width="9" stroke-linecap="square" />
+
+      <!-- DRS Stylized Letters -->
+      <!-- D -->
+      <path d="M 112 165
+               L 175 165
+               C 200 165 214 178 214 200
+               L 214 250
+               C 214 272 200 285 175 285
+               L 112 285
+               Z
+               M 144 192
+               L 144 258
+               L 168 258
+               C 178 258 184 252 184 242
+               L 184 208
+               C 184 198 178 192 168 192
+               Z"
+            fill="url(#engrave-depth)" />
+
+      <!-- R -->
+      <path d="M 226 165
+               L 282 165
+               C 305 165 318 176 318 195
+               C 318 209 308 218 294 222
+               L 322 285
+               L 290 285
+               L 266 230
+               L 256 230
+               L 256 285
+               L 226 285
+               Z
+               M 256 190
+               L 256 210
+               L 276 210
+               C 284 210 288 206 288 200
+               C 288 194 284 190 276 190
+               Z"
+            fill="url(#engrave-depth)" />
+
+      <!-- S -->
+      <path d="M 334 260
+               L 358 260
+               C 368 260 376 256 376 248
+               C 376 240 370 236 352 232
+               C 334 227 325 220 325 204
+               C 325 180 342 165 372 165
+               L 404 165
+               L 404 190
+               L 374 190
+               C 364 190 357 194 357 201
+               C 357 207 363 211 380 215
+               C 400 220 408 230 408 246
+               C 408 270 390 285 360 285
+               L 334 285
+               Z"
+            fill="url(#engrave-depth)" />
+
+      <!-- Underline Divider -->
+      <line x1="86" y1="344" x2="434" y2="344" stroke="url(#engrave-depth)" stroke-width="4.5" stroke-linecap="round" />
+
+      <!-- DAILY.RIDE.SOUTH Laser Subtitle -->
+      <text x="260" y="388"
+            font-family="'Montserrat', 'Arial Black', sans-serif"
+            font-size="25"
+            font-weight="900"
+            font-style="italic"
+            letter-spacing="5"
+            text-anchor="middle"
+            fill="url(#engrave-depth)">
+        DAILY.RIDE.SOUTH
+      </text>
+
+      <text x="260" y="424"
+            font-family="monospace"
+            font-size="11"
+            font-weight="700"
+            letter-spacing="3"
+            text-anchor="middle"
+            fill="#3a404a"
+            opacity="0.8">
+        BRUSHED TITANIUM ALLOY • FIBER LASER ETCH
+      </text>
+    </g>
+  </g>
+
+  <!-- Tag Pill Top Left -->
+  <g transform="translate(60, 50)">
+    <rect width="180" height="34" rx="17" fill="#000" stroke="#a3e635" stroke-width="1.5" opacity="0.9" />
+    <circle cx="20" cy="17" r="5" fill="#a3e635" />
+    <text x="36" y="22" font-family="'Montserrat', sans-serif" font-size="11" font-weight="900" fill="#a3e635" letter-spacing="1.5">LASER ENGRAVING</text>
+  </g>
+
+  <!-- Precision Badge Bottom Right -->
+  <g transform="translate(560, 720)">
+    <rect width="180" height="30" rx="8" fill="#181a1e" stroke="#2b3038" stroke-width="1" />
+    <text x="90" y="19" font-family="monospace" font-size="10" font-weight="700" fill="#8b94a0" text-anchor="middle" letter-spacing="1.5">DRS MOTORSPORT CO.</text>
+  </g>
+</svg>

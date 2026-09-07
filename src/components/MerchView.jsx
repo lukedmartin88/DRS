@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot
+  collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, getDocs
 } from 'firebase/firestore';
 import {
   ShoppingBag, Package, Truck, AlertCircle, Tag,
@@ -833,7 +833,7 @@ export const AdminMerchSection = ({
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [productForm, setProductForm] = useState({
     title: '',
-    category: 'Clothing',
+    category: 'Hoodies',
     price: 25.00,
     description: '',
     image: '',
@@ -937,14 +937,21 @@ export const AdminMerchSection = ({
 
   const handleSeedDefaults = async () => {
     if (!db || !appId) return;
-    if (!window.confirm("Load official DRS default merchandise catalog into your database?")) return;
+    if (!window.confirm("Sync official DRS merchandise lineup (Laser Engraving, Vinyl Signs, Hoodie, T-Shirts, Car Stickers) to your database?")) return;
     try {
+      // Clear legacy items if any
+      const currentSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'merch_products'));
+      for (const d of currentSnap.docs) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', d.id));
+      }
+      // Seed current 5 products
       for (const p of DEFAULT_MERCH_PRODUCTS) {
         await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', p.id), p);
       }
-      alert("Default merchandise catalog loaded successfully!");
+      alert("Merchandise catalog synchronized to official 5 products successfully!");
     } catch (err) {
       console.error("Failed to seed merch:", err);
+      alert("Error syncing products: " + err.message);
     }
   };
 
@@ -1350,8 +1357,11 @@ export const AdminMerchSection = ({
                     onChange={e => setProductForm({ ...productForm, category: e.target.value })}
                     className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
                   >
-                    <option value="Clothing">Clothing</option>
-                    <option value="Decals & Banners">Decals &amp; Banners</option>
+                    <option value="Laser Engraving">Laser Engraving</option>
+                    <option value="Vinyl Signs">Vinyl Signs</option>
+                    <option value="Hoodies">Hoodies</option>
+                    <option value="T-Shirts">T-Shirts</option>
+                    <option value="Car Stickers">Car Stickers</option>
                     <option value="Accessories">Accessories</option>
                   </select>
                 </div>
@@ -1369,14 +1379,37 @@ export const AdminMerchSection = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Image URL</label>
+                <label className="block text-xs font-semibold text-zinc-400 mb-1">Image URL or Asset Path</label>
                 <input
-                  type="url"
+                  type="text"
                   value={productForm.image}
                   onChange={e => setProductForm({ ...productForm, image: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                  placeholder="/merch/hoodie.svg or https://..."
+                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none mb-2"
                 />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase self-center mr-1">Quick Select:</span>
+                  {[
+                    { label: 'Laser Engraving', path: '/merch/laser-engraving.svg' },
+                    { label: 'Vinyl Signs', path: '/merch/vinyl-signs.svg' },
+                    { label: 'Hoodie', path: '/merch/hoodie.svg' },
+                    { label: 'T-Shirts', path: '/merch/tshirt.svg' },
+                    { label: 'Car Stickers', path: '/merch/car-stickers.svg' }
+                  ].map(preset => (
+                    <button
+                      key={preset.path}
+                      type="button"
+                      onClick={() => setProductForm({ ...productForm, image: preset.path })}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all ${
+                        productForm.image === preset.path
+                          ? 'bg-lime-500 text-black border-lime-400'
+                          : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

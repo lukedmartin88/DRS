@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 900" width="100%" height="100%">
+  <defs>
+    <!-- Studio Background -->
+    <radialGradient id="tee-bg" cx="50%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#161920" />
+      <stop offset="60%" stop-color="#0c0e12" />
+      <stop offset="100%" stop-color="#050608" />
+    </radialGradient>
+
+    <!-- Cotton Fabric Gradient -->
+    <linearGradient id="cotton-base" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22262e" />
+      <stop offset="25%" stop-color="#14171d" />
+      <stop offset="70%" stop-color="#0c0e12" />
+      <stop offset="100%" stop-color="#191c24" />
+    </linearGradient>
+
+    <filter id="tee-neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#84cc16" flood-opacity="0.6" />
+      <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#84cc16" flood-opacity="0.3" />
+    </filter>
+
+    <filter id="tee-pink-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#ec4899" flood-opacity="0.7" />
+      <feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="#ec4899" flood-opacity="0.35" />
+    </filter>
+
+    <filter id="tee-drop" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="25" stdDeviation="30" flood-color="#000" flood-opacity="0.9" />
+    </filter>
+  </defs>
+
+  <!-- Studio Surface -->
+  <rect width="800" height="900" fill="url(#tee-bg)" />
+  <ellipse cx="400" cy="850" rx="320" ry="70" fill="#ec4899" opacity="0.07" />
+
+  <!-- T-SHIRT SILHOUETTE (Rear View) -->
+  <g transform="translate(100, 50)" filter="url(#tee-drop)">
+    <!-- Crewneck Ribbed Collar -->
+    <path d="M 230 40 Q 300 65 370 40 Q 300 25 230 40 Z" fill="#1b1e24" stroke="#08090c" stroke-width="2" />
+
+    <!-- Main T-Shirt Body & Sleeves -->
+    <path d="M 230 40
+             C 170 50 100 80 0 150
+             C -8 165 5 195 25 190
+             L 85 170
+             L 95 620
+             C 95 640 120 650 160 650
+             L 440 650
+             C 480 650 505 640 505 620
+             L 515 170
+             L 575 190
+             C 595 195 608 165 600 150
+             C 500 80 430 50 370 40
+             Q 300 65 230 40
+             Z"
+          fill="url(#cotton-base)" />
+
+    <!-- Sleeve Seams -->
+    <path d="M 125 100 L 85 170" stroke="#000" stroke-width="2.5" opacity="0.6" />
+    <path d="M 475 100 L 515 170" stroke="#000" stroke-width="2.5" opacity="0.6" />
+
+    <!-- Sleeve Hem Lines -->
+    <line x1="2" y1="165" x2="25" y2="190" stroke="#fff" stroke-opacity="0.1" stroke-width="1" />
+    <line x1="598" y1="165" x2="575" y2="190" stroke="#fff" stroke-opacity="0.1" stroke-width="1" />
+
+    <!-- Bottom Hem Stitching Line -->
+    <line x1="95" y1="635" x2="505" y2="635" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1" stroke-dasharray="3 3" />
+
+    <!-- Cotton Drapery / Shading Highlights -->
+    <path d="M 100 200 Q 120 400 98 620" stroke="#000000" stroke-width="3" fill="none" opacity="0.4" />
+    <path d="M 500 200 Q 480 400 502 620" stroke="#000000" stroke-width="3" fill="none" opacity="0.4" />
+
+    <!-- BACK PRINT DESIGN: DRS LOGO & FIESTA ST WITH NEON SPLATTERS -->
+    <g transform="translate(50, 95)">
+      <!-- Neon Splash Artwork Background -->
+      <path d="M 120 370 L 190 290 L 220 320 L 170 400 Z" fill="#84cc16" opacity="0.8" />
+      <polygon points="100,420 180,350 190,370 120,440" fill="#a3e635" opacity="0.85" />
+      <path d="M 320 270 L 410 200 L 430 225 L 350 300 Z" fill="#ec4899" opacity="0.85" />
+      <polygon points="310,360 410,270 425,290 340,380" fill="#ec4899" opacity="0.8" />
+      <circle cx="105" cy="360" r="6" fill="#84cc16" />
+      <circle cx="130" cy="450" r="4" fill="#a3e635" />
+      <circle cx="420" cy="240" r="5" fill="#ec4899" />
+      <circle cx="390" cy="340" r="7" fill="#ec4899" />
+
+      <!-- DRS RACING LOGO FRAME -->
+      <g filter="url(#tee-neon-glow)">
+        <path d="M 95 90
+                 L 125 60
+                 L 375 60
+                 L 405 90
+                 L 405 170
+                 L 375 200
+                 L 125 200
+                 L 95 170
+                 Z"
+              fill="none"
+              stroke="#84cc16"
+              stroke-width="7"
+              stroke-linejoin="round" />
+        <line x1="80" y1="130" x2="95" y2="130" stroke="#84cc16" stroke-width="7" />
+        <line x1="405" y1="130" x2="420" y2="130" stroke="#84cc16" stroke-width="7" />
+      </g>
+
+      <!-- DRS Letters -->
+      <!-- D -->
+      <path d="M 120 85 L 175 85 C 200 85 212 98 212 115 L 212 145 C 212 162 200 175 175 175 L 120 175 Z M 145 108 L 145 152 L 170 152 C 180 152 185 148 185 138 L 185 122 C 185 112 180 108 170 108 Z"
+            fill="#a3e635" filter="url(#tee-neon-glow)" />
+
+      <!-- R -->
+      <path d="M 210 85 L 260 85 C 280 85 292 95 292 112 C 292 125 282 135 269 138 L 299 175 L 269 175 L 246 140 L 236 140 L 236 175 L 210 175 Z M 236 105 L 236 122 L 256 122 C 262 122 266 118 266 114 C 266 109 262 105 256 105 Z"
+            fill="#ec4899" filter="url(#tee-pink-glow)" />
+
+      <!-- S -->
+      <path d="M 300 155 L 323 155 C 333 155 339 150 339 142 C 339 135 333 130 317 126 C 301 121 293 115 293 102 C 293 90 307 85 327 85 L 357 85 L 357 105 L 329 105 C 323 105 319 108 319 112 C 319 116 323 119 337 122 C 355 127 365 135 365 146 C 365 162 350 175 325 175 L 300 175 Z"
+            fill="#a3e635" filter="url(#tee-neon-glow)" />
+
+      <!-- DAILY RIDE SOUTH Subtitle -->
+      <text x="250" y="230"
+            font-family="'Montserrat', 'Arial Black', sans-serif"
+            font-size="22"
+            font-weight="900"
+            font-style="italic"
+            letter-spacing="4"
+            text-anchor="middle"
+            fill="#84cc16"
+            filter="url(#tee-neon-glow)">
+        DAILY <tspan fill="#ec4899" filter="url(#tee-pink-glow)">RIDE</tspan> SOUTH
+      </text>
+
+      <!-- FIESTA ST CAR GRAPHIC -->
+      <g transform="translate(140, 245)">
+        <!-- Car Shadow -->
+        <ellipse cx="110" cy="180" rx="120" ry="18" fill="#000" opacity="0.9" />
+
+        <!-- Roof & Windshield -->
+        <path d="M 50 70 L 80 20 L 150 20 L 180 70 Z" fill="#0b0d10" stroke="#1f242d" stroke-width="2" />
+        <path d="M 55 68 L 82 25 L 145 25 L 172 68 Z" fill="#141820" opacity="0.85" />
+        <!-- Front Bonnet / Hood -->
+        <path d="M 35 70 L 190 70 L 180 110 L 40 110 Z" fill="#141820" stroke="#84cc16" stroke-width="1.5" />
+        <!-- Honeycomb ST Grille -->
+        <polygon points="50,110 170,110 160,150 60,150" fill="#060709" stroke="#ec4899" stroke-width="1.5" />
+        <!-- ST Badge -->
+        <rect x="145" y="125" width="16" height="8" rx="2" fill="#ec4899" />
+        <text x="153" y="132" font-family="sans-serif" font-size="7" font-weight="900" fill="#fff" text-anchor="middle">ST</text>
+
+        <!-- Headlights -->
+        <polygon points="35,80 65,85 55,105 25,95" fill="#f0fdf4" stroke="#84cc16" stroke-width="2" filter="url(#tee-neon-glow)" />
+        <polygon points="185,80 155,85 165,105 195,95" fill="#f0fdf4" stroke="#84cc16" stroke-width="2" filter="url(#tee-neon-glow)" />
+
+        <!-- Front Splitter Aero Kit (Neon Lime Accent) -->
+        <path d="M 20 155 L 70 165 L 150 165 L 200 155 L 205 162 L 145 172 L 75 172 L 15 162 Z" fill="#84cc16" filter="url(#tee-neon-glow)" />
+
+        <!-- Low Profile Stance Wheels -->
+        <ellipse cx="35" cy="155" rx="18" ry="24" fill="#000" stroke="#333" stroke-width="3" />
+        <circle cx="35" cy="155" r="12" fill="#111" stroke="#ec4899" stroke-width="2" />
+        <ellipse cx="185" cy="155" rx="18" ry="24" fill="#000" stroke="#333" stroke-width="3" />
+        <circle cx="185" cy="155" r="12" fill="#ec4899" stroke="#84cc16" stroke-width="2" />
+      </g>
+    </g>
+  </g>
+
+  <!-- Tag Pill Top Left -->
+  <g transform="translate(50, 45)">
+    <rect width="140" height="34" rx="17" fill="#000000" stroke="#a3e635" stroke-width="1.5" opacity="0.95" />
+    <circle cx="18" cy="17" r="5" fill="#a3e635" />
+    <text x="34" y="22" font-family="'Montserrat', sans-serif" font-size="11" font-weight="900" fill="#a3e635" letter-spacing="1.5">T-SHIRTS</text>
+  </g>
+
+  <!-- Fabric Specs Bottom -->
+  <g transform="translate(510, 835)">
+    <rect width="240" height="28" rx="6" fill="#101216" stroke="#222730" stroke-width="1" />
+    <text x="120" y="18" font-family="monospace" font-size="10" font-weight="700" fill="#9ca3af" text-anchor="middle" letter-spacing="1.5">100% RINGSPUN COMBED COTTON</text>
+  </g>
+</svg>
