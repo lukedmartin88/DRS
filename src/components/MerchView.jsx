@@ -210,6 +210,24 @@ export const MerchStoreView = ({
     setIsSubmitting(false);
   };
 
+  // Lock body scroll and listen for Escape key when order modal is open
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        closeOrderModal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [selectedProduct]);
+
   // Customer photo upload handler (with Firebase Storage and dataURL fallback)
   const handleCustomerImageUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -732,14 +750,32 @@ export const MerchStoreView = ({
 
       {/* Order Modal with SumUp Checkout */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl my-8">
-            <button
-              onClick={closeOrderModal}
-              className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div
+          id="order-modal-backdrop"
+          onClick={(e) => {
+            if (e.target.id === 'order-modal-backdrop') {
+              closeOrderModal();
+            }
+          }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 md:p-8 overscroll-contain animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl p-5 sm:p-8 shadow-2xl my-3 sm:my-6 flex flex-col"
+          >
+            {/* Sticky Floating Exit Bar - ALWAYS visible regardless of scroll position */}
+            <div className="sticky top-0 -mt-2 -mr-2 sm:-mt-4 sm:-mr-4 pt-1 pr-1 flex justify-end z-30 pointer-events-none mb-1">
+              <button
+                type="button"
+                onClick={closeOrderModal}
+                className="pointer-events-auto p-2 sm:p-2.5 rounded-2xl bg-zinc-900/95 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-700 shadow-xl transition-all flex items-center gap-1.5 text-xs font-bold active:scale-95 cursor-pointer"
+                title="Exit (Esc or Click outside)"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4 text-zinc-300" />
+                <span className="text-[11px] uppercase tracking-wider font-extrabold pr-0.5">Exit</span>
+              </button>
+            </div>
 
             {completedOrder ? (
               /* Order Completed Screen */
@@ -919,14 +955,19 @@ export const MerchStoreView = ({
 
                 <div className="flex justify-between items-center pt-2 text-xs">
                   <button
+                    type="button"
                     onClick={() => setSumupCheckoutId(null)}
                     className="text-zinc-400 hover:text-white transition-colors underline flex items-center gap-1"
                   >
                     <ChevronLeft className="w-4 h-4" /> Change Order Details
                   </button>
-                  <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider">
-                    Secured by SumUp Gateway
-                  </span>
+                  <button
+                    type="button"
+                    onClick={closeOrderModal}
+                    className="text-zinc-400 hover:text-rose-400 transition-colors uppercase font-bold text-[11px] tracking-wider"
+                  >
+                    Cancel &amp; Exit
+                  </button>
                 </div>
               </div>
             ) : (
@@ -1457,17 +1498,26 @@ export const MerchStoreView = ({
                       </span>
                     </div>
 
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-xl shadow-amber-500/20 active:scale-[0.99] flex items-center justify-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting Custom Quote...</>
-                      ) : (
-                        <><Sparkles className="w-4 h-4" /> Submit Custom Design Request (POA)</>
-                      )}
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={closeOrderModal}
+                        className="px-5 py-3.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold uppercase tracking-wider text-xs transition-colors"
+                      >
+                        Exit
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-xl shadow-amber-500/20 active:scale-[0.99] flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting Custom Quote...</>
+                        ) : (
+                          <><Sparkles className="w-4 h-4" /> Submit Custom Design Request (POA)</>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="border-t border-zinc-800 pt-4 space-y-3">
@@ -1500,17 +1550,26 @@ export const MerchStoreView = ({
                       </span>
                     </div>
 
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-xl shadow-lime-500/20 active:scale-[0.99] flex items-center justify-center gap-2"
-                    >
-                      {isSubmitting ? (
-                        <><RefreshCw className="w-4 h-4 animate-spin" /> Preparing Checkout...</>
-                      ) : (
-                        <><ShoppingBag className="w-4 h-4" /> Pay £{grandTotal.toFixed(2)} via SumUp</>
-                      )}
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={closeOrderModal}
+                        className="px-5 py-3.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold uppercase tracking-wider text-xs transition-colors"
+                      >
+                        Exit
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="flex-1 bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-xl shadow-lime-500/20 active:scale-[0.99] flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <><RefreshCw className="w-4 h-4 animate-spin" /> Preparing Checkout...</>
+                        ) : (
+                          <><ShoppingBag className="w-4 h-4" /> Pay £{grandTotal.toFixed(2)} via SumUp</>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
               </form>
@@ -1547,10 +1606,9 @@ export const AdminMerchSection = ({
   const [isCreatingDesign, setIsCreatingDesign] = useState(false);
   const [designForm, setDesignForm] = useState({
     title: '',
-    category: 'Cyberpunk & Drift',
-    description: '',
+    category: 'Custom Graphics',
     image: '/merch/designs/neon-drift.svg',
-    tag: 'Popular'
+    tag: ''
   });
   const [isSavingDesign, setIsSavingDesign] = useState(false);
   const [designSaveError, setDesignSaveError] = useState('');
@@ -1559,6 +1617,29 @@ export const AdminMerchSection = ({
   const [designImageProgress, setDesignImageProgress] = useState(0);
   const [designImageError, setDesignImageError] = useState('');
   const designFileInputRef = useRef(null);
+
+  // Bulk Design Upload State
+  const [isBulkUploading, setIsBulkUploading] = useState(false);
+  const [bulkQueue, setBulkQueue] = useState([]); // [{ id, file, preview, title }]
+  const [bulkCategory, setBulkCategory] = useState('Custom Graphics');
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkSuccess, setBulkSuccess] = useState('');
+  const bulkFileInputRef = useRef(null);
+
+  // Escape key handler for admin modals
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (isBulkUploading && !isProcessingBulk) setIsBulkUploading(false);
+        if (isCreatingDesign && !isSavingDesign) { setIsCreatingDesign(false); setEditingDesign(null); }
+        if (isCreatingProduct && !isSavingProduct) { setIsCreatingProduct(false); setEditingProduct(null); }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBulkUploading, isProcessingBulk, isCreatingDesign, isSavingDesign, isCreatingProduct, isSavingProduct]);
   
   // Product edit / create modal
   const [editingProduct, setEditingProduct] = useState(null);
@@ -1913,11 +1994,11 @@ export const AdminMerchSection = ({
     setIsSavingDesign(true);
     const targetId = editingDesign?.id || `drs-design-${Date.now()}`;
 
+    // Leave out description as requested, only store title, category, badge, image
     const designPayload = {
       id: targetId,
       title: designForm.title.trim(),
-      category: designForm.category || 'Cyberpunk & Drift',
-      description: (designForm.description || '').trim(),
+      category: designForm.category || 'Custom Graphics',
       image: designForm.image || '/merch/designs/neon-drift.svg',
       tag: (designForm.tag || '').trim(),
       updatedAt: new Date().toISOString()
@@ -1965,6 +2046,142 @@ export const AdminMerchSection = ({
       console.error("Failed to delete design:", err);
       alert("Error deleting design: " + err.message);
     }
+  };
+
+  // Convert raw filename to clean display title (e.g. "kanjo_drift_spec.png" -> "Kanjo Drift Spec")
+  const formatTitleFromFileName = (fileName) => {
+    if (!fileName) return 'Custom Design';
+    const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
+    const cleanWords = nameWithoutExt.replace(/[_-]+/g, " ").trim();
+    return cleanWords
+      .split(/\s+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ") || "Custom Design";
+  };
+
+  // Handle multi-file selection for bulk design uploads
+  const handleBulkFilesSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setBulkError('');
+    setBulkSuccess('');
+
+    const newItems = files.map((file, idx) => {
+      const id = `bulk-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`;
+      const title = formatTitleFromFileName(file.name);
+      let preview;
+      try {
+        preview = URL.createObjectURL(file);
+      } catch {
+        preview = '';
+      }
+      return {
+        id,
+        file,
+        preview,
+        title
+      };
+    });
+
+    setBulkQueue(prev => [...prev, ...newItems]);
+    if (e.target) e.target.value = '';
+  };
+
+  const handleUpdateBulkTitle = (id, newTitle) => {
+    setBulkQueue(prev => prev.map(item => item.id === id ? { ...item, title: newTitle } : item));
+  };
+
+  const handleRemoveBulkItem = (id) => {
+    setBulkQueue(prev => prev.filter(item => item.id !== id));
+  };
+
+  // Upload and persist all queued design variations (with titles only, omitting descriptions)
+  const handleProcessBulkUpload = async () => {
+    if (!bulkQueue.length) {
+      setBulkError("Please select at least one design image to upload.");
+      return;
+    }
+
+    if (!db || !appId) {
+      setBulkError("Database connection is not available.");
+      return;
+    }
+
+    setIsProcessingBulk(true);
+    setBulkError('');
+    setBulkSuccess('');
+    setBulkProgress(0);
+
+    const savedDesigns = [];
+    let completedCount = 0;
+
+    for (let i = 0; i < bulkQueue.length; i++) {
+      const item = bulkQueue[i];
+      const designId = `drs-design-${Date.now()}-${i}`;
+      const title = (item.title && item.title.trim()) || formatTitleFromFileName(item.file.name);
+
+      try {
+        let imageUrl = '';
+        if (storage) {
+          try {
+            const cleanFileName = item.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const storagePath = `merch/designs/${Date.now()}_${i}_${cleanFileName}`;
+            const imageRef = ref(storage, storagePath);
+            const uploadRes = await uploadBytesResumable(imageRef, item.file);
+            imageUrl = await getDownloadURL(uploadRes.ref);
+          } catch (storageErr) {
+            console.warn("Storage upload failed, falling back to dataURL:", storageErr);
+            imageUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = () => resolve('/merch/designs/neon-drift.svg');
+              reader.readAsDataURL(item.file);
+            });
+          }
+        } else {
+          imageUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => resolve('/merch/designs/neon-drift.svg');
+            reader.readAsDataURL(item.file);
+          });
+        }
+
+        // Schema leaves out description, just includes title, category, and image
+        const payload = {
+          id: designId,
+          title: title,
+          category: bulkCategory || 'Custom Graphics',
+          image: imageUrl,
+          updatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_designs', designId),
+          payload,
+          { merge: true }
+        );
+
+        savedDesigns.push(payload);
+        completedCount++;
+        setBulkProgress(completedCount);
+      } catch (err) {
+        console.error(`Error saving design variation ${item.title}:`, err);
+      }
+    }
+
+    setGalleryDesigns(prev => [...savedDesigns, ...prev]);
+    setIsProcessingBulk(false);
+    setBulkSuccess(`Successfully uploaded and added ${completedCount} design variations!`);
+
+    setTimeout(() => {
+      setIsBulkUploading(false);
+      setBulkQueue([]);
+      setBulkSuccess('');
+      setBulkProgress(0);
+    }, 1200);
   };
 
   const handleSeedDefaultDesigns = async () => {
@@ -2128,7 +2345,7 @@ export const AdminMerchSection = ({
         )}
 
         {activeTab === 'designs' && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
               onClick={handleSeedDefaultDesigns}
@@ -2139,22 +2356,34 @@ export const AdminMerchSection = ({
             <button
               type="button"
               onClick={() => {
+                setBulkQueue([]);
+                setBulkError('');
+                setBulkSuccess('');
+                setBulkProgress(0);
+                setIsBulkUploading(true);
+              }}
+              className="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white font-black px-3.5 py-2 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5"
+            >
+              <UploadCloud className="w-4 h-4" /> Bulk Upload Designs
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setEditingDesign(null);
                 setDesignForm({
                   title: '',
-                  category: 'Cyberpunk & Drift',
-                  description: '',
+                  category: 'Custom Graphics',
                   image: '/merch/designs/neon-drift.svg',
-                  tag: 'New'
+                  tag: ''
                 });
                 setDesignSaveError('');
                 setDesignSaveSuccess('');
                 setDesignImageError('');
                 setIsCreatingDesign(true);
               }}
-              className="bg-lime-500 hover:bg-lime-400 text-black font-black px-4 py-2 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-1.5"
+              className="bg-lime-500 hover:bg-lime-400 text-black font-black px-3.5 py-2 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-1.5"
             >
-              <Plus className="w-4 h-4" /> Add Gallery Design
+              <Plus className="w-4 h-4" /> Add Single Design
             </button>
           </div>
         )}
@@ -2535,12 +2764,9 @@ export const AdminMerchSection = ({
                   </div>
                   <div className="space-y-1 overflow-hidden flex-1 min-w-0">
                     <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 block">
-                      {des.category}
+                      {des.category || 'Custom Graphics'}
                     </span>
                     <h4 className="text-white font-black text-sm truncate">{des.title}</h4>
-                    <p className="text-zinc-400 text-xs line-clamp-2 leading-relaxed">
-                      {des.description || 'Preloaded garment design graphic'}
-                    </p>
                   </div>
                 </div>
 
@@ -2555,8 +2781,7 @@ export const AdminMerchSection = ({
                         setEditingDesign(des);
                         setDesignForm({
                           title: des.title,
-                          category: des.category || 'Cyberpunk & Drift',
-                          description: des.description || '',
+                          category: des.category || 'Custom Graphics',
                           image: des.image || '',
                           tag: des.tag || ''
                         });
@@ -2588,9 +2813,22 @@ export const AdminMerchSection = ({
 
       {/* Product Edit / Create Modal */}
       {isCreatingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
-          <div className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl my-8">
+        <div
+          id="product-modal-backdrop"
+          onClick={(e) => {
+            if (e.target.id === 'product-modal-backdrop') {
+              setIsCreatingProduct(false);
+              setEditingProduct(null);
+            }
+          }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl my-4 sm:my-8"
+          >
             <button
+              type="button"
               onClick={() => { setIsCreatingProduct(false); setEditingProduct(null); }}
               className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white"
             >
@@ -2919,9 +3157,22 @@ export const AdminMerchSection = ({
 
       {/* Design Gallery Edit / Create Modal */}
       {isCreatingDesign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
-          <div className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl my-8">
+        <div
+          id="design-modal-backdrop"
+          onClick={(e) => {
+            if (e.target.id === 'design-modal-backdrop' && !isSavingDesign) {
+              setIsCreatingDesign(false);
+              setEditingDesign(null);
+            }
+          }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl my-4 sm:my-8"
+          >
             <button
+              type="button"
               onClick={() => { setIsCreatingDesign(false); setEditingDesign(null); }}
               className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white"
             >
@@ -3078,17 +3329,6 @@ export const AdminMerchSection = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Design Description</label>
-                <textarea
-                  rows={2}
-                  value={designForm.description}
-                  onChange={e => setDesignForm({ ...designForm, description: e.target.value })}
-                  placeholder="Design aesthetic, print position, color accents..."
-                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                />
-              </div>
-
               {designSaveError && (
                 <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
@@ -3124,6 +3364,229 @@ export const AdminMerchSection = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Design Variations Upload Modal */}
+      {isBulkUploading && (
+        <div
+          id="bulk-design-modal-backdrop"
+          onClick={(e) => {
+            if (e.target.id === 'bulk-design-modal-backdrop' && !isProcessingBulk) {
+              setIsBulkUploading(false);
+            }
+          }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl my-4 sm:my-8 space-y-6"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 pb-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-pink-400 block mb-1">
+                  Design Variations Catalog
+                </span>
+                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <UploadCloud className="w-6 h-6 text-lime-400" />
+                  Bulk Upload Design Variations
+                </h3>
+                <p className="text-zinc-400 text-xs mt-1">
+                  Select multiple design graphics at once. Titles are auto-generated from file names and can be customized below. Descriptions are left out as requested.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={isProcessingBulk}
+                onClick={() => setIsBulkUploading(false)}
+                className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Batch Category Selector */}
+            <div>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5 uppercase tracking-wider">
+                Category for this batch:
+              </label>
+              <select
+                value={bulkCategory}
+                onChange={(e) => setBulkCategory(e.target.value)}
+                disabled={isProcessingBulk}
+                className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+              >
+                <option value="Custom Graphics">Custom Graphics</option>
+                <option value="Cyberpunk & Drift">Cyberpunk & Drift</option>
+                <option value="JDM Heritage">JDM Heritage</option>
+                <option value="Engineering & Tech">Engineering & Tech</option>
+                <option value="Retro Motorsport">Retro Motorsport</option>
+              </select>
+            </div>
+
+            {/* Hidden multi-file input */}
+            <input
+              type="file"
+              ref={bulkFileInputRef}
+              onChange={handleBulkFilesSelect}
+              multiple
+              accept="image/*"
+              className="hidden"
+            />
+
+            {/* File Drop / Select Area */}
+            <div
+              onClick={() => {
+                if (!isProcessingBulk) bulkFileInputRef.current?.click();
+              }}
+              className="border-2 border-dashed border-zinc-700 hover:border-lime-500/70 bg-black/50 hover:bg-black/80 rounded-2xl p-6 text-center cursor-pointer transition-all group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-zinc-900 group-hover:bg-lime-500/10 border border-zinc-800 group-hover:border-lime-500/30 text-zinc-400 group-hover:text-lime-400 flex items-center justify-center mx-auto mb-3 transition-colors">
+                <UploadCloud className="w-6 h-6" />
+              </div>
+              <p className="text-white text-sm font-bold">
+                Click to browse &amp; select multiple design image files
+              </p>
+              <p className="text-zinc-500 text-xs mt-1">
+                Supports PNG, JPG, WEBP, SVG • Select 1, 5, 10, or more graphics together
+              </p>
+            </div>
+
+            {/* Queue List */}
+            {bulkQueue.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                    Selected Designs to Upload ({bulkQueue.length}):
+                  </h4>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={isProcessingBulk}
+                      onClick={() => bulkFileInputRef.current?.click()}
+                      className="text-xs text-lime-400 hover:underline font-bold"
+                    >
+                      + Add More Files
+                    </button>
+                    <span className="text-zinc-700">•</span>
+                    <button
+                      type="button"
+                      disabled={isProcessingBulk}
+                      onClick={() => setBulkQueue([])}
+                      className="text-xs text-rose-400 hover:underline"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 divide-y divide-zinc-800/40">
+                  {bulkQueue.map((item) => (
+                    <div
+                      key={item.id}
+                      className="pt-2.5 flex items-center gap-3 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5"
+                    >
+                      <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-black border border-zinc-700 shrink-0">
+                        {item.preview ? (
+                          <img
+                            src={item.preview}
+                            alt="preview"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                            <ImageIcon className="w-5 h-5" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <label className="block text-[10px] uppercase font-bold text-zinc-400 mb-0.5">
+                          Design Title (Required):
+                        </label>
+                        <input
+                          type="text"
+                          value={item.title}
+                          disabled={isProcessingBulk}
+                          onChange={(e) => handleUpdateBulkTitle(item.id, e.target.value)}
+                          placeholder="e.g. Neon Horizon"
+                          className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg px-2.5 py-1.5 text-xs focus:border-lime-500 outline-none"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={isProcessingBulk}
+                        onClick={() => handleRemoveBulkItem(item.id)}
+                        className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-rose-400 transition-colors shrink-0"
+                        title="Remove from batch"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Error and Success Banners */}
+            {bulkError && (
+              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{bulkError}</span>
+              </div>
+            )}
+
+            {bulkSuccess && (
+              <div className="bg-lime-500/10 border border-lime-500/30 rounded-xl p-3 text-lime-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{bulkSuccess}</span>
+              </div>
+            )}
+
+            {/* Upload Progress Bar */}
+            {isProcessingBulk && (
+              <div className="space-y-1.5 bg-black/60 p-3 rounded-xl border border-zinc-800">
+                <div className="flex justify-between text-xs text-zinc-300 font-bold">
+                  <span>Saving Designs to Gallery...</span>
+                  <span className="font-mono text-lime-400">{bulkProgress} / {bulkQueue.length}</span>
+                </div>
+                <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-pink-500 to-lime-400 h-2 rounded-full transition-all duration-300"
+                    style={{
+                      width: `${bulkQueue.length ? Math.round((bulkProgress / bulkQueue.length) * 100) : 0}%`
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Footer Buttons */}
+            <div className="flex gap-3 pt-2 border-t border-zinc-800/80">
+              <button
+                type="button"
+                disabled={isProcessingBulk}
+                onClick={() => setIsBulkUploading(false)}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white font-black py-3.5 rounded-xl uppercase tracking-wider text-xs transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isProcessingBulk || bulkQueue.length === 0}
+                onClick={handleProcessBulkUpload}
+                className="flex-1 bg-gradient-to-r from-pink-500 to-lime-400 hover:from-pink-400 hover:to-lime-300 disabled:opacity-50 text-black font-black py-3.5 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2 transition-all"
+              >
+                {isProcessingBulk ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Uploading ({bulkProgress}/{bulkQueue.length})...</>
+                ) : (
+                  <><Save className="w-4 h-4" /> Upload &amp; Save All ({bulkQueue.length}) Designs</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
