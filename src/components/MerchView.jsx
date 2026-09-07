@@ -381,6 +381,8 @@ export const MerchStoreView = ({
               <img
                 src={product.image}
                 alt={product.title}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
@@ -546,6 +548,8 @@ export const MerchStoreView = ({
                   <img
                     src={selectedProduct.image}
                     alt={selectedProduct.title}
+                    loading="lazy"
+                    decoding="async"
                     className="w-20 h-20 md:w-24 md:h-24 rounded-2xl object-cover border border-zinc-800 shrink-0"
                   />
                   <div className="space-y-1">
@@ -1249,6 +1253,8 @@ export const AdminMerchSection = ({
                   <img
                     src={p.image}
                     alt={p.title}
+                    loading="lazy"
+                    decoding="async"
                     className="w-16 h-16 rounded-xl object-cover border border-zinc-800 shrink-0"
                   />
                   <div className="space-y-0.5 overflow-hidden">

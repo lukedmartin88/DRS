@@ -173,7 +173,9 @@ const compressImageFromUrl = async (url, maxWidth = 1080, maxHeight = 1080, qual
   }
 };
 
-const DEFAULT_AVATAR = "https://i.ibb.co/RTHHJ3JW/PROFILE-PIC.png";
+const CLUB_LOGO = "/club-logo.webp";
+const CLUB_HERO = "/club-hero.webp";
+const DEFAULT_AVATAR = "/default-avatar.webp";
 const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
 
 // --- GLOBAL ROBUST TICKET AGGREGATOR ---
@@ -279,7 +281,7 @@ const EventListTile = ({ event, onEdit }) => (
   </div>
 );
 
-const ImageUpload = ({ label, onUploadSuccess, className }) => {
+const ImageUpload = ({ label, onUploadSuccess, className, maxWidth = 1080, maxHeight = 1080, quality = 0.8 }) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
@@ -297,7 +299,7 @@ const ImageUpload = ({ label, onUploadSuccess, className }) => {
     setProgress(0);
     setStatusText('Compressing...');
     try {
-      const compressedFile = await compressImage(file, 1080, 1080, 0.8);
+      const compressedFile = await compressImage(file, maxWidth, maxHeight, quality);
       setStatusText('Uploading...');
       const storageRef = ref(storage, `artifacts/${appId}/users/${auth.currentUser.uid}/uploads/${Date.now()}_${compressedFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`);
       const uploadTask = uploadBytesResumable(storageRef, compressedFile);
@@ -530,12 +532,15 @@ const SplashView = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4 relative overflow-hidden selection:bg-lime-500/30 selection:text-lime-200">
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center opacity-20 blur-sm scale-105"></div>
+      <div className="absolute inset-0 bg-[url('/club-hero.webp')] bg-cover bg-center opacity-25 blur-sm scale-105"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-zinc-950/40"></div>
       <div className="relative z-10 w-full max-w-md bg-black/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-800 shadow-2xl shadow-lime-500/10 animate-in zoom-in-95 duration-700">
         <div className="flex flex-col items-center mb-8">
           <img 
-            src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" 
+            src={CLUB_LOGO} 
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
             className="w-36 h-36 md:w-40 md:h-40 rounded-3xl object-cover border-2 border-lime-500/40 shadow-2xl shadow-lime-500/25" 
             alt="Daily Ride South Logo" 
           />
@@ -687,7 +692,7 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
         <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Back
       </button>
       <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 flex flex-col md:flex-row gap-6 items-start shadow-2xl">
-        <img src={member.avatar || DEFAULT_AVATAR} alt={member.name} className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800" />
+        <img src={member.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" alt={member.name} className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800" />
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
             {member.name || 'Pending Setup'}
@@ -722,7 +727,7 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
         {cars.map((car, idx) => (
           <div key={idx} onClick={() => onCarClick(car)} className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-lime-500 transition-all transform hover:-translate-y-1 group">
             <div className="h-64 overflow-hidden relative">
-              <img src={car.image || DEFAULT_CAR} alt={`${car.make} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={car.image || DEFAULT_CAR} loading="lazy" decoding="async" alt={`${car.make} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
               <div className="absolute bottom-4 left-4 right-4">
                 <div className="flex justify-between items-end mb-1">
@@ -764,9 +769,9 @@ const CarGalleryModal = ({ viewingCar, onClose }) => {
           {viewingCar.mods && <p className="text-lime-400 mt-4 text-sm font-medium">Mods: <span className="text-zinc-300 font-normal">{viewingCar.mods}</span></p>}
         </div>
         <div className="space-y-8">
-          <img src={viewingCar.image || DEFAULT_CAR} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt="Main vehicle profile" />
+          <img src={viewingCar.image || DEFAULT_CAR} loading="lazy" decoding="async" className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt="Main vehicle profile" />
           {viewingCar.gallery && viewingCar.gallery.map((img, i) => (
-            <img key={i} src={img} className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt={`Gallery item ${i+1}`} />
+            <img key={i} src={img} loading="lazy" decoding="async" className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt={`Gallery item ${i+1}`} />
           ))}
           {(!viewingCar.gallery || viewingCar.gallery.length === 0) && viewingCar.image && (
             <p className="text-zinc-600 text-center uppercase tracking-[0.3em] text-xs font-bold py-16">End of Gallery</p>
@@ -786,8 +791,9 @@ const EnlargedImageModal = ({ imageObj, onClose, onMemberClick }) => {
       </button>
       <div className="relative max-w-full max-h-full flex flex-col items-center">
         <div className="relative group overflow-hidden rounded-2xl border border-zinc-800 shadow-2xl">
-          <img src={imageObj.url} alt={imageObj.carName} className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
-<div onClick={() => onMemberClick(imageObj.member)} className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-lime-500 hover:text-black transition-all cursor-pointer group/member z-[130] shadow-2xl">            <img src={imageObj.member.avatar || DEFAULT_AVATAR} className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
+          <img src={imageObj.url} loading="lazy" decoding="async" alt={imageObj.carName} className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
+          <div onClick={() => onMemberClick(imageObj.member)} className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-lime-500 hover:text-black transition-all cursor-pointer group/member z-[130] shadow-2xl">
+            <img src={imageObj.member.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
             <div className="flex flex-col">
               <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member.name || 'Pending Setup'}</span>
               <span className="text-white/60 group-hover/member:text-white/80 text-[8px] uppercase font-bold tracking-widest mt-1">View Garage</span>
@@ -906,10 +912,24 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
         }
       `}</style>
       
-      <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center">
-        <img src="https://i.ibb.co/dwGFSkDT/Whats-App-Image-2026-05-10-at-4.jpg" alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" />
+      <div className="w-full h-64 md:h-96 rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 mb-6 relative group flex items-center justify-center bg-zinc-950">
+        <img 
+          src={CLUB_HERO} 
+          alt="Daily Ride South Club Meet" 
+          loading="eager" 
+          fetchPriority="high" 
+          decoding="async" 
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-black/40 to-black/20"></div>
-        <img src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-2xl" alt="Daily Ride South Logo" />
+        <img 
+          src={CLUB_LOGO} 
+          loading="eager" 
+          fetchPriority="high" 
+          decoding="async" 
+          className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-2xl" 
+          alt="Daily Ride South Logo" 
+        />
       </div>
       
       <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner mb-10">
@@ -936,11 +956,23 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
       
       {spotlightMember && (
         <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => onMemberClick(spotlightMember)}>
-          <img src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt="" />
+          <img 
+            src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} 
+            loading="lazy" 
+            decoding="async" 
+            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+            alt="" 
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
           <div className="absolute top-4 right-4 bg-lime-500 text-black text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">{isBirthdaySpotlight ? '🎉 Happy Birthday! 🎂' : 'Member Spotlight'}</div>
           <div className="absolute bottom-6 left-6 flex items-center gap-4">
-            <img src={spotlightMember.avatar || DEFAULT_AVATAR} className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" alt="" />
+            <img 
+              src={spotlightMember.avatar || DEFAULT_AVATAR} 
+              loading="lazy" 
+              decoding="async" 
+              className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" 
+              alt="" 
+            />
             <div>
               <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name || 'Pending Setup'} {isBirthdaySpotlight && '🎂'}</h3>
               {spotlightMember.nickname && <p className="text-lime-400 italic text-lg md:text-xl font-medium mt-1">"{spotlightMember.nickname}"</p>}
@@ -959,11 +991,11 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
           {mosaicSlots.map((slot, i) => (
             <div key={i} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-lime-500 transition-colors group relative bg-zinc-900 shadow-inner">
               {slot.previous && (
-                <img src={slot.previous.url} className="absolute inset-0 w-full h-full object-cover" alt="" />
+                <img src={slot.previous.url} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" alt="" />
               )}
               {slot.current && (
                 <div key={slot.fadeKey} onClick={() => onImageClick(slot.current)} className="absolute inset-0 w-full h-full mosaic-fade-in z-10">
-                  <img src={slot.current.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
+                  <img src={slot.current.url} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
                 </div>
               )}
             </div>
@@ -1047,12 +1079,15 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
           return (
             <div key={event.id} className="bg-zinc-900 rounded-2xl overflow-hidden shadow-xl border border-zinc-800 flex flex-col transition-all hover:shadow-lime-500/10 hover:border-zinc-700">
               <div className="h-48 overflow-hidden shrink-0 relative group">
-<img 
-  src={event.image || DEFAULT_CAR} 
-  onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_CAR; }} 
-  alt={event.title} 
-  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-/>                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
+                <img 
+                  src={event.image || DEFAULT_CAR} 
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_CAR; }} 
+                  alt={event.title} 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent"></div>
               </div>
               <div className="p-6 flex flex-col flex-grow">
                 <h3 className="text-2xl font-black text-white mb-3 uppercase tracking-tighter leading-tight">{event.title}</h3>
@@ -1108,7 +1143,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                     </p>
                     <div className="flex -space-x-3 overflow-hidden p-1">
                       {attendeeMembers.slice(0, 6).map(m => (
-                        <img key={m.id} src={m.avatar || DEFAULT_AVATAR} title={m.name || 'Pending Setup'} onClick={(e) => { e.stopPropagation(); onMemberClick(m); }} className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover cursor-pointer hover:scale-110 transition-transform relative z-10 hover:z-20 shadow-lg" alt="avatar" />
+                        <img key={m.id} src={m.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" title={m.name || 'Pending Setup'} onClick={(e) => { e.stopPropagation(); onMemberClick(m); }} className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover cursor-pointer hover:scale-110 transition-transform relative z-10 hover:z-20 shadow-lg" alt="avatar" />
                       ))}
                       {attendeeMembers.length > 6 && (
                         <div className="flex items-center justify-center h-10 w-10 rounded-full ring-2 ring-zinc-900 bg-zinc-800 text-xs font-bold text-white z-10">
@@ -1162,7 +1197,7 @@ const MembersView = ({ members, onMemberClick }) => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {members.map(member => (
           <div key={member.id} onClick={() => onMemberClick(member)} className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 hover:border-lime-500 hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-4">
-            <img src={member.avatar || DEFAULT_AVATAR} alt={member.name} className="w-16 h-16 rounded-full object-cover" />
+            <img src={member.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" alt={member.name} className="w-16 h-16 rounded-full object-cover" />
             <div>
               <h3 className="text-lg font-bold text-white leading-tight">
                 {member.name || 'Pending Setup'}
@@ -1277,6 +1312,8 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
       <div className="relative h-52 overflow-hidden shrink-0">
         <img
           src={raffle.image || DEFAULT_CAR}
+          loading="lazy"
+          decoding="async"
           alt={raffle.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
@@ -1310,6 +1347,8 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
                 <img
                   key={m.id}
                   src={m.avatar || DEFAULT_AVATAR}
+                  loading="lazy"
+                  decoding="async"
                   title={`${m.name} : ${m.ticketCount} ticket${m.ticketCount !== 1 ? 's' : ''}`}
                   className="w-7 h-7 rounded-full border-2 border-zinc-900 object-cover relative z-10"
                   alt=""
@@ -1442,6 +1481,8 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                   key={activeImg}
                   src={galleryImages[activeImg]}
                   alt="Prize"
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover animate-in fade-in duration-500"
                 />
               ) : (
@@ -1487,7 +1528,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                       activeImg === i ? 'border-lime-500 opacity-100' : 'border-zinc-700 opacity-50 hover:opacity-75'
                     }`}
                   >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <img src={img} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -1533,7 +1574,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
               <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
                 {allReservedList.map((m) => (
                   <div key={m.id} className="flex items-center gap-2 bg-black/50 rounded-xl p-2 border border-zinc-800/50">
-                    <img src={m.avatar || DEFAULT_AVATAR} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
+                    <img src={m.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
                     <div className="min-w-0">
                       <p className="text-white text-xs font-bold truncate">{m.name}</p>
                       <p className="text-pink-500 text-[9px] font-black uppercase tracking-widest">
@@ -1900,9 +1941,9 @@ const ProfileView = ({ user, userProfile }) => {
         <div className="flex flex-col md:flex-row gap-8 items-start">
           <div className="w-full md:w-1/3 space-y-4 shrink-0">
             <div className="aspect-square rounded-2xl overflow-hidden border-2 border-zinc-800 bg-black relative group">
-              <img src={profileData.avatar || DEFAULT_AVATAR} className="w-full h-full object-cover" alt="Profile" />
+              <img src={profileData.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="Profile" />
             </div>
-            <ImageUpload label="Update Profile Picture" onUploadSuccess={(url) => setProfileData({...profileData, avatar: url})} />
+            <ImageUpload label="Update Profile Picture" maxWidth={360} maxHeight={360} quality={0.8} onUploadSuccess={(url) => setProfileData({...profileData, avatar: url})} />
           </div>
           
           <div className="w-full flex-grow space-y-4">
@@ -1959,7 +2000,7 @@ const ProfileView = ({ user, userProfile }) => {
                 <div className="grid md:grid-cols-2 gap-8 border-t border-zinc-800 pt-6">
                   <div>
                     <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3">Main Cover Image</p>
-                    {car.image && <img src={car.image} className="w-full h-40 object-cover rounded-xl mb-3 border border-zinc-800" alt="Main Car" />}
+                    {car.image && <img src={car.image} loading="lazy" decoding="async" className="w-full h-40 object-cover rounded-xl mb-3 border border-zinc-800" alt="Main Car" />}
                     <ImageUpload label="Upload Main Image" onUploadSuccess={url => { const c = [...profileData.cars]; c[idx].image = url; setProfileData({...profileData, cars: c}); }} />
                   </div>
                   <div>
@@ -1967,7 +2008,7 @@ const ProfileView = ({ user, userProfile }) => {
                     <div className="grid grid-cols-3 gap-2 mb-3">
                       {(car.gallery || []).map((img, gIdx) => (
                         <div key={gIdx} className="relative group aspect-square rounded-lg overflow-hidden border border-zinc-800">
-                          <img src={img} className="w-full h-full object-cover" alt="Gallery" />
+                          <img src={img} loading="lazy" decoding="async" className="w-full h-full object-cover" alt="Gallery" />
                           <button onClick={() => { const c = [...profileData.cars]; c[idx].gallery.splice(gIdx, 1); setProfileData({...profileData, cars: c}); }} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <Trash2 className="w-5 h-5 text-red-500" />
                           </button>
@@ -2001,6 +2042,8 @@ const CharityView = () => {
             <div className="h-48 overflow-hidden">
               <img 
                 src={charity.image} 
+                loading="lazy"
+                decoding="async"
                 alt={charity.title} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
               />
@@ -2483,7 +2526,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
             <InputField label="External Ticket Link" value={editingEvent.link || ''} onChange={e => setEditingEvent({...editingEvent, link: e.target.value})} />
             <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
               <ImageUpload label="Update Event Poster" onUploadSuccess={url => setEditingEvent({...editingEvent, image: url})} />
-              {editingEvent.image && <img src={editingEvent.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
+              {editingEvent.image && <img src={editingEvent.image} loading="lazy" decoding="async" alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
             </div>
             <div className="md:col-span-2 space-y-1">
               <label className="block text-sm font-medium text-zinc-400">Event Description</label>
@@ -2538,11 +2581,11 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
               
               <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
                 <ImageUpload label="Update 1st Prize Image" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image: url})} />
-                {editingRaffle.image && <img src={editingRaffle.image} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
+                {editingRaffle.image && <img src={editingRaffle.image} loading="lazy" decoding="async" alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
               </div>
               <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
                 <ImageUpload label="Update 2nd Prize Image (Optional)" onUploadSuccess={url => setEditingRaffle({...editingRaffle, image2: url})} />
-                {editingRaffle.image2 && <img src={editingRaffle.image2} alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
+                {editingRaffle.image2 && <img src={editingRaffle.image2} loading="lazy" decoding="async" alt="preview" className="mt-4 h-24 rounded-lg border border-zinc-700 object-cover" />}
               </div>
               
               <div className="md:col-span-2 bg-black/50 p-4 rounded-lg border border-zinc-800/50">
@@ -2552,7 +2595,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 <div className="flex flex-wrap gap-3 mb-3">
                   {(editingRaffle.extraImages || []).map((img, i) => (
                     <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-zinc-700 group">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <img src={img} loading="lazy" decoding="async" alt="" className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setEditingRaffle(prev => ({ ...prev, extraImages: prev.extraImages.filter((_, idx) => idx !== i) }))}
@@ -2601,7 +2644,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 <div className="flex flex-wrap gap-3 mb-3">
                   {(newRaffle.extraImages || []).map((img, i) => (
                     <div key={i} className="relative w-20 h-16 rounded-lg overflow-hidden border border-zinc-700 group">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <img src={img} loading="lazy" decoding="async" alt="" className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setNewRaffle(prev => ({ ...prev, extraImages: prev.extraImages.filter((_, idx) => idx !== i) }))}
@@ -2654,7 +2697,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
         {allReservedList.map((item) => (
           <div key={item.id} className="flex items-center justify-between bg-black/50 p-2 rounded-lg border border-zinc-800/50">
             <div className="flex items-center gap-2 overflow-hidden">
-              <img src={item.avatar || DEFAULT_AVATAR} alt="" className="w-6 h-6 rounded-full object-cover shrink-0 border border-zinc-700" />
+              <img src={item.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" alt="" className="w-6 h-6 rounded-full object-cover shrink-0 border border-zinc-700" />
               <div className="min-w-0">
                 <p className="text-white text-[10px] font-bold truncate">{item.name}</p>
                 <p className="text-pink-500 text-[8px] uppercase tracking-widest">
@@ -3356,7 +3399,14 @@ const MainApp = () => {
       <header className="bg-black/90 backdrop-blur-xl border-b border-zinc-900 sticky top-0 z-50 h-20 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4 h-full flex justify-between items-center">
           <div className="flex items-center cursor-pointer select-none" onClick={() => window.location.hash = 'home'}>
-            <img src="https://i.ibb.co/hJSgsj2J/Whats-App-Image-2026-08-27-at-9-38-31-PM.jpg" className="h-12 w-12 rounded-2xl object-cover border border-zinc-800 shadow-lg shrink-0 hover:border-lime-500/40 transition-colors" alt="Daily Ride South Logo" />
+            <img 
+              src={CLUB_LOGO} 
+              loading="eager" 
+              fetchPriority="high" 
+              decoding="async" 
+              className="h-12 w-12 rounded-2xl object-cover border border-zinc-800 shadow-lg shrink-0 hover:border-lime-500/40 transition-colors" 
+              alt="Daily Ride South Logo" 
+            />
           </div>
           {!requiresProfileSetup && (
             <button onClick={() => setIsMenuOpen(true)} className="p-3 bg-zinc-900 rounded-xl border border-zinc-800 text-lime-400 hover:text-white transition-all active:scale-95 shadow-xl">
