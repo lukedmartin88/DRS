@@ -85,11 +85,16 @@ export const MerchStoreView = ({
   const [selectedDesign, setSelectedDesign] = useState(DEFAULT_GALLERY_DESIGNS[0]);
   const [hasCustomUserImage, setHasCustomUserImage] = useState(false);
   const [customUserImageUrl, setCustomUserImageUrl] = useState('');
-  const [customUserImageNotes, setCustomUserImageNotes] = useState('');
   const [isUploadingUserImage, setIsUploadingUserImage] = useState(false);
   const [userImageUploadProgress, setUserImageUploadProgress] = useState(0);
   const [userImageUploadError, setUserImageUploadError] = useState('');
   const userImageFileInputRef = useRef(null);
+
+  // Dynamic Design Extra Fees (Premade default £3, Custom default £5; customizable by admin)
+  const [merchFees, setMerchFees] = useState({
+    premadeDesignFee: 3.00,
+    customDesignFee: 5.00
+  });
 
   // Shipping Form State
   const [customerName, setCustomerName] = useState(userProfile?.name || '');
@@ -164,6 +169,25 @@ export const MerchStoreView = ({
     return () => unsub();
   }, [db, appId]);
 
+  // Sync design fees (premade £3, custom £5 by default; configured by admin)
+  useEffect(() => {
+    if (!db || !appId) return;
+    const unsub = onSnapshot(
+      doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'merchFees'),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setMerchFees({
+            premadeDesignFee: data.premadeDesignFee !== undefined ? Number(data.premadeDesignFee) : 3.00,
+            customDesignFee: data.customDesignFee !== undefined ? Number(data.customDesignFee) : 5.00
+          });
+        }
+      },
+      (err) => console.warn("Error fetching merch fees:", err)
+    );
+    return () => unsub();
+  }, [db, appId]);
+
   // Update customer name / email if userProfile changes
   useEffect(() => {
     if (userProfile?.name && !customerName) setCustomerName(userProfile.name);
@@ -199,7 +223,6 @@ export const MerchStoreView = ({
     setSelectedDesign(galleryDesigns[0] || DEFAULT_GALLERY_DESIGNS[0]);
     setHasCustomUserImage(false);
     setCustomUserImageUrl('');
-    setCustomUserImageNotes('');
     setUserImageUploadError('');
     setIsUploadingUserImage(false);
   };
@@ -307,11 +330,14 @@ export const MerchStoreView = ({
   const isSelectedProductPoa = selectedProduct && (selectedProduct.isPoa || selectedProduct.price === 0);
   const isApparel = isApparelCustomizable(selectedProduct);
   const isCustomDesignActive = isApparel && designMode === 'custom';
-  // £5 extra charge when customer opts to provide their own photo/image to be put into the design
-  const customImageFee = (isCustomDesignActive && hasCustomUserImage) ? 5.00 : 0.00;
+  // Premade designs default as £3 extra (configurable by admin)
+  const appliedPremadeFee = (isCustomDesignActive && selectedDesign) ? (merchFees.premadeDesignFee ?? 3.00) : 0.00;
+  // Custom design / photo default as £5 extra (configurable by admin)
+  const appliedCustomFee = (isCustomDesignActive && hasCustomUserImage) ? (merchFees.customDesignFee ?? 5.00) : 0.00;
+  const extraDesignFee = appliedPremadeFee + appliedCustomFee;
 
   const baseUnitPrice = selectedProduct ? selectedProduct.price : 0;
-  const effectiveUnitPrice = baseUnitPrice + customImageFee;
+  const effectiveUnitPrice = baseUnitPrice + extraDesignFee;
   const itemsSubtotal = effectiveUnitPrice * quantity;
   const shippingFee = fulfillmentType === 'postal_delivery' ? 3.99 : 0.00;
   const grandTotal = isSelectedProductPoa ? 0 : (itemsSubtotal + shippingFee);
@@ -336,9 +362,9 @@ export const MerchStoreView = ({
       }
     }
 
-    // Validation for custom image upload option (+£5)
+    // Validation for custom image upload option
     if (isCustomDesignActive && hasCustomUserImage && !customUserImageUrl.trim()) {
-      setCheckoutError('Please upload an image or provide a link for your +£5 custom design option, or uncheck the custom image option.');
+      setCheckoutError(`Please upload an image or provide a link for your +£${appliedCustomFee.toFixed(2)} custom design option, or uncheck the custom image option.`);
       return;
     }
 
@@ -407,9 +433,14 @@ export const MerchStoreView = ({
 
     try {
       const orderRef = `DRS-MERCH-${Date.now().toString(36).toUpperCase()}`;
-      const designTag = isCustomDesignActive
-        ? ` [Design: ${selectedDesign?.title || 'Custom'}${hasCustomUserImage ? ' + Custom Photo (£5)' : ''}]`
-        : '';
+      const designTagParts = [];
+      if (isCustomDesignActive && selectedDesign) {
+        designTagParts.push(`Premade: ${selectedDesign.title} (+£${appliedPremadeFee.toFixed(2)})`);
+      }
+      if (isCustomDesignActive && hasCustomUserImage) {
+        designTagParts.push(`Custom Photo (+£${appliedCustomFee.toFixed(2)})`);
+      }
+      const designTag = designTagParts.length > 0 ? ` [${designTagParts.join(', ')}]` : '';
       const description = `DRS Merch: ${selectedProduct.title} (x${quantity}${selectedOption ? ` - ${selectedOption}` : ''})${designTag}`;
 
       const res = await fetch(
@@ -465,16 +496,19 @@ export const MerchStoreView = ({
             category: selectedDesign?.category,
             image: selectedDesign?.image
           } : null,
+          hasPremadeDesign: Boolean(isCustomDesignActive && selectedDesign),
+          premadeDesignFee: appliedPremadeFee,
           hasCustomUserImage: Boolean(isCustomDesignActive && hasCustomUserImage),
           customUserImageUrl: (isCustomDesignActive && hasCustomUserImage) ? customUserImageUrl : null,
-          customUserImageNotes: (isCustomDesignActive && hasCustomUserImage) ? customUserImageNotes : null,
-          customImageFee: (isCustomDesignActive && hasCustomUserImage) ? 5.00 : 0
+          customImageFee: appliedCustomFee,
+          extraDesignFee: extraDesignFee
         },
-        customDesignVariation: isCustomDesignActive ? (selectedDesign?.title || 'Custom Gallery Design') : null,
+        customDesignVariation: (isCustomDesignActive && selectedDesign) ? selectedDesign.title : null,
+        premadeDesignFee: appliedPremadeFee,
         hasCustomUserImage: Boolean(isCustomDesignActive && hasCustomUserImage),
         customUserImageUrl: (isCustomDesignActive && hasCustomUserImage) ? customUserImageUrl : null,
-        customUserImageNotes: (isCustomDesignActive && hasCustomUserImage) ? customUserImageNotes : null,
-        customImageFee: (isCustomDesignActive && hasCustomUserImage) ? 5.00 : 0,
+        customImageFee: appliedCustomFee,
+        extraDesignFee: extraDesignFee,
         itemsSubtotal: Number(itemsSubtotal.toFixed(2)),
         shippingFee: Number(shippingFee.toFixed(2)),
         grandTotal: Number(grandTotal.toFixed(2)),
@@ -868,9 +902,10 @@ export const MerchStoreView = ({
                     </div>
                     {completedOrder.customDesignVariation && (
                       <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-                        <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Design Artwork:</span>
-                        <span className="text-lime-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Premade Design:</span>
+                        <span className="text-pink-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
                           <Sparkles className="w-3.5 h-3.5" /> {completedOrder.customDesignVariation}
+                          {completedOrder.premadeDesignFee ? ` (+£${Number(completedOrder.premadeDesignFee).toFixed(2)})` : ''}
                         </span>
                       </div>
                     )}
@@ -879,7 +914,7 @@ export const MerchStoreView = ({
                         <div className="flex justify-between items-center">
                           <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Customer Photo Add-on:</span>
                           <span className="text-lime-400 font-bold text-xs flex items-center gap-1 font-mono">
-                            +£5.00 Included
+                            +£{Number(completedOrder.customImageFee || 5.00).toFixed(2)} Included
                           </span>
                         </div>
                         {completedOrder.customUserImageUrl && (
@@ -894,11 +929,6 @@ export const MerchStoreView = ({
                               <p className="text-[11px] text-zinc-500">Will be integrated into the print design</p>
                             </div>
                           </div>
-                        )}
-                        {completedOrder.customUserImageNotes && (
-                          <p className="text-[11px] text-zinc-400 italic">
-                            Placement: &quot;{completedOrder.customUserImageNotes}&quot;
-                          </p>
                         )}
                       </div>
                     )}
@@ -1010,10 +1040,15 @@ export const MerchStoreView = ({
                         <p className="text-lime-400 font-black text-lg">
                           £{effectiveUnitPrice.toFixed(2)}
                         </p>
-                        {isCustomDesignActive && hasCustomUserImage && (
-                          <span className="text-[10px] text-zinc-400 font-medium">
-                            (Includes £5 custom image)
-                          </span>
+                        {isCustomDesignActive && (
+                          <div className="flex flex-wrap gap-1.5 text-[10px] text-zinc-400 font-medium">
+                            {appliedPremadeFee > 0 && (
+                              <span className="text-pink-400 font-bold">(+£{appliedPremadeFee.toFixed(2)} premade)</span>
+                            )}
+                            {appliedCustomFee > 0 && (
+                              <span className="text-lime-400 font-bold">(+£{appliedCustomFee.toFixed(2)} custom photo)</span>
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -1048,7 +1083,7 @@ export const MerchStoreView = ({
                         }`}
                       >
                         <Sparkles className="w-3.5 h-3.5" />
-                        Custom Gallery ({galleryDesigns.length})
+                        Premade Designs ({galleryDesigns.length}) (+£{merchFees.premadeDesignFee.toFixed(2)})
                       </button>
                     </div>
                   </div>
@@ -1058,8 +1093,8 @@ export const MerchStoreView = ({
                 {isCustomDesignActive && (
                   <div className="space-y-4 bg-black/40 p-4 rounded-2xl border border-zinc-800/80 animate-in fade-in duration-300">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-lime-400 flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-pink-400" /> Choose Design from Gallery:
+                      <label className="text-xs font-bold uppercase tracking-wider text-pink-400 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-pink-400" /> Choose Premade Design (+£{merchFees.premadeDesignFee.toFixed(2)} Extra):
                       </label>
                       <span className="text-[10px] text-zinc-400 font-mono">
                         {galleryDesigns.length} Variations
@@ -1112,7 +1147,7 @@ export const MerchStoreView = ({
                       </div>
                     )}
 
-                    {/* Custom Image Upload Option (+£5 Extra) */}
+                    {/* Custom Image Upload Option (Default +£5 Extra) */}
                     <div className={`p-3.5 rounded-2xl border transition-all ${
                       hasCustomUserImage ? 'bg-lime-500/10 border-lime-500/50' : 'bg-zinc-900/90 border-zinc-800'
                     }`}>
@@ -1133,10 +1168,10 @@ export const MerchStoreView = ({
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-white text-xs font-black uppercase tracking-wider">
-                                Provide your own image to be put into the design
+                                Provide your own custom image to be put into the design
                               </span>
                               <span className="bg-lime-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                                +£5.00 Extra
+                                +£{merchFees.customDesignFee.toFixed(2)} Extra
                               </span>
                             </div>
                             <p className="text-zinc-400 text-[11px] mt-1 leading-relaxed">
@@ -1159,7 +1194,7 @@ export const MerchStoreView = ({
                         <div className="mt-3.5 pt-3 border-t border-zinc-800/80 space-y-3 animate-in fade-in duration-300">
                           <div className="flex items-center justify-between">
                             <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                              <Upload className="w-3.5 h-3.5 text-lime-400" /> Upload Your Image / Photo:
+                              <Upload className="w-3.5 h-3.5 text-lime-400" /> Upload Your Custom Photo / Artwork:
                             </label>
                             {customUserImageUrl && (
                               <span className="text-[10px] text-lime-400 font-bold flex items-center gap-1">
@@ -1226,19 +1261,6 @@ export const MerchStoreView = ({
                                 className="w-full bg-black border border-zinc-800 text-white rounded-xl p-2.5 text-xs focus:border-lime-500 outline-none font-mono"
                               />
                             </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-semibold text-zinc-400 mb-1">
-                              Design Placement / Instructions (Optional)
-                            </label>
-                            <input
-                              type="text"
-                              value={customUserImageNotes}
-                              onChange={(e) => setCustomUserImageNotes(e.target.value)}
-                              placeholder="e.g. Put my car in the center frame, small DRS crest on chest"
-                              className="w-full bg-black border border-zinc-800 text-white rounded-xl p-2.5 text-xs focus:border-lime-500 outline-none"
-                            />
                           </div>
                         </div>
                       )}
@@ -1525,16 +1547,16 @@ export const MerchStoreView = ({
                       <span>Base Garment ({selectedProduct.title} x{quantity}):</span>
                       <span className="font-mono">£{(selectedProduct.price * quantity).toFixed(2)}</span>
                     </div>
-                    {isCustomDesignActive && (
-                      <div className="flex justify-between text-xs text-zinc-400">
-                        <span>Selected Artwork ({selectedDesign?.title || 'Custom'}):</span>
-                        <span className="font-mono text-lime-400 font-bold">Included</span>
+                    {isCustomDesignActive && selectedDesign && (
+                      <div className="flex justify-between text-xs text-pink-400 font-semibold bg-pink-500/10 p-2 rounded-lg border border-pink-500/20">
+                        <span>Premade Design ({selectedDesign.title} x{quantity}):</span>
+                        <span className="font-mono font-bold">+£{(appliedPremadeFee * quantity).toFixed(2)}</span>
                       </div>
                     )}
                     {isCustomDesignActive && hasCustomUserImage && (
                       <div className="flex justify-between text-xs text-lime-400 font-semibold bg-lime-500/10 p-2 rounded-lg border border-lime-500/20">
-                        <span>Customer Photo Integration (+£5.00 x{quantity}):</span>
-                        <span className="font-mono font-bold">+£{(5 * quantity).toFixed(2)}</span>
+                        <span>Custom Photo Integration (+£{appliedCustomFee.toFixed(2)} x{quantity}):</span>
+                        <span className="font-mono font-bold">+£{(appliedCustomFee * quantity).toFixed(2)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-xs text-zinc-400">
@@ -1628,19 +1650,6 @@ export const AdminMerchSection = ({
   const [bulkSuccess, setBulkSuccess] = useState('');
   const bulkFileInputRef = useRef(null);
 
-  // Escape key handler for admin modals
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (isBulkUploading && !isProcessingBulk) setIsBulkUploading(false);
-        if (isCreatingDesign && !isSavingDesign) { setIsCreatingDesign(false); setEditingDesign(null); }
-        if (isCreatingProduct && !isSavingProduct) { setIsCreatingProduct(false); setEditingProduct(null); }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isBulkUploading, isProcessingBulk, isCreatingDesign, isSavingDesign, isCreatingProduct, isSavingProduct]);
-  
   // Product edit / create modal
   const [editingProduct, setEditingProduct] = useState(null);
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
@@ -1671,6 +1680,86 @@ export const AdminMerchSection = ({
 
   // Auth context
   const currentUser = auth?.currentUser;
+
+  // Design Extra Fees (Premade default £3, Custom default £5, customizable by admin)
+  const [merchFees, setMerchFees] = useState({
+    premadeDesignFee: 3.00,
+    customDesignFee: 5.00
+  });
+  const [feeInputs, setFeeInputs] = useState({
+    premadeDesignFee: '3.00',
+    customDesignFee: '5.00'
+  });
+  const [isSavingFees, setIsSavingFees] = useState(false);
+  const [feeSaveSuccess, setFeeSaveSuccess] = useState('');
+  const [feeSaveError, setFeeSaveError] = useState('');
+
+  // Sync Merch Fee Settings from Firestore
+  useEffect(() => {
+    if (!db || !appId) return;
+    const unsub = onSnapshot(
+      doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'merchFees'),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const pFee = data.premadeDesignFee !== undefined ? Number(data.premadeDesignFee) : 3.00;
+          const cFee = data.customDesignFee !== undefined ? Number(data.customDesignFee) : 5.00;
+          setMerchFees({ premadeDesignFee: pFee, customDesignFee: cFee });
+          setFeeInputs({
+            premadeDesignFee: pFee.toFixed(2),
+            customDesignFee: cFee.toFixed(2)
+          });
+        }
+      },
+      (err) => console.warn("Error fetching admin merch fees:", err)
+    );
+    return () => unsub();
+  }, [db, appId]);
+
+  const handleSaveFees = async (e) => {
+    if (e) e.preventDefault();
+    if (!db || !appId) return;
+    const p = parseFloat(feeInputs.premadeDesignFee);
+    const c = parseFloat(feeInputs.customDesignFee);
+    if (isNaN(p) || p < 0 || isNaN(c) || c < 0) {
+      setFeeSaveError("Please enter valid non-negative numbers for fees.");
+      return;
+    }
+    setIsSavingFees(true);
+    setFeeSaveError('');
+    setFeeSaveSuccess('');
+    try {
+      await setDoc(
+        doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'merchFees'),
+        {
+          premadeDesignFee: p,
+          customDesignFee: c,
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
+      setFeeSaveSuccess("Design extra pricing saved successfully!");
+      setTimeout(() => setFeeSaveSuccess(''), 3500);
+    } catch (err) {
+      console.error("Failed to save design fees:", err);
+      setFeeSaveError("Failed to save pricing: " + err.message);
+    } finally {
+      setIsSavingFees(false);
+    }
+  };
+
+  // Escape key handler for admin modals (safely declared after all modal state hooks)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (isBulkUploading && !isProcessingBulk) setIsBulkUploading(false);
+        if (isCreatingDesign && !isSavingDesign) { setIsCreatingDesign(false); setEditingDesign(null); }
+        if (isCreatingProduct && !isSavingProduct) { setIsCreatingProduct(false); setEditingProduct(null); }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBulkUploading, isProcessingBulk, isCreatingDesign, isSavingDesign, isCreatingProduct, isSavingProduct]);
 
   // Sync Orders from Firestore
   useEffect(() => {
@@ -2364,7 +2453,7 @@ export const AdminMerchSection = ({
               }}
               className="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white font-black px-3.5 py-2 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5"
             >
-              <UploadCloud className="w-4 h-4" /> Bulk Upload Designs
+              <UploadCloud className="w-4 h-4" /> Bulk Create Premade Designs
             </button>
             <button
               type="button"
@@ -2728,13 +2817,82 @@ export const AdminMerchSection = ({
       {/* --- TAB CONTENT: DESIGNS GALLERY --- */}
       {activeTab === 'designs' && (
         <div className="space-y-4">
+          {/* Design Pricing Configuration Card (Configurable by Admin) */}
+          <div className="bg-black/60 border border-zinc-800 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-lg">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-pink-400" />
+                <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                  Store Design Extra Pricing Configuration
+                </h4>
+              </div>
+              <p className="text-xs text-zinc-400 max-w-xl">
+                Premade designs default as <span className="text-pink-400 font-bold">£3 extra</span> and custom user photo uploads default as <span className="text-lime-400 font-bold">£5 extra</span>. Set your preferred fees below and click Save.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveFees} className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
+                <label htmlFor="premade-fee-input" className="text-[11px] font-bold uppercase text-pink-400">Premade (+£):</label>
+                <input
+                  id="premade-fee-input"
+                  type="number"
+                  step="0.50"
+                  min="0"
+                  value={feeInputs.premadeDesignFee}
+                  onChange={(e) => setFeeInputs(prev => ({ ...prev, premadeDesignFee: e.target.value }))}
+                  className="w-16 bg-black border border-zinc-700 text-white rounded-lg px-2 py-1 text-xs font-bold text-center focus:border-pink-500 outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
+                <label htmlFor="custom-fee-input" className="text-[11px] font-bold uppercase text-lime-400">Custom (+£):</label>
+                <input
+                  id="custom-fee-input"
+                  type="number"
+                  step="0.50"
+                  min="0"
+                  value={feeInputs.customDesignFee}
+                  onChange={(e) => setFeeInputs(prev => ({ ...prev, customDesignFee: e.target.value }))}
+                  className="w-16 bg-black border border-zinc-700 text-white rounded-lg px-2 py-1 text-xs font-bold text-center focus:border-lime-500 outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSavingFees}
+                className="bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+              >
+                {isSavingFees ? (
+                  <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving...</>
+                ) : (
+                  <><Save className="w-3.5 h-3.5" /> Save Pricing</>
+                )}
+              </button>
+            </form>
+          </div>
+
+          {feeSaveSuccess && (
+            <div className="bg-lime-500/10 border border-lime-500/30 rounded-xl p-3 text-lime-400 text-xs flex items-center gap-2 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{feeSaveSuccess}</span>
+            </div>
+          )}
+
+          {feeSaveError && (
+            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{feeSaveError}</span>
+            </div>
+          )}
+
           <div className="bg-black/40 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h4 className="text-white font-black text-sm uppercase tracking-wider flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-pink-400" /> Preloaded Custom Designs Gallery
+                <Sparkles className="w-4 h-4 text-pink-400" /> Premade Designs Gallery (+£{merchFees.premadeDesignFee.toFixed(2)} Extra)
               </h4>
               <p className="text-zinc-400 text-xs mt-0.5">
-                These graphic variations appear when customers choose &ldquo;Purchase a Custom Design&rdquo; on hoodies or t-shirts. Customers can also provide their own image for +£5.
+                These graphic variations appear when customers choose &ldquo;Premade Designs&rdquo; on hoodies or t-shirts. Customers can also provide their own photo/custom artwork for +£{merchFees.customDesignFee.toFixed(2)}.
               </p>
             </div>
             <div className="text-xs text-lime-400 font-mono font-bold bg-lime-500/10 px-3 py-1.5 rounded-xl border border-lime-500/20 whitespace-nowrap">
@@ -3391,10 +3549,10 @@ export const AdminMerchSection = ({
                 </span>
                 <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
                   <UploadCloud className="w-6 h-6 text-lime-400" />
-                  Bulk Upload Design Variations
+                  Bulk Create Premade Designs
                 </h3>
                 <p className="text-zinc-400 text-xs mt-1">
-                  Select multiple design graphics at once. Titles are auto-generated from file names and can be customized below. Descriptions are left out as requested.
+                  Select multiple design graphics at once to add as premade designs (defaults to +£{merchFees.premadeDesignFee.toFixed(2)} extra for shoppers). Titles are auto-generated from file names and can be edited below.
                 </p>
               </div>
               <button
@@ -3581,9 +3739,9 @@ export const AdminMerchSection = ({
                 className="flex-1 bg-gradient-to-r from-pink-500 to-lime-400 hover:from-pink-400 hover:to-lime-300 disabled:opacity-50 text-black font-black py-3.5 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2 transition-all"
               >
                 {isProcessingBulk ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Uploading ({bulkProgress}/{bulkQueue.length})...</>
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Creating ({bulkProgress}/{bulkQueue.length})...</>
                 ) : (
-                  <><Save className="w-4 h-4" /> Upload &amp; Save All ({bulkQueue.length}) Designs</>
+                  <><Save className="w-4 h-4" /> Upload &amp; Create All ({bulkQueue.length}) Premade Designs</>
                 )}
               </button>
             </div>
