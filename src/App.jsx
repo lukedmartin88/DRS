@@ -548,7 +548,7 @@ const STATIC_CHARITY = [{
 const STATIC_RAFFLES = [{
   id: 'mock-past-raffle',
   title: "Premium Prize Bundle",
-  description: "Official UK skill-based competition. A massive thank you to everyone who entered and answered correctly!",
+  description: "A massive thank you to everyone who entered our club competition! Congratulations to our winner, Steve Ronnie.",
   drawDate: "20th April 2026",
   ticketPrice: 5,
   totalTickets: 100,
@@ -556,10 +556,7 @@ const STATIC_RAFFLES = [{
   reservations: { 'mock_winner': 10 },
   image: "https://i.ibb.co/fzbH9zQj/Whats-App-Image-2026-05-10-at-10-23-14-PM.jpg",
   isEnded: true,
-  winner: "Steve Ronnie",
-  question: "In what year was the Daily Ride South (DRS) club founded?",
-  options: ["2018", "2020", "2022", "2024"],
-  correctAnswer: "2022"
+  winner: "Steve Ronnie"
 }];
 
 // --- VIEWS ---
@@ -1429,16 +1426,21 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
         <div className="absolute top-3 left-3 bg-lime-500 text-black text-[10px] font-black px-2.5 py-1 rounded-lg shadow-lg uppercase tracking-widest">
           £{raffle.ticketPrice} / Entry
         </div>
-        {raffle.question && (
+        {raffle.question && !raffle.isEnded && (
           <div className="absolute top-3 right-3 bg-black/80 backdrop-blur-sm text-lime-400 border border-lime-500/40 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider flex items-center gap-1.5 shadow">
             <Sparkles className="w-3 h-3 text-lime-400" /> Skill Draw
           </div>
         )}
         {raffle.isEnded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-            <span className="bg-black/90 text-pink-500 font-black text-sm uppercase tracking-[0.3em] px-5 py-2 border border-lime-500/50 -rotate-3 shadow-2xl">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 p-4 text-center">
+            <span className="bg-black/90 text-pink-500 font-black text-sm uppercase tracking-[0.3em] px-5 py-2 border border-lime-500/50 -rotate-3 shadow-2xl mb-2">
               Concluded
             </span>
+            {raffle.winner && (
+              <div className="bg-yellow-500/20 border border-yellow-500/60 backdrop-blur-md rounded-xl px-3 py-1.5 flex items-center gap-1.5 text-yellow-300 text-xs font-black uppercase tracking-wider shadow-lg">
+                <Trophy className="w-3.5 h-3.5 text-yellow-400 shrink-0" /> Winner: {raffle.winner}
+              </div>
+            )}
           </div>
         )}
         {!raffle.isEnded && raffle.isPaused && (
@@ -1454,11 +1456,15 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
           <h3 className="text-white font-black uppercase tracking-tight text-base leading-tight truncate">
             {raffle.title}
           </h3>
-          {raffle.question && (
+          {raffle.isEnded && raffle.winner ? (
+            <p className="text-yellow-400 text-xs font-black uppercase tracking-wider mt-1.5 flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5 text-yellow-500 shrink-0" /> Previous Winner: {raffle.winner}
+            </p>
+          ) : raffle.question ? (
             <p className="text-zinc-400 text-xs mt-1 line-clamp-1 italic">
               Q: {raffle.question}
             </p>
-          )}
+          ) : null}
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -1828,8 +1834,15 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
             </div>
 
             {raffle.isEnded ? (
-              <div className="text-center py-6">
-                <p className="text-pink-500 font-black uppercase tracking-widest">This competition has closed.</p>
+              <div className="text-center py-6 space-y-2 bg-black/40 rounded-2xl border border-zinc-800/80 p-4">
+                <Trophy className="w-8 h-8 text-yellow-500 mx-auto" />
+                <p className="text-pink-500 font-black uppercase tracking-widest text-xs">This competition has closed</p>
+                {raffle.winner && (
+                  <div className="pt-2 border-t border-zinc-800">
+                    <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Winning Entrant</p>
+                    <p className="text-yellow-400 font-black text-base mt-0.5">{raffle.winner}</p>
+                  </div>
+                )}
               </div>
             ) : raffle.isPaused ? (
               <div className="text-center py-6">
@@ -2043,15 +2056,6 @@ const RafflesView = ({ raffles, user, members }) => {
   
   return (
     <div className="space-y-12">
-      <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner">
-        <div className="flex items-center gap-2 mb-2 text-lime-400">
-          <Trophy className="w-5 h-5" />
-          <span className="text-xs font-black uppercase tracking-widest">DRS Skill-Based Competitions</span>
-        </div>
-        <p className="text-zinc-300 text-sm md:text-base leading-relaxed italic">
-          Enter our official UK skill-based prize competitions! Select your entries, answer the automotive skill question, and correct entries will be entered directly into the live draw drum. All draws take place transparently using the DRS Draw Machine.
-        </p>
-      </div>
       <div className="space-y-5">
         <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Competitions</h2>
         {activeRaffles.length === 0 ? (
@@ -3699,10 +3703,6 @@ const MainApp = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [activeTab]);
-  
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [activeTab]);
 
   // --- SUMUP GLOBAL SCRIPT ---
   useEffect(() => {
@@ -3956,6 +3956,7 @@ const MainApp = () => {
       case 'gallery': return <GalleryView members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
       case 'members': return <MembersView members={sortedMembers} onMemberClick={handleMemberModal} />;
       case 'profile': return <ProfileView user={user} userProfile={currentUserProfile} />;
+      case 'competitions':
       case 'raffles': return <RafflesView raffles={combinedRaffles} user={user} members={cloudMembers} />;
       case 'merch': return (
         <MerchStoreView
@@ -3986,15 +3987,15 @@ const MainApp = () => {
       );
       case 'admin_guide': return <AdminGuideView onBack={() => window.location.hash = 'admin'} />;
       default:
-        if (activeTab.startsWith('raffle_detail_')) {
-          const raffleId = activeTab.replace('raffle_detail_', '');
+        if (activeTab.startsWith('competition_detail_') || activeTab.startsWith('raffle_detail_')) {
+          const raffleId = activeTab.replace('competition_detail_', '').replace('raffle_detail_', '');
           return (
             <RaffleDetailPage
               raffleId={raffleId}
               raffles={combinedRaffles}
               members={cloudMembers}
               user={user}
-              onBack={() => window.location.hash = 'raffles'}
+              onBack={() => { window.location.hash = 'competitions'; }}
             />
           );
         }
@@ -4031,9 +4032,14 @@ const MainApp = () => {
           <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-zinc-900 rounded-lg text-zinc-500 hover:text-white transition-colors"><X className="w-5 h-5" /></button>
         </div>
         <nav className="space-y-3 mb-10">
-          {visibleNavItems.map(item => (
-            <NavLink key={item.id} item={item} mobile isActive={activeTab === item.id || (activeTab === 'past_events' && item.id === 'events')} onClick={() => { window.location.hash = item.id; setIsMenuOpen(false); }} />
-          ))}
+          {visibleNavItems.map(item => {
+            const isItemActive = activeTab === item.id || 
+              (activeTab === 'past_events' && item.id === 'events') ||
+              (item.id === 'competitions' && (activeTab === 'competitions' || activeTab === 'raffles' || activeTab.startsWith('competition_detail_') || activeTab.startsWith('raffle_detail_')));
+            return (
+              <NavLink key={item.id} item={item} mobile isActive={isItemActive} onClick={() => { window.location.hash = item.id; setIsMenuOpen(false); }} />
+            );
+          })}
         </nav>
         <div className="pt-8 border-t border-zinc-900 space-y-4">
           <div className="flex justify-center gap-6 mb-2">
