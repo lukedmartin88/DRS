@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { DEFAULT_MERCH_PRODUCTS } from '../data/defaultMerch';
 import { DEFAULT_GALLERY_DESIGNS } from '../data/defaultDesigns';
+import { DEFAULT_PRINT_SAMPLES } from '../data/defaultSamples';
 
 // Reusable SumUp mounting widget for merchandise
 const MerchSumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
@@ -95,6 +96,12 @@ export const MerchStoreView = ({
     premadeDesignFee: 3.00,
     customDesignFee: 5.00
   });
+
+  // Custom Print Samples State
+  const [printSamples, setPrintSamples] = useState(DEFAULT_PRINT_SAMPLES);
+  const [isViewingSamplesModal, setIsViewingSamplesModal] = useState(false);
+  const [activeSampleFilter, setActiveSampleFilter] = useState('All'); // 'All' | 'Hoodie' | 'T-Shirt'
+  const [inspectingSample, setInspectingSample] = useState(null);
 
   // Shipping Form State
   const [customerName, setCustomerName] = useState(userProfile?.name || '');
@@ -184,6 +191,26 @@ export const MerchStoreView = ({
         }
       },
       (err) => console.warn("Error fetching merch fees:", err)
+    );
+    return () => unsub();
+  }, [db, appId]);
+
+  // Sync print samples from Firestore (merch_print_samples)
+  useEffect(() => {
+    if (!db || !appId) return;
+    const unsub = onSnapshot(
+      collection(db, 'artifacts', appId, 'public', 'data', 'merch_print_samples'),
+      (snap) => {
+        if (!snap.empty) {
+          const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          const customIds = new Set(list.map(d => d.id));
+          const combined = [...list, ...DEFAULT_PRINT_SAMPLES.filter(d => !customIds.has(d.id))];
+          setPrintSamples(combined);
+        } else {
+          setPrintSamples(DEFAULT_PRINT_SAMPLES);
+        }
+      },
+      (err) => console.error("Error loading merch print samples:", err)
     );
     return () => unsub();
   }, [db, appId]);
@@ -666,6 +693,46 @@ export const MerchStoreView = ({
             {cat}
           </button>
         ))}
+
+        <button
+          type="button"
+          onClick={() => setIsViewingSamplesModal(true)}
+          className="sm:ml-auto bg-gradient-to-r from-zinc-900 to-black hover:from-zinc-800 hover:to-zinc-900 border border-pink-500/50 hover:border-pink-400 text-pink-400 hover:text-pink-300 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-md cursor-pointer"
+        >
+          <Camera className="w-3.5 h-3.5 text-pink-400" />
+          <span>Print Samples ({printSamples.length})</span>
+          <span className="bg-pink-500 text-black text-[9px] px-1.5 py-0.5 rounded font-black">DRS Prints</span>
+        </button>
+      </div>
+
+      {/* DRS Custom Print Standard Notice */}
+      <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-black border border-zinc-800 hover:border-lime-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-black border border-zinc-800 flex items-center justify-center shrink-0 p-1">
+            <img src="/club-logo.webp" alt="DRS Logo" className="w-full h-full object-contain" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="text-white font-black text-xs uppercase tracking-wider">
+                Custom Apparel Print Standard
+              </h4>
+              <span className="bg-lime-500/20 text-lime-400 border border-lime-500/40 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                Desired Design + DRS Club Logo
+              </span>
+            </div>
+            <p className="text-zinc-400 text-[11px] mt-0.5 leading-relaxed">
+              All custom prints feature your desired design alongside the official DRS club logo. Explore our finished sample mockups to see real examples.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsViewingSamplesModal(true)}
+          className="shrink-0 bg-zinc-800 hover:bg-zinc-700 text-lime-400 hover:text-lime-300 border border-lime-500/30 text-xs font-black px-3.5 py-2 rounded-xl uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-sm self-start sm:self-auto"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          View Sample Mockups
+        </button>
       </div>
 
       {/* Products Grid */}
@@ -1092,6 +1159,31 @@ export const MerchStoreView = ({
                 {/* Preloaded Gallery of Designs + Custom Photo Option */}
                 {isCustomDesignActive && (
                   <div className="space-y-4 bg-black/40 p-4 rounded-2xl border border-zinc-800/80 animate-in fade-in duration-300">
+                    {/* Custom Print Specification Banner */}
+                    <div className="bg-gradient-to-r from-zinc-950 via-zinc-900 to-black border border-lime-500/30 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-md">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-black border border-zinc-800 flex items-center justify-center shrink-0 p-0.5">
+                          <img src="/club-logo.webp" alt="DRS Logo" className="w-full h-full object-contain" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-white text-[11px] font-black uppercase tracking-wider truncate">
+                            Desired Design + Official DRS Logo
+                          </p>
+                          <p className="text-zinc-400 text-[10px] leading-tight">
+                            All custom prints feature your desired design and the DRS club logo.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsViewingSamplesModal(true)}
+                        className="shrink-0 bg-zinc-800 hover:bg-zinc-700 text-pink-400 hover:text-pink-300 border border-pink-500/30 text-[10px] font-bold px-2.5 py-1.5 rounded-xl uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <Camera className="w-3 h-3" />
+                        Samples ({printSamples.length})
+                      </button>
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold uppercase tracking-wider text-pink-400 flex items-center gap-1.5">
                         <Sparkles className="w-4 h-4 text-pink-400" /> Choose Premade Design (+£{merchFees.premadeDesignFee.toFixed(2)} Extra):
@@ -1175,7 +1267,7 @@ export const MerchStoreView = ({
                               </span>
                             </div>
                             <p className="text-zinc-400 text-[11px] mt-1 leading-relaxed">
-                              Add your car photo, engine bay shot, custom logo or graphic to be printed into your chosen garment design.
+                              Add your car photo, engine bay shot, custom logo or graphic. All custom prints feature your desired design alongside the official DRS club logo.
                             </p>
                           </div>
                         </div>
@@ -1599,6 +1691,284 @@ export const MerchStoreView = ({
           </div>
         </div>
       )}
+
+      {/* Customer-Facing Custom Print Samples Modal */}
+      {isViewingSamplesModal && (
+        <div
+          id="samples-modal-backdrop"
+          onClick={(e) => {
+            if (e.target.id === 'samples-modal-backdrop') {
+              setIsViewingSamplesModal(false);
+            }
+          }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-5xl bg-zinc-950 border border-zinc-800 rounded-3xl p-5 sm:p-8 shadow-2xl my-4 sm:my-8"
+          >
+            <button
+              type="button"
+              onClick={() => setIsViewingSamplesModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 transition-colors z-10"
+              title="Close Gallery"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="mb-6 pr-10">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-pink-500/10 text-pink-400 border border-pink-500/30 mb-2">
+                <Camera className="w-3.5 h-3.5" /> Real Production Mockups
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2.5">
+                Custom Print Samples &amp; Mockups
+              </h2>
+              <div className="mt-2 bg-gradient-to-r from-zinc-900 via-black to-zinc-900 border border-lime-500/30 rounded-2xl p-3.5 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-black border border-zinc-800 flex items-center justify-center shrink-0 p-1">
+                  <img src="/club-logo.webp" alt="DRS Logo" className="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <p className="text-white text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    Official Quality Guarantee
+                    <span className="bg-lime-500 text-black text-[9px] font-black px-1.5 py-0.5 rounded">100% Authentic</span>
+                  </p>
+                  <p className="text-zinc-400 text-xs mt-0.5 leading-relaxed">
+                    All custom prints feature your desired design alongside the official DRS club logo. These samples show real finished prints on our heavyweight fleece hoodies and premium organic cotton tees.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex items-center gap-2 border-b border-zinc-800/80 pb-4 mb-6 overflow-x-auto">
+              {['All', 'Hoodie', 'T-Shirt'].map(filter => {
+                const count = filter === 'All' 
+                  ? printSamples.length 
+                  : printSamples.filter(s => s.garmentType?.toLowerCase().includes(filter.toLowerCase())).length;
+                return (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setActiveSampleFilter(filter)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0 ${
+                      activeSampleFilter === filter
+                        ? 'bg-lime-500 text-black shadow-md shadow-lime-500/20'
+                        : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                    }`}
+                  >
+                    {filter === 'All' ? 'All Samples' : `${filter}s`} ({count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Samples Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {printSamples
+                .filter(s => activeSampleFilter === 'All' || s.garmentType?.toLowerCase().includes(activeSampleFilter.toLowerCase()))
+                .map(sample => (
+                  <div
+                    key={sample.id}
+                    className="bg-zinc-900/90 border border-zinc-800 rounded-3xl overflow-hidden shadow-lg flex flex-col group hover:border-lime-500/50 transition-all"
+                  >
+                    <div 
+                      className="relative aspect-square w-full bg-black overflow-hidden cursor-pointer"
+                      onClick={() => setInspectingSample(sample)}
+                    >
+                      <img
+                        src={sample.image}
+                        alt={sample.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        onError={(e) => {
+                          e.target.src = '/merch/samples/sample-hoodie-neon.svg';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                        <span className="bg-black/80 backdrop-blur-md text-white border border-zinc-700 text-[11px] font-black uppercase px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5">
+                          <Camera className="w-3.5 h-3.5 text-lime-400" /> Click to Zoom
+                        </span>
+                      </div>
+
+                      {sample.tag && (
+                        <span className="absolute top-3 left-3 bg-black/80 backdrop-blur-md text-lime-400 border border-lime-500/30 text-[9px] font-black uppercase px-2 py-0.5 rounded-md">
+                          {sample.tag}
+                        </span>
+                      )}
+
+                      <div className="absolute top-3 right-3 bg-black/85 backdrop-blur-md border border-lime-500/40 text-lime-400 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md">
+                        <CheckCircle2 className="w-3 h-3 text-lime-400" /> Features DRS Logo
+                      </div>
+
+                      <div className="absolute bottom-2 left-2 bg-black/75 backdrop-blur-sm px-2 py-1 rounded-md text-[10px] font-bold text-zinc-300">
+                        {sample.garmentType}
+                      </div>
+                    </div>
+
+                    <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                      <div>
+                        <h4 className="text-white font-black text-sm uppercase tracking-tight leading-snug">
+                          {sample.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-pink-400 text-[11px] font-bold mt-1">
+                          <Sparkles className="w-3 h-3 text-pink-400" />
+                          <span>Desired Design: {sample.designName}</span>
+                        </div>
+                        <p className="text-zinc-400 text-xs mt-2 leading-relaxed line-clamp-3">
+                          {sample.description}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 border-t border-zinc-800/80 space-y-2">
+                        <div className="flex items-center gap-2 text-[10px] text-zinc-400">
+                          <span className="font-bold text-zinc-500 uppercase">DRS Logo:</span>
+                          <span className="text-zinc-300 truncate">{sample.drsLogoPlacement}</span>
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setInspectingSample(sample)}
+                            className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold uppercase text-[10px] tracking-wider transition-colors border border-zinc-700 flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            <Camera className="w-3.5 h-3.5" /> Preview
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const targetGarment = sample.garmentType?.toLowerCase().includes('tee') ? 'drs-tee-blk' : 'drs-hoodie-blk';
+                              const matchedProduct = products.find(p => p.id === targetGarment) || products.find(p => isApparelCustomizable(p));
+                              if (matchedProduct) {
+                                setSelectedProduct(matchedProduct);
+                                setDesignMode('custom');
+                                const matchingDes = galleryDesigns.find(d => d.title.toLowerCase().includes(sample.designName.toLowerCase()) || sample.title.toLowerCase().includes(d.title.toLowerCase()));
+                                if (matchingDes) {
+                                  setSelectedDesign(matchingDes);
+                                }
+                                setIsViewingSamplesModal(false);
+                              }
+                            }}
+                            className="flex-1 px-3 py-2 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-black uppercase text-[10px] tracking-wider transition-all flex items-center justify-center gap-1 shadow-md cursor-pointer"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" /> Order This Style
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            {/* Close footer */}
+            <div className="mt-8 pt-4 border-t border-zinc-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsViewingSamplesModal(false)}
+                className="px-6 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-bold uppercase tracking-wider text-xs border border-zinc-800 transition-colors cursor-pointer"
+              >
+                Close Gallery
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enlarged Sample Inspector Modal */}
+      {inspectingSample && (
+        <div
+          id="inspect-sample-backdrop"
+          onClick={(e) => {
+            if (e.target.id === 'inspect-sample-backdrop') {
+              setInspectingSample(null);
+            }
+          }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/95 backdrop-blur-lg flex justify-center items-center p-4 overscroll-contain animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-3xl bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl p-6 sm:p-8"
+          >
+            <button
+              type="button"
+              onClick={() => setInspectingSample(null)}
+              className="absolute top-5 right-5 p-2.5 rounded-xl bg-black/80 text-zinc-400 hover:text-white border border-zinc-800 transition-colors z-10 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="grid sm:grid-cols-2 gap-6 items-center">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-black border border-zinc-800 flex items-center justify-center">
+                <img
+                  src={inspectingSample.image}
+                  alt={inspectingSample.title}
+                  className="w-full h-full object-contain"
+                />
+                <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md text-lime-400 border border-lime-500/30 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+                  {inspectingSample.garmentType}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-pink-400 bg-pink-500/10 border border-pink-500/30 px-2.5 py-0.5 rounded-full mb-2">
+                    <Sparkles className="w-3 h-3" /> Custom Print Sample
+                  </span>
+                  <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                    {inspectingSample.title}
+                  </h3>
+                  <p className="text-lime-400 text-xs font-bold mt-1">
+                    Desired Design: {inspectingSample.designName}
+                  </p>
+                </div>
+
+                <div className="bg-black/60 border border-zinc-800 rounded-2xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white uppercase">
+                    <CheckCircle2 className="w-4 h-4 text-lime-400 shrink-0" />
+                    Official DRS Club Logo Included
+                  </div>
+                  <p className="text-zinc-400 text-xs leading-relaxed">
+                    {inspectingSample.drsLogoPlacement}
+                  </p>
+                </div>
+
+                <p className="text-zinc-400 text-xs leading-relaxed">
+                  {inspectingSample.description}
+                </p>
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setInspectingSample(null)}
+                    className="px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold uppercase text-xs border border-zinc-800 transition-colors cursor-pointer"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetGarment = inspectingSample.garmentType?.toLowerCase().includes('tee') ? 'drs-tee-blk' : 'drs-hoodie-blk';
+                      const matchedProduct = products.find(p => p.id === targetGarment) || products.find(p => isApparelCustomizable(p));
+                      if (matchedProduct) {
+                        setSelectedProduct(matchedProduct);
+                        setDesignMode('custom');
+                        const matchingDes = galleryDesigns.find(d => d.title.toLowerCase().includes(inspectingSample.designName.toLowerCase()) || inspectingSample.title.toLowerCase().includes(d.title.toLowerCase()));
+                        if (matchingDes) {
+                          setSelectedDesign(matchingDes);
+                        }
+                        setInspectingSample(null);
+                        setIsViewingSamplesModal(false);
+                      }
+                    }}
+                    className="flex-1 py-3 px-4 rounded-xl bg-lime-500 hover:bg-lime-400 text-black font-black uppercase text-xs tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-lime-500/20 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" /> Order This Print Style
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1681,6 +2051,29 @@ export const AdminMerchSection = ({
   // Auth context
   const currentUser = auth?.currentUser;
 
+  // Print Samples Management State
+  const [printSamples, setPrintSamples] = useState(DEFAULT_PRINT_SAMPLES);
+  const [editingSample, setEditingSample] = useState(null);
+  const [isCreatingSample, setIsCreatingSample] = useState(false);
+  const [sampleForm, setSampleForm] = useState({
+    title: '',
+    garmentType: 'Hoodie',
+    productId: 'drs-hoodie-blk',
+    designName: '',
+    featuresDrsLogo: true,
+    drsLogoPlacement: 'Official DRS Club Chest Crest & Hem Badge',
+    image: '/merch/samples/sample-hoodie-neon.svg',
+    description: 'Custom print sample featuring desired design and the official DRS club logo.',
+    tag: 'Sample Mockup'
+  });
+  const [isSavingSample, setIsSavingSample] = useState(false);
+  const [sampleSaveError, setSampleSaveError] = useState('');
+  const [sampleSaveSuccess, setSampleSaveSuccess] = useState('');
+  const [sampleImageUploading, setSampleImageUploading] = useState(false);
+  const [sampleImageProgress, setSampleImageProgress] = useState(0);
+  const [sampleImageError, setSampleImageError] = useState('');
+  const sampleFileInputRef = useRef(null);
+
   // Design Extra Fees (Premade default £3, Custom default £5, customizable by admin)
   const [merchFees, setMerchFees] = useState({
     premadeDesignFee: 3.00,
@@ -1755,11 +2148,32 @@ export const AdminMerchSection = ({
         if (isBulkUploading && !isProcessingBulk) setIsBulkUploading(false);
         if (isCreatingDesign && !isSavingDesign) { setIsCreatingDesign(false); setEditingDesign(null); }
         if (isCreatingProduct && !isSavingProduct) { setIsCreatingProduct(false); setEditingProduct(null); }
+        if (isCreatingSample && !isSavingSample) { setIsCreatingSample(false); setEditingSample(null); }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isBulkUploading, isProcessingBulk, isCreatingDesign, isSavingDesign, isCreatingProduct, isSavingProduct]);
+  }, [isBulkUploading, isProcessingBulk, isCreatingDesign, isSavingDesign, isCreatingProduct, isSavingProduct, isCreatingSample, isSavingSample]);
+
+  // Sync Print Samples from Firestore
+  useEffect(() => {
+    if (!db || !appId) return;
+    const unsub = onSnapshot(
+      collection(db, 'artifacts', appId, 'public', 'data', 'merch_print_samples'),
+      (snap) => {
+        if (!snap.empty) {
+          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          const customIds = new Set(list.map(d => d.id));
+          const combined = [...list, ...DEFAULT_PRINT_SAMPLES.filter(d => !customIds.has(d.id))];
+          setPrintSamples(combined);
+        } else {
+          setPrintSamples(DEFAULT_PRINT_SAMPLES);
+        }
+      },
+      (err) => console.error("Error fetching merch print samples:", err)
+    );
+    return () => unsub();
+  }, [db, appId]);
 
   // Sync Orders from Firestore
   useEffect(() => {
@@ -2288,6 +2702,151 @@ export const AdminMerchSection = ({
     }
   };
 
+  const handleSampleImageFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      setSampleImageError("Image size exceeds 15MB limit.");
+      return;
+    }
+
+    setSampleImageUploading(true);
+    setSampleImageProgress(0);
+    setSampleImageError('');
+
+    try {
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const uploaderId = currentUser?.uid || 'admin';
+      const storagePath = `artifacts/${appId || 'daily-ride-south'}/merch_samples/${uploaderId}_${Date.now()}_${cleanFileName}`;
+      const imageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(imageRef, file);
+
+      uploadTask.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setSampleImageProgress(Math.round(progress));
+        },
+        (err) => {
+          console.error("Sample image upload failed:", err);
+          setSampleImageError(err.message || "Failed to upload image.");
+          setSampleImageUploading(false);
+        },
+        async () => {
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+            setSampleForm(prev => ({ ...prev, image: downloadUrl }));
+            setSampleImageUploading(false);
+            setSampleImageProgress(0);
+          } catch (urlErr) {
+            setSampleImageError("Failed to retrieve uploaded image URL.");
+            setSampleImageUploading(false);
+          }
+        }
+      );
+    } catch (err) {
+      console.error("Sample upload initialization failed:", err);
+      setSampleImageError("Upload initialization failed.");
+      setSampleImageUploading(false);
+    }
+  };
+
+  const handleSaveSample = async (e) => {
+    e.preventDefault();
+    setSampleSaveError('');
+    setSampleSaveSuccess('');
+
+    if (!sampleForm.title.trim()) {
+      setSampleSaveError('Sample title is required.');
+      return;
+    }
+    if (!sampleForm.image.trim()) {
+      setSampleSaveError('A sample mockup image or photo is required.');
+      return;
+    }
+
+    setIsSavingSample(true);
+    try {
+      const targetId = editingSample?.id || `sample-${Date.now()}`;
+      const samplePayload = {
+        id: targetId,
+        title: sampleForm.title.trim(),
+        garmentType: sampleForm.garmentType || 'Hoodie',
+        productId: sampleForm.productId || (sampleForm.garmentType === 'T-Shirt' ? 'drs-tee-blk' : 'drs-hoodie-blk'),
+        designName: sampleForm.designName.trim() || 'Custom Desired Design',
+        featuresDrsLogo: sampleForm.featuresDrsLogo !== false,
+        drsLogoPlacement: sampleForm.drsLogoPlacement.trim() || 'Official DRS Club Chest Crest & Hem Badge',
+        image: sampleForm.image.trim(),
+        description: sampleForm.description.trim() || 'Custom print sample featuring desired design and the official DRS club logo.',
+        tag: sampleForm.tag.trim() || 'Sample Mockup',
+        updatedAt: new Date().toISOString()
+      };
+
+      if (!editingSample) {
+        samplePayload.createdAt = new Date().toISOString();
+      }
+
+      if (db && appId) {
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_print_samples', targetId),
+          samplePayload,
+          { merge: true }
+        );
+      }
+
+      setPrintSamples(prev => {
+        const idx = prev.findIndex(s => s.id === targetId);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = samplePayload;
+          return next;
+        }
+        return [samplePayload, ...prev];
+      });
+
+      setSampleSaveSuccess(editingSample ? 'Sample updated successfully!' : 'Sample added successfully!');
+      setTimeout(() => {
+        setIsCreatingSample(false);
+        setEditingSample(null);
+        setSampleSaveSuccess('');
+      }, 700);
+    } catch (err) {
+      console.error("Failed to save print sample:", err);
+      setSampleSaveError(err.message || 'Failed to save sample.');
+    } finally {
+      setIsSavingSample(false);
+    }
+  };
+
+  const handleDeleteSample = async (sampleId) => {
+    if (!window.confirm("Are you sure you want to remove this custom print sample?")) return;
+    try {
+      if (db && appId) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_print_samples', sampleId));
+      }
+      setPrintSamples(prev => prev.filter(s => s.id !== sampleId));
+    } catch (err) {
+      console.error("Failed to delete sample:", err);
+      alert("Failed to delete sample: " + err.message);
+    }
+  };
+
+  const handleSeedDefaultSamples = async () => {
+    if (!db || !appId) return;
+    if (!window.confirm("Restore 5 production custom print samples demonstrating desired designs paired with the DRS club logo?")) return;
+    try {
+      for (const s of DEFAULT_PRINT_SAMPLES) {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_print_samples', s.id), s);
+      }
+      setPrintSamples(DEFAULT_PRINT_SAMPLES);
+      alert("Restored 5 custom print samples successfully!");
+    } catch (err) {
+      console.error("Failed to seed samples:", err);
+      alert("Failed to restore samples: " + err.message);
+    }
+  };
+
   const pendingOrdersCount = orders.filter(o => o.fulfillmentStatus === 'Pending').length;
 
   const filteredOrders = useMemo(() => {
@@ -2395,6 +2954,19 @@ export const AdminMerchSection = ({
             <Sparkles className="w-4 h-4" />
             Design Gallery ({galleryDesigns.length})
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('samples')}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+              activeTab === 'samples'
+                ? 'bg-gradient-to-r from-lime-400 via-emerald-400 to-teal-400 text-black shadow-md font-black'
+                : 'bg-zinc-800/80 text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Camera className="w-4 h-4" />
+            Print Samples ({printSamples.length})
+          </button>
         </div>
 
         {activeTab === 'products' && (
@@ -2473,6 +3045,42 @@ export const AdminMerchSection = ({
               className="bg-lime-500 hover:bg-lime-400 text-black font-black px-3.5 py-2 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" /> Add Single Design
+            </button>
+          </div>
+        )}
+
+        {activeTab === 'samples' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSeedDefaultSamples}
+              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-zinc-700 cursor-pointer"
+            >
+              Restore 5 Samples
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingSample(null);
+                setSampleForm({
+                  title: '',
+                  garmentType: 'Hoodie',
+                  productId: 'drs-hoodie-blk',
+                  designName: '',
+                  featuresDrsLogo: true,
+                  drsLogoPlacement: 'Official DRS Club Chest Crest & Hem Badge',
+                  image: '/merch/samples/sample-hoodie-neon.svg',
+                  description: 'Custom print sample featuring desired design and the official DRS club logo.',
+                  tag: 'Sample Mockup'
+                });
+                setSampleSaveError('');
+                setSampleSaveSuccess('');
+                setSampleImageError('');
+                setIsCreatingSample(true);
+              }}
+              className="bg-lime-500 hover:bg-lime-400 text-black font-black px-3.5 py-2 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" /> Add Print Sample
             </button>
           </div>
         )}
@@ -2965,6 +3573,384 @@ export const AdminMerchSection = ({
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB CONTENT: PRINT SAMPLES --- */}
+      {activeTab === 'samples' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div className="bg-gradient-to-r from-zinc-900 via-black to-zinc-900 border border-lime-500/30 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-lime-500/10 text-lime-400 border border-lime-500/30 mb-2">
+                <Camera className="w-3.5 h-3.5" /> Customer Showroom &amp; Visual Samples
+              </span>
+              <h4 className="text-white font-black text-base uppercase tracking-wider flex items-center gap-2">
+                Custom Print Samples &amp; Mockups
+              </h4>
+              <p className="text-zinc-400 text-xs mt-1 max-w-2xl leading-relaxed">
+                Showcase how custom prints look in real production on hoodies and t-shirts. 
+                <strong className="text-lime-400 font-bold ml-1">
+                  All custom prints feature the customer's desired design and the official DRS club logo.
+                </strong>
+              </p>
+            </div>
+            <div className="text-xs text-lime-400 font-mono font-bold bg-lime-500/10 px-3 py-2 rounded-xl border border-lime-500/20 whitespace-nowrap self-start md:self-center">
+              {printSamples.length} Active Print Samples
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {printSamples.map((sample) => (
+              <div
+                key={sample.id}
+                className="bg-black/70 border border-zinc-800 rounded-3xl overflow-hidden flex flex-col justify-between hover:border-lime-500/40 transition-all group"
+              >
+                <div className="relative aspect-square w-full bg-black overflow-hidden">
+                  <img
+                    src={sample.image}
+                    alt={sample.title}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => {
+                      e.target.src = '/merch/samples/sample-hoodie-neon.svg';
+                    }}
+                  />
+                  <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md text-lime-400 text-[10px] font-black uppercase px-2.5 py-1 rounded-lg border border-lime-500/30">
+                    {sample.garmentType}
+                  </div>
+                  {sample.tag && (
+                    <div className="absolute bottom-3 left-3 bg-zinc-900/90 backdrop-blur-md text-zinc-300 text-[9px] font-bold uppercase px-2 py-0.5 rounded-md border border-zinc-800">
+                      {sample.tag}
+                    </div>
+                  )}
+                  <div className="absolute top-3 right-3 bg-black/85 backdrop-blur-md border border-lime-500/40 text-lime-400 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-md">
+                    <CheckCircle2 className="w-3 h-3 text-lime-400" /> Features DRS Logo
+                  </div>
+                </div>
+
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-pink-400 text-[11px] font-bold">
+                      <Sparkles className="w-3 h-3 text-pink-400" />
+                      <span>Desired Design: {sample.designName}</span>
+                    </div>
+                    <h4 className="text-white font-black text-sm uppercase tracking-tight leading-snug">
+                      {sample.title}
+                    </h4>
+                    <p className="text-zinc-400 text-xs leading-relaxed line-clamp-3">
+                      {sample.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-zinc-800/80 space-y-3">
+                    <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-[10px] text-zinc-400">
+                      <span className="font-bold text-zinc-500 uppercase block mb-0.5">DRS Logo Placement:</span>
+                      <span className="text-zinc-300">{sample.drsLogoPlacement}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
+                      <span className="text-[10px] text-lime-400 font-mono truncate max-w-[150px]">
+                        ID: {sample.id}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingSample(sample);
+                            setSampleForm({
+                              title: sample.title || '',
+                              garmentType: sample.garmentType || 'Hoodie',
+                              productId: sample.productId || 'drs-hoodie-blk',
+                              designName: sample.designName || '',
+                              featuresDrsLogo: sample.featuresDrsLogo !== false,
+                              drsLogoPlacement: sample.drsLogoPlacement || 'Official DRS Club Chest Crest & Hem Badge',
+                              image: sample.image || '',
+                              description: sample.description || '',
+                              tag: sample.tag || ''
+                            });
+                            setSampleSaveError('');
+                            setSampleSaveSuccess('');
+                            setSampleImageError('');
+                            setIsCreatingSample(true);
+                          }}
+                          className="p-2 rounded-xl bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer border border-zinc-700"
+                          title="Edit Sample"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSample(sample.id)}
+                          className="p-2 rounded-xl bg-zinc-800 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer border border-zinc-700"
+                          title="Delete Sample"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {printSamples.length === 0 && (
+            <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-12 text-center space-y-4">
+              <Camera className="w-12 h-12 text-zinc-600 mx-auto" />
+              <h4 className="text-white font-black text-base uppercase">No Custom Print Samples</h4>
+              <p className="text-zinc-400 text-xs max-w-md mx-auto">
+                Add custom print samples showing the customer's desired design combined with the DRS club logo.
+              </p>
+              <button
+                type="button"
+                onClick={handleSeedDefaultSamples}
+                className="px-5 py-2.5 bg-lime-500 hover:bg-lime-400 text-black font-black uppercase text-xs rounded-xl transition-all cursor-pointer"
+              >
+                Restore 5 Production Samples
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Custom Print Sample Edit / Create Modal */}
+      {isCreatingSample && (
+        <div
+          id="sample-modal-backdrop"
+          onClick={(e) => {
+            if (e.target.id === 'sample-modal-backdrop') {
+              setIsCreatingSample(false);
+              setEditingSample(null);
+            }
+          }}
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl my-4 sm:my-8"
+          >
+            <button
+              type="button"
+              onClick={() => { setIsCreatingSample(false); setEditingSample(null); }}
+              className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">
+              {editingSample ? 'Edit Custom Print Sample' : 'Add Custom Print Sample'}
+            </h3>
+
+            {/* Quality Standard Notice */}
+            <div className="bg-lime-500/10 border border-lime-500/30 rounded-2xl p-3.5 mb-5 flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-lime-400 shrink-0 mt-0.5" />
+              <p className="text-zinc-300 text-xs leading-relaxed">
+                <strong className="text-white font-bold">Standard Requirement:</strong> The prints will all feature their desired design and the official DRS club logo.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveSample} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Sample Title <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={sampleForm.title}
+                  onChange={e => setSampleForm({ ...sampleForm, title: e.target.value })}
+                  placeholder="e.g. Neon ST Drift Hoodie Mockup"
+                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                    Garment Type
+                  </label>
+                  <select
+                    value={sampleForm.garmentType}
+                    onChange={e => setSampleForm({ 
+                      ...sampleForm, 
+                      garmentType: e.target.value,
+                      productId: e.target.value === 'T-Shirt' ? 'drs-tee-blk' : 'drs-hoodie-blk'
+                    })}
+                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                  >
+                    <option value="Hoodie">Heavyweight Hoodie</option>
+                    <option value="T-Shirt">Classic T-Shirt</option>
+                    <option value="Jacket">Jacket / Outerwear</option>
+                    <option value="Other">Other Apparel</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                    Sample Badge / Tag
+                  </label>
+                  <input
+                    type="text"
+                    value={sampleForm.tag}
+                    onChange={e => setSampleForm({ ...sampleForm, tag: e.target.value })}
+                    placeholder="e.g. Sample Mockup or Bestseller"
+                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Customer's Desired Design
+                </label>
+                <input
+                  type="text"
+                  value={sampleForm.designName}
+                  onChange={e => setSampleForm({ ...sampleForm, designName: e.target.value })}
+                  placeholder="e.g. Neon ST Drift Graphic or Customer Vehicle Artwork"
+                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                />
+              </div>
+
+              {/* DRS Club Logo Placement */}
+              <div className="bg-black/60 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={sampleForm.featuresDrsLogo}
+                    onChange={e => setSampleForm({ ...sampleForm, featuresDrsLogo: e.target.checked })}
+                    className="rounded border-zinc-700 bg-zinc-900 text-lime-500 focus:ring-0 w-4 h-4"
+                  />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-lime-400" />
+                    Official DRS Club Logo Included
+                  </span>
+                </label>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                    DRS Club Logo Placement Note
+                  </label>
+                  <input
+                    type="text"
+                    value={sampleForm.drsLogoPlacement}
+                    onChange={e => setSampleForm({ ...sampleForm, drsLogoPlacement: e.target.value })}
+                    placeholder="e.g. Official DRS Club Chest Crest & Hem Badge"
+                    className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl p-2.5 text-xs focus:border-lime-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Mockup Image Upload / URL */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Sample Mockup Image <span className="text-rose-400">*</span>
+                </label>
+                <div className="flex gap-3 items-center">
+                  <input
+                    type="text"
+                    required
+                    value={sampleForm.image}
+                    onChange={e => setSampleForm({ ...sampleForm, image: e.target.value })}
+                    placeholder="Image URL or upload below"
+                    className="flex-1 bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none font-mono text-xs"
+                  />
+                  {sampleForm.image && (
+                    <div className="w-12 h-12 rounded-xl overflow-hidden bg-black border border-zinc-800 shrink-0">
+                      <img src={sampleForm.image} alt="Preview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload button & Quick Pickers */}
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  <input
+                    type="file"
+                    ref={sampleFileInputRef}
+                    onChange={handleSampleImageFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    disabled={sampleImageUploading}
+                    onClick={() => sampleFileInputRef.current?.click()}
+                    className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold uppercase px-3 py-2 rounded-xl border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-lime-400" />
+                    {sampleImageUploading ? `Uploading (${sampleImageProgress}%)` : 'Upload Mockup Image'}
+                  </button>
+
+                  <span className="text-[10px] text-zinc-500">Quick preloaded:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSampleForm({ ...sampleForm, image: '/merch/samples/sample-hoodie-neon.svg' })}
+                    className="text-[10px] bg-zinc-900 hover:bg-zinc-800 text-zinc-400 px-2 py-1 rounded-md border border-zinc-800 cursor-pointer"
+                  >
+                    Neon Hoodie
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSampleForm({ ...sampleForm, image: '/merch/samples/sample-tee-kanjo.svg' })}
+                    className="text-[10px] bg-zinc-900 hover:bg-zinc-800 text-zinc-400 px-2 py-1 rounded-md border border-zinc-800 cursor-pointer"
+                  >
+                    Kanjo Tee
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSampleForm({ ...sampleForm, image: '/merch/samples/sample-hoodie-turbo.svg' })}
+                    className="text-[10px] bg-zinc-900 hover:bg-zinc-800 text-zinc-400 px-2 py-1 rounded-md border border-zinc-800 cursor-pointer"
+                  >
+                    Turbo Hoodie
+                  </button>
+                </div>
+
+                {sampleImageError && (
+                  <p className="text-xs text-rose-400">{sampleImageError}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Sample Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={sampleForm.description}
+                  onChange={e => setSampleForm({ ...sampleForm, description: e.target.value })}
+                  placeholder="Describe the print quality, garment texture, and logo placement..."
+                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none resize-none"
+                />
+              </div>
+
+              {sampleSaveError && (
+                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-xl text-xs">
+                  {sampleSaveError}
+                </div>
+              )}
+              {sampleSaveSuccess && (
+                <div className="bg-lime-500/10 border border-lime-500/20 text-lime-400 p-3 rounded-xl text-xs">
+                  {sampleSaveSuccess}
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setIsCreatingSample(false); setEditingSample(null); }}
+                  className="px-5 py-2.5 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-wider border border-zinc-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingSample || sampleImageUploading}
+                  className="px-6 py-2.5 rounded-xl bg-lime-500 hover:bg-lime-400 text-black text-xs font-black uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  {isSavingSample ? 'Saving...' : editingSample ? 'Update Sample' : 'Save Sample'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
