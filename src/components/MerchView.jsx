@@ -2,11 +2,12 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot
 } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
   ShoppingBag, Package, Truck, AlertCircle, Tag,
   ChevronLeft, Plus, Trash2, Edit3, X, CheckCircle2,
   RefreshCw, EyeOff, Sparkles, Filter, MapPin,
-  Save, Check, CreditCard, Banknote
+  Save, Check, CreditCard, Banknote, UploadCloud, Link2
 } from 'lucide-react';
 import { DEFAULT_MERCH_PRODUCTS } from '../data/defaultMerch';
 
@@ -66,6 +67,302 @@ const MerchSumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
     />
   );
 });
+
+// Helper: Compress selected image file to keep uploads fast and storage light
+const compressImageFile = (file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) => {
+  return new Promise((resolve, reject) => {
+    // If it's an SVG, skip canvas compression
+    if (file.type === 'image/svg+xml') {
+      resolve(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/webp',
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image for compression'));
+      img.src = event.target.result;
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
+const blobToDataURL = (blob) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+// Reusable Product Image Upload Component
+const ProductImageUploader = ({
+  value,
+  onChange,
+  storage,
+  auth,
+  appId,
+  label = "Product Image"
+}) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [showManualUrl, setShowManualUrl] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const processAndUploadFile = async (file) => {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please select a valid image file (PNG, JPG, WEBP, or SVG).');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError('');
+    setUploadProgress(0);
+
+    try {
+      const compressedBlob = await compressImageFile(file, 1200, 1200, 0.85);
+
+      // Attempt Firebase Storage upload if available
+      if (storage && appId && auth?.currentUser?.uid) {
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const storagePath = `artifacts/${appId}/users/${auth.currentUser.uid}/uploads/merch_${Date.now()}_${cleanName}`;
+        const storageReference = ref(storage, storagePath);
+        const uploadTask = uploadBytesResumable(storageReference, compressedBlob);
+
+        uploadTask.on(
+          'state_changed',
+          (snapshot) => {
+            const pct = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+            setUploadProgress(Math.round(pct));
+          },
+          async (error) => {
+            console.warn("Firebase storage error, falling back to data URL:", error);
+            const dataUrl = await blobToDataURL(compressedBlob);
+            onChange(dataUrl);
+            setIsUploading(false);
+          },
+          async () => {
+            try {
+              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+              onChange(downloadUrl);
+            } catch (e) {
+              const dataUrl = await blobToDataURL(compressedBlob);
+              onChange(dataUrl);
+            } finally {
+              setIsUploading(false);
+            }
+          }
+        );
+      } else {
+        // Fallback to data URL
+        const dataUrl = await blobToDataURL(compressedBlob);
+        onChange(dataUrl);
+        setIsUploading(false);
+      }
+    } catch (err) {
+      console.error("Image upload processing error:", err);
+      setUploadError(err.message || 'Failed to process image');
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processAndUploadFile(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processAndUploadFile(file);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+          {label} *
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowManualUrl(!showManualUrl)}
+          className="text-[10px] text-zinc-500 hover:text-lime-400 transition-colors flex items-center gap-1"
+        >
+          <Link2 className="w-3 h-3" />
+          {showManualUrl ? 'Hide URL input' : 'Paste URL instead'}
+        </button>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {value ? (
+        /* Image Preview with Change / Remove actions */
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 flex items-center gap-4 group">
+          <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-black border border-zinc-800 shrink-0">
+            <img
+              src={value}
+              alt="Product preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
+
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
+              <Check className="w-3.5 h-3.5" />
+              <span>Image Attached</span>
+            </div>
+            <p className="text-[11px] text-zinc-400 truncate font-mono">
+              {value.startsWith('data:') ? 'Local file uploaded (embedded)' : value}
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider bg-lime-500 hover:bg-lime-400 text-black flex items-center gap-1.5 shadow transition-all cursor-pointer"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>Replace Image</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange('')}
+                disabled={isUploading}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors flex items-center gap-1"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Empty Upload Dropzone */
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2.5 ${
+            isDragging
+              ? 'border-lime-400 bg-lime-500/10 scale-[1.01]'
+              : 'border-zinc-800 hover:border-lime-500/50 bg-zinc-900/60 hover:bg-zinc-900'
+          }`}
+        >
+          <div className="w-12 h-12 rounded-2xl bg-lime-500/10 border border-lime-500/30 text-lime-400 flex items-center justify-center">
+            <UploadCloud className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-white text-xs font-black uppercase tracking-wider">
+              Click to Upload Product Image
+            </p>
+            <p className="text-zinc-500 text-[11px] mt-0.5">
+              or drag and drop here (PNG, JPG, WEBP, SVG)
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Uploading Status Progress Bar */}
+      {isUploading && (
+        <div className="p-3 bg-zinc-900 border border-lime-500/40 rounded-xl space-y-1.5 animate-in fade-in">
+          <div className="flex justify-between items-center text-xs font-bold text-lime-400">
+            <span className="flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Uploading product image...
+            </span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+            <div
+              className="bg-lime-500 h-full transition-all duration-200"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Upload Error Banner */}
+      {uploadError && (
+        <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{uploadError}</span>
+        </div>
+      )}
+
+      {/* Optional Manual URL Fallback Input */}
+      {showManualUrl && (
+        <div className="pt-1.5 animate-in fade-in">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Paste image URL (e.g. /merch/jacket.svg or https://...)"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500 font-mono"
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Main Customer Merchandise Store
 export const MerchStoreView = ({
@@ -1190,18 +1487,14 @@ export const MerchStoreView = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                  Image Path or URL
-                </label>
-                <input
-                  type="text"
-                  value={adminProductForm.image}
-                  onChange={e => setAdminProductForm({ ...adminProductForm, image: e.target.value })}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
-                  placeholder="/merch/jacket.svg or https://..."
-                />
-              </div>
+              <ProductImageUploader
+                value={adminProductForm.image}
+                onChange={(url) => setAdminProductForm({ ...adminProductForm, image: url })}
+                storage={storage}
+                auth={auth}
+                appId={appId}
+                label="Product Image"
+              />
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
@@ -1894,18 +2187,14 @@ export const AdminMerchSection = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                  Image URL or Path
-                </label>
-                <input
-                  type="text"
-                  value={productForm.image}
-                  onChange={e => setProductForm({ ...productForm, image: e.target.value })}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
-                  placeholder="/merch/jacket.svg"
-                />
-              </div>
+              <ProductImageUploader
+                value={productForm.image}
+                onChange={(url) => setProductForm({ ...productForm, image: url })}
+                storage={storage}
+                auth={auth}
+                appId={appId}
+                label="Product Image"
+              />
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
