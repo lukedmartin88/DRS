@@ -19,7 +19,7 @@ import {
   Calendar, Users, Ticket, CarFront, MapPin, Clock, ChevronLeft, Award, Heart,
   ExternalLink, UserCircle, Save, Plus, Trash2, Lock, Shield, Edit3, Menu, X,
   LogOut, ImageIcon, History, Home, Eye, EyeOff, UserCog, Download, ChevronRight,
-  CheckCircle2, Grid, Trophy, Video, ShoppingBag
+  CheckCircle2, Grid, Trophy, Video, ShoppingBag, Sparkles, HelpCircle, Check, AlertCircle
 } from 'lucide-react';
 import { MerchStoreView, AdminMerchSection } from './components/MerchView';
 
@@ -178,7 +178,8 @@ const CLUB_HERO = "/club-hero.webp";
 const DEFAULT_AVATAR = "/default-avatar.webp";
 const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
 
-// --- GLOBAL ROBUST TICKET AGGREGATOR ---
+// --- GLOBAL ROBUST TICKET & COMPETITION AGGREGATOR ---
+// Used for the live draw drum: only includes participants who answered correctly!
 const parseRaffleReservations = (raffle, cloudMembers) => {
   const appRes = { ...(raffle.reservations || {}) };
   const offRes = { ...(raffle.offlineReservations || {}) };
@@ -197,27 +198,37 @@ const parseRaffleReservations = (raffle, cloudMembers) => {
   const list = [];
   
   Object.keys(appRes).forEach(uid => {
-    const m = membersById[uid] || { name: 'Pending Setup', avatar: DEFAULT_AVATAR };
-    list.push({
-      id: uid,
-      name: m.name || m.email || 'Pending Setup',
-      avatar: m.avatar || DEFAULT_AVATAR,
-      ticketCount: appRes[uid],
-      type: 'app'
-    });
+    const count = parseInt(appRes[uid]) || 0;
+    if (count > 0) {
+      const m = membersById[uid] || { name: 'Pending Setup', avatar: DEFAULT_AVATAR };
+      list.push({
+        id: uid,
+        name: m.name || m.email || 'Pending Setup',
+        avatar: m.avatar || DEFAULT_AVATAR,
+        ticketCount: count,
+        type: 'app',
+        isCorrect: true
+      });
+    }
   });
   
   Object.keys(offRes).forEach(gid => {
     const record = offRes[gid];
-    const safeCount = typeof record === 'object' ? record.count : parseInt(record) || 0;
+    const safeCount = typeof record === 'object' ? (parseInt(record.count) || 0) : parseInt(record) || 0;
     const safeName = typeof record === 'object' ? record.name : 'Guest Participant';
-    list.push({
-      id: gid,
-      name: safeName,
-      avatar: DEFAULT_AVATAR,
-      ticketCount: safeCount,
-      type: 'offline'
-    });
+    const isCorrect = typeof record === 'object' && record.isCorrect !== undefined ? record.isCorrect : true;
+    
+    // Only entrants who answered correctly enter the draw drum!
+    if (safeCount > 0 && isCorrect) {
+      list.push({
+        id: gid,
+        name: safeName,
+        avatar: DEFAULT_AVATAR,
+        ticketCount: safeCount,
+        type: 'offline',
+        isCorrect: true
+      });
+    }
   });
   
   // Sort alphabetically to prevent jumping during live updates
@@ -227,6 +238,98 @@ const parseRaffleReservations = (raffle, cloudMembers) => {
     return a.id.localeCompare(b.id);
   });
   return list;
+};
+
+// Returns all entrants (both correct and incorrect) for administrative review and post-draw disclosure
+const parseCompetitionEntries = (raffle, cloudMembers) => {
+  const membersById = (cloudMembers || []).reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
+  const entriesMap = {};
+  
+  // 1. Process explicit competitionEntries if recorded
+  const compEntries = { ...(raffle.competitionEntries || {}) };
+  Object.keys(raffle).forEach(key => {
+    if (key.startsWith('competitionEntries.')) {
+      const subKey = key.replace('competitionEntries.', '');
+      compEntries[subKey] = raffle[key];
+    }
+  });
+  
+  Object.values(compEntries).forEach(entry => {
+    if (!entry) return;
+    const key = entry.userId || entry.id;
+    if (!entriesMap[key]) {
+      entriesMap[key] = {
+        id: key,
+        userId: entry.userId,
+        name: entry.name || (membersById[entry.userId]?.name) || 'Club Member',
+        avatar: entry.avatar || (membersById[entry.userId]?.avatar) || DEFAULT_AVATAR,
+        ticketCount: entry.ticketCount || entry.quantity || 1,
+        selectedAnswer: entry.answer || entry.selectedAnswer || '',
+        isCorrect: entry.isCorrect !== undefined ? entry.isCorrect : true,
+        type: entry.type || 'app',
+        createdAt: entry.createdAt || 0
+      };
+    } else {
+      entriesMap[key].ticketCount += (entry.ticketCount || entry.quantity || 1);
+    }
+  });
+  
+  // 2. Merge in legacy reservations
+  const appRes = { ...(raffle.reservations || {}) };
+  Object.keys(raffle).forEach(key => {
+    if (key.startsWith('reservations.')) {
+      const subKey = key.replace('reservations.', '');
+      appRes[subKey] = raffle[key];
+    }
+  });
+  Object.keys(appRes).forEach(uid => {
+    if (!entriesMap[uid] && appRes[uid] > 0) {
+      const m = membersById[uid] || { name: 'Club Member', avatar: DEFAULT_AVATAR };
+      entriesMap[uid] = {
+        id: uid,
+        userId: uid,
+        name: m.name || m.email || 'Club Member',
+        avatar: m.avatar || DEFAULT_AVATAR,
+        ticketCount: parseInt(appRes[uid]) || 0,
+        selectedAnswer: raffle.correctAnswer || 'Correct',
+        isCorrect: true,
+        type: 'app',
+        createdAt: 0
+      };
+    }
+  });
+  
+  // 3. Merge in offline reservations
+  const offRes = { ...(raffle.offlineReservations || {}) };
+  Object.keys(raffle).forEach(key => {
+    if (key.startsWith('offlineReservations.')) {
+      const subKey = key.replace('offlineReservations.', '');
+      offRes[subKey] = raffle[key];
+    }
+  });
+  Object.keys(offRes).forEach(gid => {
+    if (!entriesMap[gid]) {
+      const record = offRes[gid];
+      const safeCount = typeof record === 'object' ? (parseInt(record.count) || 0) : parseInt(record) || 0;
+      const safeName = typeof record === 'object' ? record.name : 'Guest Participant';
+      const isCorrect = typeof record === 'object' && record.isCorrect !== undefined ? record.isCorrect : true;
+      const ans = typeof record === 'object' && record.answer ? record.answer : (isCorrect ? raffle.correctAnswer : 'Incorrect');
+      entriesMap[gid] = {
+        id: gid,
+        name: safeName,
+        avatar: DEFAULT_AVATAR,
+        ticketCount: safeCount,
+        selectedAnswer: ans,
+        isCorrect: isCorrect,
+        type: 'offline',
+        createdAt: 0
+      };
+    }
+  });
+  
+  const allList = Object.values(entriesMap);
+  allList.sort((a, b) => a.name.localeCompare(b.name));
+  return allList;
 };
 
 // --- SHARED COMPONENTS ---
@@ -253,7 +356,7 @@ const navItems = [
   { id: 'gallery', label: 'Gallery', icon: Grid },
   { id: 'members', label: 'Members', icon: Users },
   { id: 'profile', label: 'My Profile', icon: UserCircle },
-  { id: 'raffles', label: 'Raffles', icon: Ticket },
+  { id: 'competitions', label: 'Competitions', icon: Trophy },
   { id: 'merch', label: 'Merch', icon: ShoppingBag },
   { id: 'charity', label: 'Charity', icon: Heart },
 ];
@@ -428,9 +531,9 @@ const guideSections = [
     { title: 'Deploy Events', content: 'Fill out the new event form to update the board.' },
     { title: 'Guest Lists', content: 'Download a PDF roster of all attendees directly from the event card.' }
   ]},
-  { id: '3', title: 'Raffle System', icon: Trophy, steps: [
-    { title: 'Offline Tickets', content: 'Use the manual reservation tool for cash payments to insert their name into the drum.' },
-    { title: 'The Draw Machine', content: 'Launch the draw machine to record and download the winner reveal video. The system automatically weights the odds based on tickets held.' }
+  { id: '3', title: 'Skill Competition System', icon: Trophy, steps: [
+    { title: 'UK Compliance', content: 'Set a skill-based automotive question to qualify entrants for the draw drum under UK prize competition regulations.' },
+    { title: 'The Draw Machine', content: 'Launch the draw machine to record and download the winner reveal video. Only entrants with the correct answer are placed into the draw drum.' }
   ]}
 ];
 
@@ -445,15 +548,18 @@ const STATIC_CHARITY = [{
 const STATIC_RAFFLES = [{
   id: 'mock-past-raffle',
   title: "Premium Prize Bundle",
-  description: "A massive thank you to everyone who entered.",
+  description: "Official UK skill-based competition. A massive thank you to everyone who entered and answered correctly!",
   drawDate: "20th April 2026",
   ticketPrice: 5,
   totalTickets: 100,
   ticketsSold: 100,
-  reservations: {},
+  reservations: { 'mock_winner': 10 },
   image: "https://i.ibb.co/fzbH9zQj/Whats-App-Image-2026-05-10-at-10-23-14-PM.jpg",
   isEnded: true,
-  winner: "Steve Ronnie"
+  winner: "Steve Ronnie",
+  question: "In what year was the Daily Ride South (DRS) club founded?",
+  options: ["2018", "2020", "2022", "2024"],
+  correctAnswer: "2022"
 }];
 
 // --- VIEWS ---
@@ -941,14 +1047,14 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
         </div>
       </div>
       
-      <div onClick={() => window.location.hash = 'raffles'} className="bg-gradient-to-r from-lime-500 via-lime-600 to-emerald-600 text-black rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-lime-500/25 mb-10 group border border-lime-400/60">
+      <div onClick={() => window.location.hash = 'competitions'} className="bg-gradient-to-r from-lime-500 via-lime-600 to-emerald-600 text-black rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-lime-500/25 mb-10 group border border-lime-400/60">
         <div className="flex items-center gap-4 md:gap-6">
           <div className="bg-white/20 p-3 md:p-4 rounded-full shadow-inner">
-            <Ticket className="w-8 h-8 md:w-10 md:h-10 text-black" />
+            <Trophy className="w-8 h-8 md:w-10 md:h-10 text-black" />
           </div>
           <div>
-            <h3 className="text-xl md:text-3xl font-black text-black uppercase tracking-tighter">Live Club Raffles</h3>
-            <p className="text-black/80 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Win premium prizes & support the club</p>
+            <h3 className="text-xl md:text-3xl font-black text-black uppercase tracking-tighter">Live Club Competitions</h3>
+            <p className="text-black/80 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-1">Win premium prizes & test your automotive knowledge (UK Skill Draws)</p>
           </div>
         </div>
         <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-black group-hover:translate-x-2 transition-transform shrink-0" />
@@ -1300,9 +1406,11 @@ const SumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
 });
 
 const RafflePreviewCard = ({ raffle, members, onClick }) => {
-  const allReservedList = parseRaffleReservations(raffle, members);
-  const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-  const progress = Math.min((totalReserved / raffle.totalTickets) * 100, 100);
+  const allEntries = parseCompetitionEntries(raffle, members);
+  const totalEntries = raffle.totalEntriesSold !== undefined 
+    ? raffle.totalEntriesSold 
+    : (raffle.ticketsSold || allEntries.reduce((sum, item) => sum + item.ticketCount, 0));
+  const progress = Math.min((totalEntries / raffle.totalTickets) * 100, 100);
   
   return (
     <div
@@ -1318,9 +1426,14 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent" />
-        <div className="absolute top-3 left-3 bg-pink-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-lg uppercase tracking-widest">
-          £{raffle.ticketPrice} / ticket
+        <div className="absolute top-3 left-3 bg-lime-500 text-black text-[10px] font-black px-2.5 py-1 rounded-lg shadow-lg uppercase tracking-widest">
+          £{raffle.ticketPrice} / Entry
         </div>
+        {raffle.question && (
+          <div className="absolute top-3 right-3 bg-black/80 backdrop-blur-sm text-lime-400 border border-lime-500/40 text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider flex items-center gap-1.5 shadow">
+            <Sparkles className="w-3 h-3 text-lime-400" /> Skill Draw
+          </div>
+        )}
         {raffle.isEnded && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
             <span className="bg-black/90 text-pink-500 font-black text-sm uppercase tracking-[0.3em] px-5 py-2 border border-lime-500/50 -rotate-3 shadow-2xl">
@@ -1337,35 +1450,42 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
         )}
       </div>
       <div className="p-4 space-y-3 flex flex-col flex-grow justify-between">
-        <h3 className="text-white font-black uppercase tracking-tight text-base leading-tight truncate">
-          {raffle.title}
-        </h3>
+        <div>
+          <h3 className="text-white font-black uppercase tracking-tight text-base leading-tight truncate">
+            {raffle.title}
+          </h3>
+          {raffle.question && (
+            <p className="text-zinc-400 text-xs mt-1 line-clamp-1 italic">
+              Q: {raffle.question}
+            </p>
+          )}
+        </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex -space-x-2">
-              {allReservedList.slice(0, 5).map((m) => (
+              {allEntries.slice(0, 5).map((m) => (
                 <img
                   key={m.id}
                   src={m.avatar || DEFAULT_AVATAR}
                   loading="lazy"
                   decoding="async"
-                  title={`${m.name} : ${m.ticketCount} ticket${m.ticketCount !== 1 ? 's' : ''}`}
+                  title={`${m.name} : ${m.ticketCount} entry${m.ticketCount !== 1 ? 'ies' : ''}`}
                   className="w-7 h-7 rounded-full border-2 border-zinc-900 object-cover relative z-10"
                   alt=""
                 />
               ))}
-              {allReservedList.length > 5 && (
+              {allEntries.length > 5 && (
                 <div className="w-7 h-7 rounded-full border-2 border-zinc-900 bg-zinc-700 flex items-center justify-center text-[9px] font-black text-white relative z-10">
-                  +{allReservedList.length - 5}
+                  +{allEntries.length - 5}
                 </div>
               )}
             </div>
-            {allReservedList.length === 0 && (
-              <span className="text-zinc-600 text-[10px] italic">No tickets yet</span>
+            {allEntries.length === 0 && (
+              <span className="text-zinc-600 text-[10px] italic">No entries yet</span>
             )}
           </div>
           <span className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">
-            {totalReserved}/{raffle.totalTickets} sold
+            {totalEntries}/{raffle.totalTickets} sold
           </span>
         </div>
         <div>
@@ -1377,7 +1497,7 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
           </div>
           <button className="w-full mt-4 bg-zinc-800 group-hover:bg-lime-500 group-hover:text-black text-white font-black py-2.5 rounded-xl text-[10px] uppercase tracking-widest transition-colors duration-300 flex items-center justify-center gap-2">
             <Eye className="w-3.5 h-3.5" />
-            {raffle.isEnded ? 'View Results' : 'View Draw'}
+            {raffle.isEnded ? 'View Results' : 'Enter Competition'}
           </button>
         </div>
       </div>
@@ -1389,6 +1509,8 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
   const raffle = raffles.find((r) => r.id === raffleId);
   const [activeImg, setActiveImg] = useState(0);
   const [reserveQuantity, setReserveQuantity] = useState(1);
+  const [selectedAnswer, setSelectedAnswer] = useState('');
+  const [answerError, setAnswerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [loginPrompt, setLoginPrompt] = useState(false);
@@ -1400,26 +1522,23 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
     return members.reduce((acc, m) => { acc[m.id] = m; return acc; }, {});
   }, [members]);
   
-  const handlePaymentSuccess = useCallback(() => {
-    setPaymentSuccess(true);
-  }, []);
-  
-  const handlePaymentFail = useCallback((body) => {
-    console.error("Payment Failed:", body);
-    setSubmitError('Payment failed or was cancelled. Please try again.');
-    setSumupCheckoutId(null);
-  }, []);
-  
   if (!raffle) return (
     <div className="text-center py-20 text-zinc-500">
-      <p className="font-bold uppercase tracking-widest">Raffle not found.</p>
+      <p className="font-bold uppercase tracking-widest">Competition not found.</p>
       <button onClick={onBack} className="mt-4 text-lime-400 underline text-sm">Go back</button>
     </div>
   );
   
-  const allReservedList = parseRaffleReservations(raffle, members);
-  const totalReserved = allReservedList.reduce((sum, item) => sum + item.ticketCount, 0);
-  const progress = Math.min((totalReserved / raffle.totalTickets) * 100, 100);
+  // All public competition entries (for display before reveal - does NOT leak correct/incorrect)
+  const allEntriesList = parseCompetitionEntries(raffle, members);
+  const totalEntriesSold = raffle.totalEntriesSold !== undefined 
+    ? raffle.totalEntriesSold 
+    : (raffle.ticketsSold || allEntriesList.reduce((sum, item) => sum + item.ticketCount, 0));
+  const progress = Math.min((totalEntriesSold / raffle.totalTickets) * 100, 100);
+
+  // Qualified entries (those who got the question right - only put into the drum)
+  const qualifiedList = parseRaffleReservations(raffle, members);
+  const totalQualifiedTickets = qualifiedList.reduce((sum, item) => sum + item.ticketCount, 0);
   
   const galleryImages = [
     raffle.image,
@@ -1428,40 +1547,94 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
   ].filter(Boolean);
   
   const submitReservation = async () => {
-  if (!user || user.isAnonymous || !membersById[user.uid]?.name) {
-    setLoginPrompt(true);
-    return;
-  }
-  setIsSubmitting(true);
-  setSubmitError('');
-  
-  try {
-    const res = await fetch(
-      'https://createsumupcheckout-7hvlzmnlea-uc.a.run.app',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reference: `drs_${user.uid}_${Date.now()}`,
-          amount: raffle.ticketPrice * reserveQuantity,
-          description: `${membersById[user.uid]?.name || 'Unknown Member'} : ${raffle.title} (x${reserveQuantity})`,
-        })  
-      }
-    );
-    
-    if (!res.ok) throw new Error(`Server error ${res.status}`);
-    const { checkoutId } = await res.json();
-    
-    if (checkoutId) {
-      setSumupCheckoutId(checkoutId);
-    } else {
-      throw new Error('No checkout ID returned');
+    if (!user || user.isAnonymous || !membersById[user.uid]?.name) {
+      setLoginPrompt(true);
+      return;
     }
-  } catch (e) {
-    setSubmitError(e.message.includes('fetch') ? 'Connection error. Please try again.' : e.message);
-    setIsSubmitting(false);
-  }
-};
+
+    if (raffle.question && (!selectedAnswer || selectedAnswer.trim() === '')) {
+      setAnswerError('Please select or enter your answer to the skill question to enter.');
+      return;
+    }
+    setAnswerError('');
+    setIsSubmitting(true);
+    setSubmitError('');
+    
+    try {
+      const res = await fetch(
+        'https://createsumupcheckout-7hvlzmnlea-uc.a.run.app',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reference: `drs_${user.uid}_${Date.now()}`,
+            amount: raffle.ticketPrice * reserveQuantity,
+            description: `${membersById[user.uid]?.name || 'Unknown Member'} : ${raffle.title} (x${reserveQuantity})`,
+          })  
+        }
+      );
+      
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const { checkoutId } = await res.json();
+      
+      if (checkoutId) {
+        setSumupCheckoutId(checkoutId);
+      } else {
+        throw new Error('No checkout ID returned');
+      }
+    } catch (e) {
+      setSubmitError(e.message.includes('fetch') ? 'Connection error. Please try again.' : e.message);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSuccessfulPayment = async () => {
+    try {
+      // Determine behind the scenes if answer is correct
+      const isCorrect = raffle.correctAnswer
+        ? (selectedAnswer || '').trim().toLowerCase() === (raffle.correctAnswer || '').trim().toLowerCase()
+        : true;
+
+      if (!raffle.id.startsWith('mock-')) {
+        const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
+        const entryId = `entry_${user.uid}_${Date.now()}`;
+        const memberInfo = membersById[user.uid] || {};
+        
+        const newEntry = {
+          id: entryId,
+          userId: user.uid,
+          name: memberInfo.name || memberInfo.email || user.email || 'Club Member',
+          avatar: memberInfo.avatar || DEFAULT_AVATAR,
+          ticketCount: reserveQuantity,
+          selectedAnswer: selectedAnswer || '',
+          isCorrect: isCorrect,
+          createdAt: Date.now(),
+          type: 'app'
+        };
+
+        const updates = {
+          [`competitionEntries.${entryId}`]: newEntry,
+          totalEntriesSold: (raffle.totalEntriesSold || 0) + reserveQuantity
+        };
+
+        // UK Skill Draw: Behind the scenes, ONLY those who answer correctly get tickets put into the drum!
+        if (isCorrect) {
+          const appRes = raffle.reservations || {};
+          const currentVal = appRes[user.uid] || 0;
+          updates[`reservations.${user.uid}`] = currentVal + reserveQuantity;
+        }
+
+        await updateDoc(rRef, updates).catch(() => setDoc(rRef, updates, { merge: true }));
+      }
+
+      setPaymentSuccess(true);
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error("Database update failed after payment:", error);
+      setPaymentSuccess(true);
+      setIsSubmitting(false);
+    }
+  };
   
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -1470,7 +1643,7 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
         className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors group"
       >
         <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-        <span className="text-xs font-black uppercase tracking-widest">Back to Raffles</span>
+        <span className="text-xs font-black uppercase tracking-widest">Back to Competitions</span>
       </button>
       <div className="grid lg:grid-cols-2 gap-10 lg:gap-16">
         <div className="space-y-6">
@@ -1535,6 +1708,11 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
             )}
           </div>
           <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="bg-lime-500/10 text-lime-400 border border-lime-500/30 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-lime-400" /> UK Skill Competition
+              </span>
+            </div>
             <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter leading-none">
               {raffle.title}
             </h1>
@@ -1547,62 +1725,96 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
               </p>
             )}
           </div>
+
           {!raffle.isEnded && <CountdownTimer drawDate={raffle.drawDate} />}
+
           {raffle.isEnded && (
-            <div className="bg-pink-900/20 border border-pink-500/40 rounded-2xl p-6 text-center">
-              <Trophy className="w-10 h-10 text-yellow-500 mx-auto mb-3" />
-              <p className="text-pink-500 font-black uppercase tracking-widest text-sm mb-2">Draw Complete</p>
-              <p className="text-white font-bold">1st Place: <span className="text-yellow-400">{raffle.winner}</span></p>
-              {raffle.winner2 && (
-                <p className="text-zinc-400 font-bold mt-1">2nd Place: <span className="text-white">{raffle.winner2}</span></p>
+            <div className="bg-pink-900/20 border border-pink-500/40 rounded-2xl p-6 text-center space-y-3">
+              <Trophy className="w-10 h-10 text-yellow-500 mx-auto" />
+              <p className="text-pink-500 font-black uppercase tracking-widest text-sm">Draw Complete</p>
+              <div className="space-y-1">
+                <p className="text-white font-bold text-lg">1st Place Winner: <span className="text-yellow-400">{raffle.winner}</span></p>
+                {raffle.winner2 && (
+                  <p className="text-zinc-400 font-bold">2nd Place Winner: <span className="text-white">{raffle.winner2}</span></p>
+                )}
+              </div>
+              {raffle.question && (
+                <div className="mt-4 pt-4 border-t border-pink-500/20 text-left bg-black/40 p-3 rounded-xl">
+                  <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">Official Competition Question & Answer:</p>
+                  <p className="text-white text-sm font-semibold mt-1">Q: {raffle.question}</p>
+                  <p className="text-lime-400 text-xs font-black uppercase tracking-wider mt-1 flex items-center gap-1">
+                    <Check className="w-4 h-4" /> Correct Answer: {raffle.correctAnswer || 'Not specified'}
+                  </p>
+                  <p className="text-zinc-500 text-[10px] mt-1">
+                    Only participants with the correct answer were entered into the live draw drum ({totalQualifiedTickets} qualified tickets in the drum).
+                  </p>
+                </div>
               )}
             </div>
           )}
+
           {raffle.description && (
             <div className="bg-zinc-900/60 border border-zinc-800/50 rounded-2xl p-6">
-              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-3">About This Draw</p>
+              <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-3">About This Competition</p>
               <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{raffle.description}</p>
             </div>
           )}
+
+          {/* PARTICIPANTS & ENTRANTS LIST */}
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-4">
-              Ticket Holders ({allReservedList.length})
-            </p>
-            {allReservedList.length === 0 ? (
-              <p className="text-zinc-600 italic text-sm">No tickets reserved yet - be the first!</p>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-zinc-400 text-xs font-black uppercase tracking-widest">
+                Registered Entrants ({allEntriesList.length})
+              </p>
+              <span className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">
+                {totalEntriesSold} Total Entries Sold
+              </span>
+            </div>
+
+            {allEntriesList.length === 0 ? (
+              <p className="text-zinc-600 italic text-sm">No entries yet - be the first to enter!</p>
             ) : (
               <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-                {allReservedList.map((m) => (
+                {allEntriesList.map((m) => (
                   <div key={m.id} className="flex items-center gap-2 bg-black/50 rounded-xl p-2 border border-zinc-800/50">
                     <img src={m.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" alt="" />
                     <div className="min-w-0">
                       <p className="text-white text-xs font-bold truncate">{m.name}</p>
-                      <p className="text-pink-500 text-[9px] font-black uppercase tracking-widest">
-                        {m.ticketCount} ticket{m.ticketCount !== 1 ? 's' : ''}
+                      <p className="text-lime-400 text-[9px] font-black uppercase tracking-widest">
+                        {m.ticketCount} {m.ticketCount === 1 ? 'entry' : 'entries'}
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+
+            {!raffle.isEnded && (
+              <p className="text-zinc-600 text-[10px] italic mt-3 text-center">
+                * As per UK regulations, answer correctness is kept sealed and verified live during the official draw.
+              </p>
+            )}
           </div>
         </div>
+
+        {/* RIGHT COLUMN: ENTER COMPETITION / CHECKOUT */}
         <div className="lg:sticky lg:top-28 h-fit">
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl space-y-6">
             <div className="flex justify-between items-center pb-5 border-b border-zinc-800">
               <div>
                 <span className="text-lime-400 font-black text-3xl">£{raffle.ticketPrice}</span>
-                <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest ml-2">/ Ticket</span>
+                <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest ml-2">/ Entry</span>
               </div>
               <div className="text-right">
-                <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-widest">Draw Date</p>
+                <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-widest">Live Draw Date</p>
                 <p className="text-white text-xs font-bold">{raffle.drawDate}</p>
               </div>
             </div>
+
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-bold uppercase text-zinc-500 tracking-widest">
-                <span>{totalReserved} sold</span>
-                <span>{raffle.totalTickets - totalReserved} remaining</span>
+                <span>{totalEntriesSold} sold</span>
+                <span>{Math.max(0, raffle.totalTickets - totalEntriesSold)} remaining</span>
               </div>
               <div className="w-full bg-zinc-800 rounded-full h-2.5 shadow-inner">
                 <div
@@ -1614,20 +1826,21 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                 {Math.round(progress)}% full
               </p>
             </div>
+
             {raffle.isEnded ? (
               <div className="text-center py-6">
-                <p className="text-pink-500 font-black uppercase tracking-widest">This draw has closed.</p>
+                <p className="text-pink-500 font-black uppercase tracking-widest">This competition has closed.</p>
               </div>
             ) : raffle.isPaused ? (
               <div className="text-center py-6">
-                <p className="text-orange-500 font-black uppercase tracking-widest">This draw is currently paused.</p>
-                <p className="text-zinc-400 text-xs mt-2">Ticket reservations are temporarily disabled.</p>
+                <p className="text-orange-500 font-black uppercase tracking-widest">This competition is currently paused.</p>
+                <p className="text-zinc-400 text-xs mt-2">Entries are temporarily disabled.</p>
               </div>
             ) : loginPrompt ? (
               <div className="text-center space-y-4">
                 <UserCircle className="w-12 h-12 text-lime-400 mx-auto" />
                 <p className="text-white font-bold uppercase tracking-widest text-sm">Member Access Required</p>
-                <p className="text-zinc-400 text-xs">Log in or complete your profile to buy tickets.</p>
+                <p className="text-zinc-400 text-xs">Log in or complete your profile to enter competitions.</p>
                 <button
                   onClick={() => { window.location.hash = 'profile'; }}
                   className="w-full bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20"
@@ -1636,45 +1849,52 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                 </button>
               </div>
             ) : paymentSuccess ? (
-              <div className="text-center space-y-4 py-4">
-                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto border border-green-500/50">
-                  <CheckCircle2 className="w-8 h-8 text-green-500" />
+              <div className="text-center space-y-4 py-4 animate-in fade-in zoom-in-95 duration-500">
+                <div className="w-16 h-16 bg-lime-500/20 rounded-full flex items-center justify-center mx-auto border border-lime-500/50">
+                  <CheckCircle2 className="w-8 h-8 text-lime-400" />
                 </div>
-                <p className="text-xl font-black text-white uppercase tracking-widest">Payment Complete!</p>
-                <p className="text-zinc-400 text-sm">Your tickets are in the drum. Good luck!</p>
+                <div>
+                  <p className="text-xl font-black text-white uppercase tracking-widest">Good Luck!</p>
+                  <p className="text-lime-400 font-bold text-xs uppercase tracking-wider mt-1">Payment Received & Entries Registered</p>
+                </div>
+                <div className="bg-black/50 p-4 rounded-xl border border-zinc-800 text-zinc-300 text-xs leading-relaxed text-left space-y-2">
+                  <p>
+                    Thank you for entering! Your payment for <strong>{reserveQuantity} {reserveQuantity === 1 ? 'entry' : 'entries'}</strong> has been confirmed.
+                  </p>
+                  <p className="text-zinc-400 text-[11px]">
+                    In compliance with UK prize competition regulations, entries answering the skill question correctly are automatically put into the live draw drum.
+                  </p>
+                  <p className="text-zinc-500 text-[10px] italic">
+                    Note: Entrants do not receive prior notification of correctness; answer results and winners will be revealed live during the draw on <strong>{raffle.drawDate}</strong>.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setPaymentSuccess(false);
+                    setSumupCheckoutId(null);
+                    setSelectedAnswer('');
+                  }}
+                  className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3 rounded-xl uppercase tracking-widest text-xs transition-colors"
+                >
+                  Enter Again
+                </button>
               </div>
             ) : sumupCheckoutId ? (
               <SumUpWidget 
-  checkoutId={sumupCheckoutId} 
-  onSuccess={async () => {
-    try {
-      // 1. Assign tickets ONLY after successful payment
-      if (!raffle.id.startsWith('mock-')) {
-        const rRef = doc(db, 'artifacts', appId, 'public', 'data', 'raffles', raffle.id);
-        const currentVal = (raffle.reservations || {})[user.uid] || 0;
-        await setDoc(rRef, { reservations: { [user.uid]: currentVal + reserveQuantity } }, { merge: true });
-      }
-
-      // 2. Add email receipt logic here if using the Firebase extension
-      // await addDoc(collection(db, 'mail'), { ... });
-
-      // 3. Show success screen
-      setPaymentSuccess(true);
-      setIsSubmitting(false);
-    } catch (error) {
-      console.error("Database update failed after payment:", error);
-    }
-  }} 
-  onFail={(error) => {
-    console.error("Payment failed or cancelled:", error);
-    setIsSubmitting(false); // Unfreeze the button so they can try again
-  }} 
-/>
+                checkoutId={sumupCheckoutId} 
+                onSuccess={handleSuccessfulPayment} 
+                onFail={(error) => {
+                  console.error("Payment failed or cancelled:", error);
+                  setIsSubmitting(false);
+                  setSubmitError('Payment was not completed. Please try again.');
+                }} 
+              />
             ) : (
-              <div className="space-y-5">
+              <div className="space-y-6">
+                {/* STEP 1: QUANTITY */}
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center mb-3">
-                    Number of Tickets
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-400 text-center mb-2">
+                    Step 1: Number of Entries
                   </label>
                   <div className="flex items-center justify-between bg-black border border-zinc-800 rounded-2xl p-2">
                     <button
@@ -1691,18 +1911,106 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                       +
                     </button>
                   </div>
+                  <div className="flex justify-center gap-2 mt-2">
+                    {[1, 3, 5, 10].map(qty => (
+                      <button
+                        key={qty}
+                        type="button"
+                        onClick={() => setReserveQuantity(qty)}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
+                          reserveQuantity === qty ? 'bg-lime-500 text-black' : 'bg-black text-zinc-400 hover:text-white border border-zinc-800'
+                        }`}
+                      >
+                        +{qty}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                {/* STEP 2: SKILL QUESTION (UK COMPLIANCE) */}
+                {raffle.question && (
+                  <div className="bg-black/60 p-4 rounded-2xl border border-lime-500/30 space-y-3">
+                    <div className="flex items-center gap-2 text-lime-400">
+                      <HelpCircle className="w-4 h-4 shrink-0" />
+                      <label className="text-[10px] font-black uppercase tracking-widest">
+                        Step 2: Answer the Skill Question to Qualify
+                      </label>
+                    </div>
+                    <p className="text-white text-sm font-bold leading-snug">
+                      {raffle.question}
+                    </p>
+
+                    {raffle.options && Array.isArray(raffle.options) && raffle.options.length > 0 ? (
+                      <div className="space-y-2 pt-1">
+                        {raffle.options.map((opt, idx) => {
+                          const isSelected = selectedAnswer === opt;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setSelectedAnswer(opt);
+                                setAnswerError('');
+                              }}
+                              className={`w-full text-left p-3 rounded-xl text-xs font-bold transition-all flex items-center justify-between border ${
+                                isSelected 
+                                  ? 'bg-lime-500/10 border-lime-400 text-white shadow-sm' 
+                                  : 'bg-zinc-900/70 border-zinc-800 text-zinc-300 hover:border-zinc-700'
+                              }`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
+                                  isSelected ? 'bg-lime-500 text-black' : 'bg-zinc-800 text-zinc-400'
+                                }`}>
+                                  {String.fromCharCode(65 + idx)}
+                                </span>
+                                <span>{opt}</span>
+                              </span>
+                              {isSelected && <Check className="w-4 h-4 text-lime-400 shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="Type your answer here..."
+                        value={selectedAnswer}
+                        onChange={(e) => {
+                          setSelectedAnswer(e.target.value);
+                          setAnswerError('');
+                        }}
+                        className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-xl p-3 text-xs outline-none focus:border-lime-500 transition-colors"
+                      />
+                    )}
+
+                    {answerError && (
+                      <div className="flex items-center gap-1.5 text-red-400 text-[11px] font-bold">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{answerError}</span>
+                      </div>
+                    )}
+
+                    <p className="text-zinc-500 text-[9px] leading-relaxed italic pt-1">
+                      UK Regulations: Correct answers are entered into the draw drum. Result announced during the live draw.
+                    </p>
+                  </div>
+                )}
+
+                {/* STEP 3: SUMMARY & PAYMENT */}
                 <div className="bg-black/50 p-4 rounded-xl border border-zinc-800/50 text-center">
-                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total</p>
+                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total Payable</p>
                   <p className="text-lime-400 font-black text-3xl">£{raffle.ticketPrice * reserveQuantity}</p>
                 </div>
+
                 <button
                   onClick={submitReservation}
                   disabled={isSubmitting}
                   className="w-full bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-lime-500/20 active:scale-[0.98]"
                 >
-                  {isSubmitting ? 'Loading Checkout...' : 'Confirm & Pay via SumUp'}
+                  {isSubmitting ? 'Opening Secure Checkout...' : 'Confirm & Pay via SumUp'}
                 </button>
+
                 {submitError && (
                   <p className="text-red-500 text-[10px] font-bold text-center uppercase tracking-widest">{submitError}</p>
                 )}
@@ -1719,7 +2027,7 @@ const RafflesView = ({ raffles, user, members }) => {
   const activeRaffles = raffles.filter((r) => !r.isEnded);
   const pastRaffles = raffles.filter((r) => r.isEnded);
   
- useEffect(() => {
+  useEffect(() => {
     if (!document.getElementById('sumup-card-sdk')) {
       const script = document.createElement('script');
       script.id = 'sumup-card-sdk';
@@ -1730,21 +2038,25 @@ const RafflesView = ({ raffles, user, members }) => {
   }, []);
   
   const handleOpen = (raffle) => {
-    window.location.hash = `raffle_detail_${raffle.id}`;
+    window.location.hash = `competition_detail_${raffle.id}`;
   };
   
   return (
     <div className="space-y-12">
       <div className="bg-zinc-900/60 p-6 md:p-8 rounded-3xl border border-zinc-800/50 shadow-inner">
+        <div className="flex items-center gap-2 mb-2 text-lime-400">
+          <Trophy className="w-5 h-5" />
+          <span className="text-xs font-black uppercase tracking-widest">DRS Skill-Based Competitions</span>
+        </div>
         <p className="text-zinc-300 text-sm md:text-base leading-relaxed italic">
-          Try your luck and win incredible club prizes whilst raising funds to keep DRS going. Click any draw to see full details and secure your tickets.
+          Enter our official UK skill-based prize competitions! Select your entries, answer the automotive skill question, and correct entries will be entered directly into the live draw drum. All draws take place transparently using the DRS Draw Machine.
         </p>
       </div>
       <div className="space-y-5">
-        <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Raffles</h2>
+        <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Active Competitions</h2>
         {activeRaffles.length === 0 ? (
           <p className="text-zinc-500 py-12 text-center italic border border-dashed border-zinc-800 rounded-3xl">
-            No active raffles right now. Check back soon!
+            No active competitions right now. Check back soon for the next draw!
           </p>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -1756,7 +2068,7 @@ const RafflesView = ({ raffles, user, members }) => {
       </div>
       {pastRaffles.length > 0 && (
         <div className="space-y-5">
-          <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Past Winners</h2>
+          <h2 className="text-3xl font-bold text-white border-b border-zinc-800 pb-2">Past Winners & Concluded Draws</h2>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {pastRaffles.map((r) => (
               <RafflePreviewCard key={r.id} raffle={r} members={members} onClick={() => handleOpen(r)} />
@@ -1856,10 +2168,24 @@ const RaffleDrawModal = ({ raffle, members, onClose, onSetWinner }) => {
       <canvas ref={canvasRef} width="800" height="600" className="hidden" />
       <Trophy className={`w-20 h-20 mb-8 ${currentWinner ? 'text-yellow-500 scale-125' : 'text-lime-400'} transition-transform duration-500`} />
       
-      <div className="mb-6 text-center">
-        <p className="text-pink-500 font-bold uppercase tracking-widest">{drawPhase === 1 ? '1st Place Draw' : '2nd Place Draw'}</p>
-        <p className="text-white font-black text-xl">{drawPhase === 1 ? raffle.title : raffle.prize2Title}</p>
+      <div className="mb-4 text-center">
+        <p className="text-pink-500 font-bold uppercase tracking-widest text-xs">{drawPhase === 1 ? '1st Place Draw' : '2nd Place Draw'}</p>
+        <p className="text-white font-black text-2xl mt-1">{drawPhase === 1 ? raffle.title : raffle.prize2Title}</p>
       </div>
+
+      {raffle.question && (
+        <div className="bg-black/70 border border-lime-500/40 rounded-2xl px-6 py-3 text-center mb-6 max-w-xl shadow-lg">
+          <p className="text-zinc-400 text-xs font-semibold">Q: {raffle.question}</p>
+          <div className="flex items-center justify-center gap-3 mt-1.5 pt-1.5 border-t border-zinc-800">
+            <span className="text-lime-400 text-xs font-black uppercase tracking-wider flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" /> Answer: {raffle.correctAnswer || 'Verified'}
+            </span>
+            <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-wider">
+              • {initialPool.length} Qualified Tickets in Drum
+            </span>
+          </div>
+        </div>
+      )}
       
       <div className={`w-full py-16 px-4 rounded-3xl border ${currentWinner ? 'border-yellow-500 bg-zinc-900/80' : 'border-zinc-800 bg-black/50'} text-center mb-12 max-w-4xl transition-colors duration-500`}>
         <h2 className="text-4xl md:text-6xl font-black text-white italic uppercase break-words">{current}</h2>
@@ -2079,7 +2405,20 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [editingMember, setEditingMember] = useState(null);
   const [editingRaffle, setEditingRaffle] = useState(null);
   const [drawingRaffle, setDrawingRaffle] = useState(null);
-  const [newRaffle, setNewRaffle] = useState({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', image2: '', prize2Title: '', extraImages: [] });
+  const [newRaffle, setNewRaffle] = useState({ 
+    title: '', 
+    description: '', 
+    drawDate: '', 
+    ticketPrice: '', 
+    totalTickets: 100, 
+    image: '', 
+    image2: '', 
+    prize2Title: '', 
+    extraImages: [],
+    question: '',
+    options: ['', '', '', ''],
+    correctAnswer: ''
+  });
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
   const [editSpotlightId, setEditSpotlightId] = useState(spotlightMemberId || '');
@@ -2182,22 +2521,67 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   };
   
   const handlePublishRaffle = async () => {
+    if (!newRaffle.title || !newRaffle.ticketPrice) {
+      alert('Please provide a Prize Title and Ticket Price.');
+      return;
+    }
+    if (!newRaffle.question || !newRaffle.question.trim()) {
+      alert('UK Skill Competition requirement: Please enter a skill question.');
+      return;
+    }
+    if (!newRaffle.correctAnswer || !newRaffle.correctAnswer.trim()) {
+      alert('Please specify the Correct Answer so the system can verify qualifying entries for the draw.');
+      return;
+    }
+
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), newRaffle);
-      setNewRaffle({ title: '', description: '', drawDate: '', ticketPrice: '', totalTickets: 100, image: '', image2: '', prize2Title: '', extraImages: [] });
+      const cleanOptions = Array.isArray(newRaffle.options)
+        ? newRaffle.options.map(o => (typeof o === 'string' ? o.trim() : '')).filter(Boolean)
+        : [];
+
+      const payload = {
+        ...newRaffle,
+        options: cleanOptions,
+        correctAnswer: newRaffle.correctAnswer.trim(),
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'raffles'), payload);
+      setNewRaffle({ 
+        title: '', 
+        description: '', 
+        drawDate: '', 
+        ticketPrice: '', 
+        totalTickets: 100, 
+        image: '', 
+        image2: '', 
+        prize2Title: '', 
+        extraImages: [],
+        question: '',
+        options: ['', '', '', ''],
+        correctAnswer: ''
+      });
+      alert('Competition published successfully with UK skill requirements!');
     } catch (err) {
-      console.error("Error saving raffle:", err);
+      console.error("Error saving competition:", err);
+      alert('Failed to publish competition. Please check console.');
     }
   };
   
   const handleUpdateRaffle = async () => {
     try {
       const { id, ...updateData } = editingRaffle;
+      if (updateData.options && Array.isArray(updateData.options)) {
+        updateData.options = updateData.options.map(o => (typeof o === 'string' ? o.trim() : '')).filter(Boolean);
+      }
+      if (updateData.correctAnswer && typeof updateData.correctAnswer === 'string') {
+        updateData.correctAnswer = updateData.correctAnswer.trim();
+      }
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', id), updateData, { merge: true });
       setEditingRaffle(null);
       window.history.back();
     } catch (err) {
-      console.error("Error updating raffle:", err);
+      console.error("Error updating competition:", err);
     }
   };
   
@@ -2567,12 +2951,22 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
 
       <section className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full bg-lime-500"></div>
-        <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Ticket className="w-5 h-5 text-lime-400" /> Raffle Administration</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2 uppercase tracking-widest"><Trophy className="w-5 h-5 text-lime-400" /> Skill Competition Administration</h3>
+          <a
+            href="https://gemini.google.com/gem/1wrHI2lrWl0OSbF9a6Byb7DV4RyeuODiR?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lime-500/10 hover:bg-lime-500/20 text-lime-400 text-xs font-bold uppercase tracking-wider border border-lime-500/30 transition-all shrink-0"
+          >
+            <Sparkles className="w-4 h-4" /> Question Assistant Gem <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
         
         {editingRaffle ? (
           <div className="bg-black/50 p-6 rounded-2xl border border-lime-500/50 animate-in zoom-in-95 duration-300 mt-6">
             <div className="flex justify-between items-center border-b border-zinc-800 pb-4 mb-4">
-              <h4 className="font-bold text-white uppercase tracking-wider">Editing Raffle: {editingRaffle.title}</h4>
+              <h4 className="font-bold text-white uppercase tracking-wider">Editing Competition: {editingRaffle.title}</h4>
               <button type="button" onClick={(e) => { e.preventDefault(); setEditingRaffle(null); window.history.back(); }} className="text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-lg transition-colors"><X className="w-5 h-5"/></button>
             </div>
             <div className="grid md:grid-cols-2 gap-6">
@@ -2614,12 +3008,116 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                   onUploadSuccess={url => setEditingRaffle(prev => ({ ...prev, extraImages: [...(prev.extraImages || []), url] }))}
                 />
               </div>
+
+              {/* UK SKILL QUESTION & OPTIONS (EDITING) */}
+              <div className="md:col-span-2 bg-zinc-950/90 border border-lime-500/40 rounded-2xl p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-lime-400" />
+                      <h4 className="text-sm font-black text-white uppercase tracking-wider">UK Skill Competition Question & Answer</h4>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1">
+                      UK regulations require a knowledge or skill test. Only entrants who answer correctly are entered into the draw drum.
+                    </p>
+                  </div>
+                  <a
+                    href="https://gemini.google.com/gem/1wrHI2lrWl0OSbF9a6Byb7DV4RyeuODiR?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lime-500/10 hover:bg-lime-500/20 text-lime-400 text-[10px] font-black uppercase tracking-wider border border-lime-500/30 transition-all shrink-0"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Question Assistant <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">Competition Question</label>
+                  <input
+                    type="text"
+                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3.5 outline-none focus:border-lime-500 text-sm transition-all"
+                    placeholder="e.g. Which engine is famously used in the Mk4 Toyota Supra?"
+                    value={editingRaffle.question || ''}
+                    onChange={e => setEditingRaffle({...editingRaffle, question: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">Multiple Choice Options</label>
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase">Click letter button to mark correct answer</span>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {[0, 1, 2, 3].map((optIdx) => {
+                      const currentOpts = Array.isArray(editingRaffle.options) ? [...editingRaffle.options] : ['', '', '', ''];
+                      const val = currentOpts[optIdx] || '';
+                      const isCurrentCorrect = (editingRaffle.correctAnswer || '').trim().toLowerCase() === val.trim().toLowerCase() && val.trim() !== '';
+                      return (
+                        <div key={optIdx} className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all ${isCurrentCorrect ? 'border-lime-500/60 bg-lime-500/5' : 'border-zinc-800 bg-black'}`}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (val.trim()) {
+                                setEditingRaffle(prev => ({ ...prev, correctAnswer: val.trim() }));
+                              }
+                            }}
+                            title="Mark as correct answer"
+                            className={`w-6 h-6 rounded-full flex items-center justify-center border text-[11px] font-black shrink-0 transition-colors ${
+                              isCurrentCorrect 
+                                ? 'bg-lime-400 text-black border-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.5)]' 
+                                : 'border-zinc-700 text-zinc-500 hover:border-zinc-500'
+                            }`}
+                          >
+                            {String.fromCharCode(65 + optIdx)}
+                          </button>
+                          <input
+                            type="text"
+                            placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                            value={val}
+                            onChange={e => {
+                              const nextOpts = [...currentOpts];
+                              nextOpts[optIdx] = e.target.value;
+                              setEditingRaffle(prev => ({
+                                ...prev,
+                                options: nextOpts,
+                                correctAnswer: isCurrentCorrect ? e.target.value.trim() : prev.correctAnswer
+                              }));
+                            }}
+                            className="w-full bg-transparent text-white text-xs outline-none"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-2">
+                  <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">Correct Answer (Matches Qualifying Entries)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Select option button above or enter correct answer..."
+                      value={editingRaffle.correctAnswer || ''}
+                      onChange={e => setEditingRaffle({...editingRaffle, correctAnswer: e.target.value})}
+                      className="w-full bg-black border border-lime-500/40 text-lime-400 font-bold rounded-xl p-3.5 outline-none focus:border-lime-400 text-sm transition-all"
+                    />
+                    {editingRaffle.correctAnswer && (
+                      <span className="px-3 py-2 bg-lime-500/10 text-lime-400 border border-lime-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> Verified
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 italic mt-1">
+                    Entrants will NOT be informed if their answer is correct. Answers are validated on submission and placed into the draw drum silently.
+                  </p>
+                </div>
+              </div>
               
               <div className="md:col-span-2 space-y-1">
-                <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
+                <label className="block text-sm font-medium text-zinc-400">Competition Terms / Details</label>
                 <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" value={editingRaffle.description || ''} onChange={e => setEditingRaffle({...editingRaffle, description: e.target.value})} rows={3} />
               </div>
-              <button type="button" onClick={handleUpdateRaffle} className="md:col-span-2 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-lime-500/20">Save Raffle Changes</button>
+              <button type="button" onClick={handleUpdateRaffle} className="md:col-span-2 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-lime-500/20">Save Competition Changes</button>
             </div>
           </div>
         ) : (
@@ -2663,12 +3161,116 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                   onUploadSuccess={url => setNewRaffle(prev => ({ ...prev, extraImages: [...(prev.extraImages || []), url] }))}
                 />
               </div>
+
+              {/* UK SKILL QUESTION & OPTIONS (NEW RAFFLE) */}
+              <div className="md:col-span-2 bg-zinc-950/90 border border-lime-500/40 rounded-2xl p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-lime-400" />
+                      <h4 className="text-sm font-black text-white uppercase tracking-wider">UK Skill Competition Question & Answer</h4>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 mt-1">
+                      UK Gambling Act requirement: Prize competitions must feature a question testing skill or automotive knowledge. Only correct entrants enter the draw.
+                    </p>
+                  </div>
+                  <a
+                    href="https://gemini.google.com/gem/1wrHI2lrWl0OSbF9a6Byb7DV4RyeuODiR?usp=sharing"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-lime-500/10 hover:bg-lime-500/20 text-lime-400 text-[10px] font-black uppercase tracking-wider border border-lime-500/30 transition-all shrink-0"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Question Assistant <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">Competition Question *</label>
+                  <input
+                    type="text"
+                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3.5 outline-none focus:border-lime-500 text-sm transition-all"
+                    placeholder="e.g. Which engine is famously used in the Mk4 Toyota Supra?"
+                    value={newRaffle.question}
+                    onChange={e => setNewRaffle({...newRaffle, question: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">Multiple Choice Options</label>
+                    <span className="text-[10px] text-zinc-500 font-bold uppercase">Click letter button to mark correct answer</span>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {[0, 1, 2, 3].map((optIdx) => {
+                      const currentOpts = Array.isArray(newRaffle.options) ? [...newRaffle.options] : ['', '', '', ''];
+                      const val = currentOpts[optIdx] || '';
+                      const isCurrentCorrect = (newRaffle.correctAnswer || '').trim().toLowerCase() === val.trim().toLowerCase() && val.trim() !== '';
+                      return (
+                        <div key={optIdx} className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all ${isCurrentCorrect ? 'border-lime-500/60 bg-lime-500/5' : 'border-zinc-800 bg-black'}`}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (val.trim()) {
+                                setNewRaffle(prev => ({ ...prev, correctAnswer: val.trim() }));
+                              }
+                            }}
+                            title="Mark as correct answer"
+                            className={`w-6 h-6 rounded-full flex items-center justify-center border text-[11px] font-black shrink-0 transition-colors ${
+                              isCurrentCorrect 
+                                ? 'bg-lime-400 text-black border-lime-400 shadow-[0_0_8px_rgba(163,230,53,0.5)]' 
+                                : 'border-zinc-700 text-zinc-500 hover:border-zinc-500'
+                            }`}
+                          >
+                            {String.fromCharCode(65 + optIdx)}
+                          </button>
+                          <input
+                            type="text"
+                            placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                            value={val}
+                            onChange={e => {
+                              const nextOpts = [...currentOpts];
+                              nextOpts[optIdx] = e.target.value;
+                              setNewRaffle(prev => ({
+                                ...prev,
+                                options: nextOpts,
+                                correctAnswer: isCurrentCorrect ? e.target.value.trim() : prev.correctAnswer
+                              }));
+                            }}
+                            className="w-full bg-transparent text-white text-xs outline-none"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-2">
+                  <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">Correct Answer * (Matches participant answer)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Select option button above or type exact correct answer..."
+                      value={newRaffle.correctAnswer}
+                      onChange={e => setNewRaffle({...newRaffle, correctAnswer: e.target.value})}
+                      className="w-full bg-black border border-lime-500/40 text-lime-400 font-bold rounded-xl p-3.5 outline-none focus:border-lime-400 text-sm transition-all"
+                    />
+                    {newRaffle.correctAnswer && (
+                      <span className="px-3 py-2 bg-lime-500/10 text-lime-400 border border-lime-500/30 rounded-xl text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5" /> Answer Set
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-zinc-500 italic mt-1">
+                    Secret verification: Participants will NOT be told if they got it right or wrong. Only correct entrants are placed into the draw drum.
+                  </p>
+                </div>
+              </div>
               
               <div className="md:col-span-2 space-y-1">
-                <label className="block text-sm font-medium text-zinc-400">Raffle Terms / Details</label>
+                <label className="block text-sm font-medium text-zinc-400">Competition Terms / Details</label>
                 <textarea className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all" value={newRaffle.description} onChange={e => setNewRaffle({...newRaffle, description: e.target.value})} placeholder="What's for grabs?..." rows={3} />
               </div>
-              <button type="button" onClick={handlePublishRaffle} className="md:col-span-2 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-lime-500/20">Go Live with Raffle</button>
+              <button type="button" onClick={handlePublishRaffle} className="md:col-span-2 bg-lime-500 hover:bg-lime-400 text-black font-black py-4 rounded-xl transition-all uppercase tracking-[0.2em] shadow-lg shadow-lime-500/20">Go Live with Skill Competition</button>
             </div>
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8 pt-8 border-t border-zinc-800/50">
@@ -2856,7 +3458,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                             disabled={!raffleWinners[r.id]?.w1}
                             className="w-full bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 disabled:hover:bg-zinc-800 text-white font-bold py-2 rounded-lg text-[10px] transition-all uppercase tracking-widest border border-zinc-700 mt-1"
                           >
-                            End Raffle Manually
+                            End Competition Manually
                           </button>
                           
                           <button 
@@ -2888,7 +3490,7 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                           type="button"
                           onClick={async (e) => { 
                             e.preventDefault();
-                            if(window.confirm('PERMANENTLY DELETE RAFFLE?')) {
+                            if(window.confirm('PERMANENTLY DELETE COMPETITION?')) {
                               try {
                                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'raffles', r.id));
                               } catch (err) { console.error(err); }
