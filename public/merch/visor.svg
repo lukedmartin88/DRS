@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+  <defs>
+    <radialGradient id="visor-bg" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#181c24" />
+      <stop offset="60%" stop-color="#0e1014" />
+      <stop offset="100%" stop-color="#060708" />
+    </radialGradient>
+    <linearGradient id="case-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2c323d" />
+      <stop offset="40%" stop-color="#181b21" />
+      <stop offset="80%" stop-color="#0e1014" />
+      <stop offset="100%" stop-color="#15181e" />
+    </linearGradient>
+    <filter id="case-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="25" stdDeviation="25" flood-color="#000" flood-opacity="0.9" />
+    </filter>
+  </defs>
+
+  <rect width="800" height="600" fill="url(#visor-bg)" />
+  <ellipse cx="400" cy="500" rx="300" ry="40" fill="#84cc16" opacity="0.06" />
+
+  <g transform="translate(130, 110)" filter="url(#case-shadow)">
+    <!-- Rear Attachment Straps / Clips -->
+    <rect x="70" y="20" width="40" height="60" rx="4" fill="#0c0e12" stroke="#252b36" stroke-width="2" />
+    <rect x="430" y="20" width="40" height="60" rx="4" fill="#0c0e12" stroke="#252b36" stroke-width="2" />
+
+    <!-- Hard-shell Visor Case Organiser Body -->
+    <rect x="40" y="50" width="460" height="280" rx="28" fill="url(#case-body)" stroke="#2f3644" stroke-width="2.5" />
+
+    <!-- Perimeter Zipper / Bevel Seam -->
+    <rect x="52" y="62" width="436" height="256" rx="20" fill="none" stroke="#0b0d10" stroke-width="6" />
+    <rect x="52" y="62" width="436" height="256" rx="20" fill="none" stroke="#282f3a" stroke-width="1.5" stroke-dasharray="6,3" />
+
+    <!-- Sunglasses / Document Holder Slot Detail -->
+    <path d="M 65 240 Q 270 265 475 240" fill="none" stroke="#1c212a" stroke-width="3" />
+
+    <!-- Centered High-Density DRS Print -->
+    <g transform="translate(100, 105) scale(0.85)">
+      <!-- Frame -->
+      <path d="M 30 50 L 55 25 L 345 25 L 370 50 L 370 125 L 345 150 L 55 150 L 30 125 Z"
+            fill="none" stroke="#84cc16" stroke-width="10" stroke-linejoin="round" />
+      <line x1="8" y1="87" x2="30" y2="87" stroke="#84cc16" stroke-width="10" />
+      <line x1="370" y1="87" x2="392" y2="87" stroke="#84cc16" stroke-width="10" />
+
+      <!-- DRS Letters -->
+      <text x="60" y="112" font-family="'Impact', Arial Black, sans-serif" font-size="96" font-style="italic" fill="#a3e635">D</text>
+      <text x="155" y="112" font-family="'Impact', Arial Black, sans-serif" font-size="96" font-style="italic" fill="#ec4899">R</text>
+      <text x="250" y="112" font-family="'Impact', Arial Black, sans-serif" font-size="96" font-style="italic" fill="#a3e635">S</text>
+
+      <!-- Underline & Title -->
+      <text x="200" y="185" font-family="Arial, sans-serif" font-size="22" font-weight="900" font-style="italic" fill="#84cc16" text-anchor="middle" letter-spacing="3">DAILY RIDE SOUTH</text>
+      <line x1="45" y1="200" x2="355" y2="200" stroke="#84cc16" stroke-width="5" />
+    </g>
+  </g>
+</svg>

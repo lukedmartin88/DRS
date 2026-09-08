@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+  <defs>
+    <radialGradient id="sun-bg" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#181c24" />
+      <stop offset="60%" stop-color="#0e1014" />
+      <stop offset="100%" stop-color="#060708" />
+    </radialGradient>
+    <linearGradient id="frame-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2d323c" />
+      <stop offset="40%" stop-color="#181b20" />
+      <stop offset="100%" stop-color="#0d0f12" />
+    </linearGradient>
+    <linearGradient id="lens-reflect" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3a414e" />
+      <stop offset="30%" stop-color="#1e2229" />
+      <stop offset="60%" stop-color="#101216" />
+      <stop offset="100%" stop-color="#08090b" />
+    </linearGradient>
+    <filter id="glasses-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="25" stdDeviation="25" flood-color="#000" flood-opacity="0.9" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="url(#sun-bg)" />
+  <ellipse cx="400" cy="520" rx="300" ry="40" fill="#84cc16" opacity="0.08" />
+
+  <g transform="translate(60, 100)" filter="url(#glasses-shadow)">
+    <!-- Right temple arm (curving back into distance) -->
+    <path d="M 170 180 C 220 140 380 120 480 160 C 500 170 480 190 460 185 C 380 160 240 175 190 200 Z" fill="#14171d" stroke="#252b34" stroke-width="2" />
+    <text x="310" y="162" font-family="Arial, sans-serif" font-size="11" font-weight="900" fill="#a1a1aa" letter-spacing="2">DAILY RIDE SOUTH</text>
+
+    <!-- Left temple arm (in front, with official DRS logo) -->
+    <path d="M 450 250 L 630 200 C 660 190 680 220 670 245 C 650 260 590 275 460 300 Z" fill="url(#frame-grad)" stroke="#323844" stroke-width="1.5" />
+    
+    <!-- DRS Logo on left arm -->
+    <g transform="translate(480, 222) rotate(-8) scale(0.38)">
+      <path d="M 25 45 L 45 25 L 180 25 L 200 45 L 200 95 L 180 115 L 45 115 L 25 95 Z" fill="none" stroke="#84cc16" stroke-width="7" />
+      <text x="45" y="85" font-family="'Impact', Arial Black, sans-serif" font-size="58" font-style="italic" fill="#a3e635">D</text>
+      <text x="90" y="85" font-family="'Impact', Arial Black, sans-serif" font-size="58" font-style="italic" fill="#ec4899">R</text>
+      <text x="135" y="85" font-family="'Impact', Arial Black, sans-serif" font-size="58" font-style="italic" fill="#a3e635">S</text>
+      <text x="112" y="136" font-family="Arial, sans-serif" font-size="16" font-weight="900" font-style="italic" fill="#84cc16" text-anchor="middle" letter-spacing="2">DAILY RIDE SOUTH</text>
+    </g>
+
+    <!-- Main Front Frame Silhouette (Angled Perspective) -->
+    <!-- Left Lens -->
+    <path d="M 180 230
+             C 270 230 350 240 370 260
+             C 380 340 360 420 300 440
+             C 230 450 170 430 150 360
+             C 140 280 160 240 180 230 Z"
+          fill="url(#lens-reflect)" stroke="#090a0d" stroke-width="4" />
+    <!-- Lens Sheen reflection -->
+    <path d="M 190 245 Q 310 260 340 320 L 310 330 Q 280 275 190 265 Z" fill="#ffffff" opacity="0.15" />
+
+    <!-- Right Lens -->
+    <path d="M 20 220
+             C 70 215 130 225 140 245
+             C 145 320 130 400 90 415
+             C 40 420 15 390 5 330
+             C -5 265 5 225 20 220 Z"
+          fill="url(#lens-reflect)" stroke="#090a0d" stroke-width="4" />
+    <path d="M 25 235 Q 90 245 110 300 L 95 310 Q 75 260 25 250 Z" fill="#ffffff" opacity="0.12" />
+
+    <!-- Outer Frame & Bridge -->
+    <path d="M -5 210
+             C 80 200 240 215 390 240
+             C 410 245 420 265 410 285
+             C 400 370 380 445 310 465
+             C 240 480 165 460 140 370
+             C 135 340 125 340 120 370
+             C 95 440 40 445 0 395
+             C -20 320 -15 230 -5 210 Z"
+          fill="none" stroke="url(#frame-grad)" stroke-width="20" stroke-linejoin="round" />
+  </g>
+</svg>

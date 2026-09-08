@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, getDocs
+  collection, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
   ShoppingBag, Package, Truck, AlertCircle, Tag,
   ChevronLeft, Plus, Trash2, Edit3, X, CheckCircle2,
-  RefreshCw, EyeOff, Sparkles, Filter, MapPin, Phone, Mail,
-  Upload, UploadCloud, Image as ImageIcon, Camera, Save
+  RefreshCw, EyeOff, Sparkles, Filter, MapPin,
+  Save, Check, CreditCard, Banknote
 } from 'lucide-react';
 import { DEFAULT_MERCH_PRODUCTS } from '../data/defaultMerch';
-import { DEFAULT_GALLERY_DESIGNS } from '../data/defaultDesigns';
+
+// Obsolete products from the legacy custom store that should be hidden
+const OBSOLETE_PRODUCT_IDS = [
+  'drs-laser-engraving',
+  'drs-vinyl-signs',
+  'drs-hoodie-blk',
+  'drs-tee-blk',
+  'drs-car-stickers'
+];
 
 // Reusable SumUp mounting widget for merchandise
 const MerchSumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
@@ -60,6 +67,7 @@ const MerchSumUpWidget = React.memo(({ checkoutId, onSuccess, onFail }) => {
   );
 });
 
+// Main Customer Merchandise Store
 export const MerchStoreView = ({
   isMerchActive,
   isAdmin,
@@ -78,43 +86,18 @@ export const MerchStoreView = ({
   const [selectedOption, setSelectedOption] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [fulfillmentType, setFulfillmentType] = useState('meet_pickup'); // 'meet_pickup' | 'postal_delivery'
-  
-  // Custom Design Variations (for Hoodies & T-Shirts)
-  const [galleryDesigns, setGalleryDesigns] = useState(DEFAULT_GALLERY_DESIGNS);
-  const [designMode, setDesignMode] = useState('standard'); // 'standard' | 'custom'
-  const [selectedDesign, setSelectedDesign] = useState(DEFAULT_GALLERY_DESIGNS[0]);
+  const [paymentChoice, setPaymentChoice] = useState('sumup'); // 'sumup' | 'cash_meet'
 
-  // Dynamic Design Extra Fees (Premade default £3, Custom default £5; customizable by admin)
-  const [merchFees, setMerchFees] = useState({
-    premadeDesignFee: 3.00,
-    customDesignFee: 5.00
-  });
-
-  // Helper to identify and filter out AI sample placeholder designs
-  const isPlaceholderDesign = (d) => {
-    if (!d) return false;
-    const placeholderIds = [
-      'design-neon-drift', 'design-retro-synthwave', 'design-midnight-kanji', 'design-track-attack', 'design-turbo-blueprint',
-      'sample-hoodie-neon', 'sample-tee-synthwave', 'sample-hoodie-turbo', 'sample-tee-kanji', 'sample-hoodie-track'
-    ];
-    if (placeholderIds.includes(d.id)) return true;
-    if (typeof d.image === 'string' && (d.image.includes('/merch/designs/') || d.image.includes('/merch/samples/'))) return true;
-    return false;
-  };
-
-  // Admin In-Store Product Editing State (Provides Save/Update Button on Merch)
+  // Admin In-Store Product Editing State
   const [adminEditingProduct, setAdminEditingProduct] = useState(null);
   const [adminProductForm, setAdminProductForm] = useState({
     title: '',
     category: 'Clothing',
-    price: 25.00,
-    isPoa: false,
-    poaLabel: 'POA / Custom Quote',
-    supportsCustomDesign: false,
+    price: 20.00,
     description: '',
     image: '',
     optionsLabel: 'Size',
-    optionsText: 'S, M, L, XL, 2XL',
+    optionsText: 'S, M, L, XL, 2XL, 3XL',
     inStock: true,
     tag: ''
   });
@@ -122,15 +105,14 @@ export const MerchStoreView = ({
   const [adminProductSaveSuccess, setAdminProductSaveSuccess] = useState('');
   const [adminProductSaveError, setAdminProductSaveError] = useState('');
 
-  // Shipping Form State
+  // Shipping & Contact Form State
   const [customerName, setCustomerName] = useState(userProfile?.name || '');
   const [customerEmail, setCustomerEmail] = useState(user?.email || '');
   const [customerPhone, setCustomerPhone] = useState(userProfile?.phone || '');
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
   const [postcode, setPostcode] = useState('');
-  const [meetNote, setMeetNote] = useState('');
-  const [customDesignNotes, setCustomDesignNotes] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
 
   // Checkout State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -138,34 +120,22 @@ export const MerchStoreView = ({
   const [sumupCheckoutId, setSumupCheckoutId] = useState(null);
   const [completedOrder, setCompletedOrder] = useState(null);
 
-  // Helper to detect if a garment supports custom design variations
-  const isApparelCustomizable = (prod) => {
-    if (!prod) return false;
-    if (prod.supportsCustomDesign) return true;
-    const cat = (prod.category || '').toLowerCase();
-    const title = (prod.title || '').toLowerCase();
-    const id = (prod.id || '').toLowerCase();
-    return (
-      cat.includes('hoodie') ||
-      cat.includes('t-shirt') ||
-      cat.includes('tshirt') ||
-      cat.includes('tee') ||
-      id.includes('hoodie') ||
-      id.includes('tee') ||
-      title.includes('hoodie') ||
-      title.includes('t-shirt')
-    );
-  };
-
-  // Sync products from Firestore if custom products exist
+  // Sync products from Firestore and filter out obsolete products
   useEffect(() => {
     if (!db || !appId) return;
     const unsub = onSnapshot(
       collection(db, 'artifacts', appId, 'public', 'data', 'merch_products'),
       (snap) => {
         if (!snap.empty) {
-          const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setProducts(list);
+          const list = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(p => !OBSOLETE_PRODUCT_IDS.includes(p.id) && !p.isPoa);
+
+          if (list.length > 0) {
+            setProducts(list);
+          } else {
+            setProducts(DEFAULT_MERCH_PRODUCTS);
+          }
         } else {
           setProducts(DEFAULT_MERCH_PRODUCTS);
         }
@@ -175,156 +145,13 @@ export const MerchStoreView = ({
     return () => unsub();
   }, [db, appId]);
 
-  // Sync design gallery from Firestore (merch_designs) without placeholder designs
-  useEffect(() => {
-    if (!db || !appId) return;
-    const unsub = onSnapshot(
-      collection(db, 'artifacts', appId, 'public', 'data', 'merch_designs'),
-      (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          // Filter out any placeholder sample designs
-          const realDesigns = list.filter(d => !isPlaceholderDesign(d));
-          setGalleryDesigns(realDesigns);
-        } else {
-          setGalleryDesigns([]);
-        }
-      },
-      (err) => console.error("Error loading merch gallery designs:", err)
-    );
-    return () => unsub();
-  }, [db, appId]);
-
-  // Sync design fees (premade £3, custom £5 by default; configured by admin)
-  useEffect(() => {
-    if (!db || !appId) return;
-    const unsub = onSnapshot(
-      doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'merchFees'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          setMerchFees({
-            premadeDesignFee: data.premadeDesignFee !== undefined ? Number(data.premadeDesignFee) : 3.00,
-            customDesignFee: data.customDesignFee !== undefined ? Number(data.customDesignFee) : 5.00
-          });
-        }
-      },
-      (err) => console.warn("Error fetching merch fees:", err)
-    );
-    return () => unsub();
-  }, [db, appId]);
-
-  // Open Admin Edit Product Modal
-  const openAdminEditProduct = (prod) => {
-    setAdminEditingProduct(prod);
-    setAdminProductForm({
-      title: prod.title || '',
-      category: prod.category || 'Laser Engraving',
-      price: prod.price ?? 0,
-      isPoa: Boolean(prod.isPoa || Number(prod.price) === 0),
-      poaLabel: prod.poaLabel || 'POA / Custom Quote',
-      supportsCustomDesign: Boolean(prod.supportsCustomDesign || isApparelCustomizable(prod)),
-      description: prod.description || '',
-      image: prod.image || '',
-      optionsLabel: prod.optionsLabel || 'Options',
-      optionsText: Array.isArray(prod.options) ? prod.options.join(', ') : '',
-      inStock: prod.inStock !== false,
-      tag: prod.tag || ''
-    });
-    setAdminProductSaveSuccess('');
-    setAdminProductSaveError('');
-  };
-
-  // Toggle In Stock / Sold Out directly from the merch page
-  const handleToggleProductStock = async (prod) => {
-    const newStock = prod.inStock === false ? true : false;
-    try {
-      if (db && appId) {
-        await setDoc(
-          doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', prod.id),
-          { inStock: newStock, updatedAt: new Date().toISOString() },
-          { merge: true }
-        );
-      }
-      setProducts(prev => prev.map(p => p.id === prod.id ? { ...p, inStock: newStock } : p));
-    } catch (err) {
-      console.error("Error toggling stock:", err);
-    }
-  };
-
-  // Save / Update Merch Product Changes directly
-  const handleSaveAdminProduct = async (e) => {
-    if (e) e.preventDefault();
-    if (!adminEditingProduct) return;
-    setAdminProductSaveError('');
-    setAdminProductSaveSuccess('');
-
-    if (!adminProductForm.title.trim()) {
-      setAdminProductSaveError("Please enter a product title.");
-      return;
-    }
-
-    setIsAdminSavingProduct(true);
-
-    try {
-      const parsedOptions = adminProductForm.optionsText
-        ? adminProductForm.optionsText.split(',').map(o => o.trim()).filter(Boolean)
-        : [];
-
-      const payload = {
-        id: adminEditingProduct.id,
-        title: adminProductForm.title.trim(),
-        category: adminProductForm.category || 'Laser Engraving',
-        price: adminProductForm.isPoa ? 0 : parseFloat(adminProductForm.price) || 0,
-        isPoa: Boolean(adminProductForm.isPoa),
-        poaLabel: adminProductForm.poaLabel || 'POA / Custom Quote',
-        supportsCustomDesign: Boolean(adminProductForm.supportsCustomDesign),
-        description: adminProductForm.description.trim(),
-        image: adminProductForm.image.trim() || adminEditingProduct.image || '/club-logo.webp',
-        optionsLabel: adminProductForm.optionsLabel.trim() || 'Options',
-        options: parsedOptions,
-        inStock: Boolean(adminProductForm.inStock),
-        tag: adminProductForm.tag.trim(),
-        updatedAt: new Date().toISOString()
-      };
-
-      if (db && appId) {
-        await setDoc(
-          doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', adminEditingProduct.id),
-          payload,
-          { merge: true }
-        );
-      }
-
-      setProducts(prev => {
-        const idx = prev.findIndex(p => p.id === adminEditingProduct.id);
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = payload;
-          return next;
-        }
-        return [payload, ...prev];
-      });
-
-      setAdminProductSaveSuccess("Merchandise updated successfully!");
-      setTimeout(() => {
-        setAdminEditingProduct(null);
-        setAdminProductSaveSuccess('');
-      }, 700);
-    } catch (err) {
-      console.error("Error saving merchandise changes:", err);
-      setAdminProductSaveError("Failed to update merchandise: " + (err.message || 'Unknown error'));
-    } finally {
-      setIsAdminSavingProduct(false);
-    }
-  };
-
-  // Update customer name / email if userProfile changes
+  // Update customer name / email if userProfile loads later
   useEffect(() => {
     if (userProfile?.name && !customerName) setCustomerName(userProfile.name);
     if (user?.email && !customerEmail) setCustomerEmail(user.email);
   }, [userProfile, user, customerName, customerEmail]);
 
+  // Categories list
   const categories = useMemo(() => {
     const cats = ['All'];
     products.forEach(p => {
@@ -333,25 +160,21 @@ export const MerchStoreView = ({
     return cats;
   }, [products]);
 
+  // Filtered products list
   const filteredProducts = useMemo(() => {
     if (activeCategory === 'All') return products;
     return products.filter(p => p.category === activeCategory);
   }, [products, activeCategory]);
 
-  const openOrderModal = (product, initialCustomDesign = false) => {
+  const openOrderModal = (product) => {
     setSelectedProduct(product);
     setSelectedOption(product.options && product.options.length > 0 ? product.options[0] : '');
     setQuantity(1);
-    setCustomDesignNotes('');
+    setPaymentChoice('sumup');
     setCheckoutError('');
     setSumupCheckoutId(null);
     setCompletedOrder(null);
     setIsSubmitting(false);
-
-    // Set custom design state for customizable apparel
-    const isApparel = isApparelCustomizable(product);
-    setDesignMode(isApparel && initialCustomDesign ? 'custom' : 'standard');
-    setSelectedDesign(galleryDesigns[0] || DEFAULT_GALLERY_DESIGNS[0]);
   };
 
   const closeOrderModal = () => {
@@ -378,19 +201,113 @@ export const MerchStoreView = ({
     };
   }, [selectedProduct]);
 
-  const isSelectedProductPoa = selectedProduct && (selectedProduct.isPoa || selectedProduct.price === 0);
-  const isApparel = isApparelCustomizable(selectedProduct);
-  const isCustomDesignActive = isApparel && designMode === 'custom';
-  // Premade designs default as £3 extra (configurable by admin)
-  const appliedPremadeFee = (isCustomDesignActive && selectedDesign) ? (merchFees.premadeDesignFee ?? 3.00) : 0.00;
-  const extraDesignFee = appliedPremadeFee;
-
-  const baseUnitPrice = selectedProduct ? selectedProduct.price : 0;
-  const effectiveUnitPrice = baseUnitPrice + extraDesignFee;
-  const itemsSubtotal = effectiveUnitPrice * quantity;
+  // Pricing calculations
+  const unitPrice = selectedProduct ? (Number(selectedProduct.price) || 0) : 0;
+  const itemsSubtotal = unitPrice * quantity;
   const shippingFee = fulfillmentType === 'postal_delivery' ? 3.99 : 0.00;
-  const grandTotal = isSelectedProductPoa ? 0 : (itemsSubtotal + shippingFee);
+  const grandTotal = itemsSubtotal + shippingFee;
 
+  // Toggle in-stock status (admin quick action)
+  const handleToggleProductStock = async (product) => {
+    if (!isAdmin) return;
+    const nextStock = product.inStock === false;
+    try {
+      if (db && appId) {
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', product.id),
+          { inStock: nextStock, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      }
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, inStock: nextStock } : p));
+    } catch (err) {
+      console.error("Error toggling stock:", err);
+    }
+  };
+
+  // Open in-store admin editing modal
+  const openAdminEditProduct = (product) => {
+    setAdminEditingProduct(product);
+    setAdminProductForm({
+      title: product.title || '',
+      category: product.category || 'Clothing',
+      price: product.price ?? 20.00,
+      description: product.description || '',
+      image: product.image || '',
+      optionsLabel: product.optionsLabel || 'Size',
+      optionsText: (product.options || []).join(', '),
+      inStock: product.inStock !== false,
+      tag: product.tag || ''
+    });
+    setAdminProductSaveSuccess('');
+    setAdminProductSaveError('');
+  };
+
+  // Save product edits
+  const handleSaveAdminProduct = async (e) => {
+    if (e) e.preventDefault();
+    if (!adminEditingProduct) return;
+
+    if (!adminProductForm.title.trim()) {
+      setAdminProductSaveError("Please enter a product title.");
+      return;
+    }
+
+    setIsAdminSavingProduct(true);
+    setAdminProductSaveError('');
+    setAdminProductSaveSuccess('');
+
+    try {
+      const parsedOptions = adminProductForm.optionsText
+        ? adminProductForm.optionsText.split(',').map(o => o.trim()).filter(Boolean)
+        : [];
+
+      const payload = {
+        id: adminEditingProduct.id,
+        title: adminProductForm.title.trim(),
+        category: adminProductForm.category || 'Clothing',
+        price: parseFloat(adminProductForm.price) || 0,
+        description: adminProductForm.description.trim(),
+        image: adminProductForm.image.trim() || adminEditingProduct.image || '/merch/tshirt.svg',
+        optionsLabel: adminProductForm.optionsLabel.trim() || 'Options',
+        options: parsedOptions,
+        inStock: Boolean(adminProductForm.inStock),
+        tag: adminProductForm.tag.trim(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (db && appId) {
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', adminEditingProduct.id),
+          payload,
+          { merge: true }
+        );
+      }
+
+      setProducts(prev => {
+        const idx = prev.findIndex(p => p.id === adminEditingProduct.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = payload;
+          return next;
+        }
+        return [payload, ...prev];
+      });
+
+      setAdminProductSaveSuccess("Product updated successfully!");
+      setTimeout(() => {
+        setAdminEditingProduct(null);
+        setAdminProductSaveSuccess('');
+      }, 600);
+    } catch (err) {
+      console.error("Error saving merchandise changes:", err);
+      setAdminProductSaveError("Failed to update merchandise: " + (err.message || 'Unknown error'));
+    } finally {
+      setIsAdminSavingProduct(false);
+    }
+  };
+
+  // Start checkout or reserve for cash collection
   const handleStartCheckout = async (e) => {
     if (e) e.preventDefault();
     if (!selectedProduct) return;
@@ -406,24 +323,19 @@ export const MerchStoreView = ({
 
     if (fulfillmentType === 'postal_delivery') {
       if (!streetAddress.trim() || !city.trim() || !postcode.trim()) {
-        setCheckoutError('Please enter your complete postal address (street, town/city, and postcode).');
+        setCheckoutError('Please enter your full postal address (street, city, and postcode).');
         return;
       }
     }
 
-    // --- POA / CUSTOM DESIGN QUOTE FLOW ---
-    if (isSelectedProductPoa) {
-      if (!customDesignNotes.trim()) {
-        setCheckoutError('Please provide your custom design requirements (text to engrave, dog tag details, bookmark quote, or sign specifications).');
-        return;
-      }
-
+    // CASH AT NEXT MEET FLOW (Direct Reservation)
+    if (paymentChoice === 'cash_meet') {
       setIsSubmitting(true);
       setCheckoutError('');
 
       try {
         const orderData = {
-          orderNumber: `POA-${Math.floor(100000 + Math.random() * 900000)}`,
+          orderNumber: `DRS-${Math.floor(100000 + Math.random() * 900000)}`,
           createdAt: new Date().toISOString(),
           customerId: user?.uid || 'guest',
           customerName: customerName.trim(),
@@ -432,29 +344,20 @@ export const MerchStoreView = ({
           product: {
             id: selectedProduct.id,
             title: selectedProduct.title,
-            price: 0,
-            isPoa: true,
+            price: selectedProduct.price,
             category: selectedProduct.category,
             image: selectedProduct.image,
             selectedOption: selectedOption || null,
-            quantity: quantity,
-            customDesignNotes: customDesignNotes.trim()
+            quantity: quantity
           },
-          customDesignNotes: customDesignNotes.trim(),
-          itemsSubtotal: 0,
-          shippingFee: fulfillmentType === 'postal_delivery' ? 3.99 : 0.00,
-          grandTotal: 0,
-          isPoa: true,
-          fulfillmentType: fulfillmentType,
-          meetNote: fulfillmentType === 'meet_pickup' ? (meetNote.trim() || 'Collect at next scheduled DRS meet') : null,
-          shippingAddress: fulfillmentType === 'postal_delivery' ? {
-            street: streetAddress.trim(),
-            city: city.trim(),
-            postcode: postcode.trim().toUpperCase(),
-            country: 'United Kingdom'
-          } : null,
-          paymentStatus: 'POA_INQUIRY',
-          fulfillmentStatus: 'Quote Pending'
+          itemsSubtotal: Number(itemsSubtotal.toFixed(2)),
+          shippingFee: 0,
+          grandTotal: Number(itemsSubtotal.toFixed(2)),
+          fulfillmentType: 'meet_pickup',
+          orderNotes: orderNotes.trim() || null,
+          paymentMethod: 'CASH_OR_CARD_ON_COLLECTION',
+          paymentStatus: 'UNPAID',
+          fulfillmentStatus: 'Awaiting Collection'
         };
 
         if (db && appId) {
@@ -462,26 +365,21 @@ export const MerchStoreView = ({
         }
         setCompletedOrder(orderData);
       } catch (err) {
-        console.error("Failed to submit custom quote request:", err);
-        setCheckoutError(err.message || 'Failed to submit quote request. Please try again.');
+        console.error("Failed to reserve order:", err);
+        setCheckoutError(err.message || 'Failed to complete reservation. Please try again.');
       } finally {
         setIsSubmitting(false);
       }
       return;
     }
 
-    // --- STANDARD FIXED PRICE SUMUP CHECKOUT FLOW ---
+    // SECURE SUMUP ONLINE PAYMENT FLOW
     setIsSubmitting(true);
     setCheckoutError('');
 
     try {
       const orderRef = `DRS-MERCH-${Date.now().toString(36).toUpperCase()}`;
-      const designTagParts = [];
-      if (isCustomDesignActive && selectedDesign) {
-        designTagParts.push(`Premade: ${selectedDesign.title} (+£${appliedPremadeFee.toFixed(2)})`);
-      }
-      const designTag = designTagParts.length > 0 ? ` [${designTagParts.join(', ')}]` : '';
-      const description = `DRS Merch: ${selectedProduct.title} (x${quantity}${selectedOption ? ` - ${selectedOption}` : ''})${designTag}`;
+      const description = `DRS: ${selectedProduct.title} (x${quantity}${selectedOption ? ` - ${selectedOption}` : ''})`;
 
       const res = await fetch(
         'https://createsumupcheckout-7hvlzmnlea-uc.a.run.app',
@@ -496,7 +394,7 @@ export const MerchStoreView = ({
         }
       );
 
-      if (!res.ok) throw new Error(`SumUp Server returned status ${res.status}`);
+      if (!res.ok) throw new Error(`SumUp server returned status ${res.status}`);
       const data = await res.json();
 
       if (data.checkoutId) {
@@ -512,6 +410,7 @@ export const MerchStoreView = ({
     }
   };
 
+  // Payment Success Handler (SumUp)
   const handlePaymentSuccess = async () => {
     try {
       const orderData = {
@@ -526,28 +425,15 @@ export const MerchStoreView = ({
           title: selectedProduct.title,
           price: selectedProduct.price,
           category: selectedProduct.category,
-          image: (isCustomDesignActive && selectedDesign?.image) ? selectedDesign.image : selectedProduct.image,
+          image: selectedProduct.image,
           selectedOption: selectedOption || null,
-          quantity: quantity,
-          designMode: isCustomDesignActive ? 'custom' : 'standard',
-          selectedDesign: isCustomDesignActive ? {
-            id: selectedDesign?.id,
-            title: selectedDesign?.title,
-            category: selectedDesign?.category,
-            image: selectedDesign?.image
-          } : null,
-          hasPremadeDesign: Boolean(isCustomDesignActive && selectedDesign),
-          premadeDesignFee: appliedPremadeFee,
-          extraDesignFee: extraDesignFee
+          quantity: quantity
         },
-        customDesignVariation: (isCustomDesignActive && selectedDesign) ? selectedDesign.title : null,
-        premadeDesignFee: appliedPremadeFee,
-        extraDesignFee: extraDesignFee,
         itemsSubtotal: Number(itemsSubtotal.toFixed(2)),
         shippingFee: Number(shippingFee.toFixed(2)),
         grandTotal: Number(grandTotal.toFixed(2)),
         fulfillmentType: fulfillmentType,
-        meetNote: fulfillmentType === 'meet_pickup' ? (meetNote.trim() || 'Collect at next scheduled DRS meet') : null,
+        orderNotes: orderNotes.trim() || null,
         shippingAddress: fulfillmentType === 'postal_delivery' ? {
           street: streetAddress.trim(),
           city: city.trim(),
@@ -555,6 +441,7 @@ export const MerchStoreView = ({
           country: 'United Kingdom'
         } : null,
         sumupCheckoutId: sumupCheckoutId,
+        paymentMethod: 'SUMUP_CARD',
         paymentStatus: 'PAID',
         fulfillmentStatus: 'Pending'
       };
@@ -566,7 +453,6 @@ export const MerchStoreView = ({
       setSumupCheckoutId(null);
     } catch (err) {
       console.error("Error saving completed order:", err);
-      // Still show the completed order screen even if firestore write failed
       setCompletedOrder({
         orderNumber: `DRS-${Date.now().toString().slice(-6)}`,
         customerName,
@@ -574,10 +460,8 @@ export const MerchStoreView = ({
         product: {
           title: selectedProduct.title,
           quantity,
-          selectedOption,
-          designTitle: isCustomDesignActive ? selectedDesign?.title : null
+          selectedOption
         },
-        customDesignVariation: isCustomDesignActive ? selectedDesign?.title : null,
         grandTotal,
         fulfillmentType
       });
@@ -591,7 +475,7 @@ export const MerchStoreView = ({
     setSumupCheckoutId(null);
   };
 
-  // If Store is INACTIVE and user is NOT Admin, show closed banner
+  // Store Closed Banner if inactive and not admin
   if (!isMerchActive && !isAdmin) {
     return (
       <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto py-8">
@@ -604,7 +488,7 @@ export const MerchStoreView = ({
             Merchandise Store <span className="text-pink-500 not-italic">Currently Closed</span>
           </h2>
           <p className="text-zinc-400 max-w-lg mx-auto text-base leading-relaxed mb-8">
-            The official Daily Ride South apparel and merch store is currently offline while our team prepares the next club drop. Check back soon or stay tuned to our announcements!
+            The official Daily Ride South apparel and merch store is currently offline while our team prepares the next club drop. Check back soon or catch us at the next scheduled meet!
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <button
@@ -627,7 +511,7 @@ export const MerchStoreView = ({
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      {/* Admin Preview Notice if inactive */}
+      {/* Admin Preview Notice */}
       {!isMerchActive && isAdmin && (
         <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -652,7 +536,7 @@ export const MerchStoreView = ({
         </div>
       )}
 
-      {/* Hero Header */}
+      {/* Header Banner */}
       <div className="relative bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-10 shadow-2xl overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="absolute -right-10 -bottom-10 opacity-5 pointer-events-none text-lime-400">
           <ShoppingBag className="w-80 h-80" />
@@ -665,7 +549,7 @@ export const MerchStoreView = ({
             Club <span className="text-pink-500 not-italic">Merch</span> &amp; <span className="text-lime-400 not-italic">Apparel</span>
           </h1>
           <p className="text-zinc-400 text-xs md:text-sm max-w-xl leading-relaxed">
-            Support the club in style. Choose free collection at our next meet or have your order delivered straight to your door with secure SumUp payments.
+            Support Daily Ride South with our official club merchandise. Pick up free at any DRS meet or order with UK tracked postal delivery.
           </p>
         </div>
 
@@ -674,16 +558,16 @@ export const MerchStoreView = ({
             <Truck className="w-5 h-5" />
           </div>
           <div className="text-left">
-            <p className="text-white text-xs font-bold uppercase tracking-wider">Meet Collection or UK Post</p>
-            <p className="text-zinc-500 text-[10px] tracking-wide">Paid securely via SumUp</p>
+            <p className="text-white text-xs font-bold uppercase tracking-wider">Meet Pickup or UK Post</p>
+            <p className="text-zinc-500 text-[10px] tracking-wide">SumUp Card or Cash at Meet</p>
           </div>
         </div>
       </div>
 
-      {/* Categories Bar */}
+      {/* Categories Filter */}
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 pb-4">
         <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mr-2 flex items-center gap-1.5">
-          <Filter className="w-3.5 h-3.5" /> Filter:
+          <Filter className="w-3.5 h-3.5" /> Category:
         </span>
         {categories.map((cat) => (
           <button
@@ -707,14 +591,11 @@ export const MerchStoreView = ({
               setAdminProductForm({
                 title: '',
                 category: activeCategory !== 'All' ? activeCategory : 'Clothing',
-                price: 25.00,
-                isPoa: false,
-                poaLabel: 'POA / Custom Quote',
-                supportsCustomDesign: false,
+                price: 20.00,
                 description: '',
                 image: '',
                 optionsLabel: 'Size',
-                optionsText: 'S, M, L, XL, 2XL',
+                optionsText: 'S, M, L, XL, 2XL, 3XL',
                 inStock: true,
                 tag: 'New'
               });
@@ -724,7 +605,7 @@ export const MerchStoreView = ({
             className="sm:ml-auto bg-lime-500 hover:bg-lime-400 text-black px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add New Merch</span>
+            <span>Add Product</span>
           </button>
         )}
       </div>
@@ -734,9 +615,10 @@ export const MerchStoreView = ({
         {filteredProducts.map((product) => (
           <div
             key={product.id}
-            className="bg-zinc-900/90 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl hover:border-lime-500/50 transition-all flex flex-col group"
+            className="bg-zinc-900/90 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl hover:border-lime-500/40 transition-all flex flex-col group"
           >
-            <div className="relative h-56 md:h-64 overflow-hidden bg-black flex items-center justify-center">
+            {/* Product Image */}
+            <div className="relative h-60 md:h-64 overflow-hidden bg-black flex items-center justify-center">
               <img
                 src={product.image}
                 alt={product.title}
@@ -744,40 +626,31 @@ export const MerchStoreView = ({
                 decoding="async"
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
-              
+              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-75" />
+
+              {/* Tag Badge */}
               {product.tag && (
                 <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md border border-lime-500/40 text-lime-400 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">
                   {product.tag}
                 </div>
               )}
 
-              {isApparelCustomizable(product) && (
-                <div className="absolute top-4 right-4 bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 text-white text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 border border-pink-400/30">
-                  <Sparkles className="w-3 h-3" /> Custom Designs
-                </div>
-              )}
-
+              {/* Price & Stock Badge */}
               <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
-                {product.isPoa || product.price === 0 ? (
-                  <span className="bg-amber-500 text-black font-black text-xs md:text-sm px-3 py-1.5 rounded-xl shadow-xl flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" /> POA / Custom Quote
-                  </span>
-                ) : (
-                  <span className="bg-lime-500 text-black font-black text-base md:text-lg px-3 py-1 rounded-xl shadow-xl">
-                    £{Number(product.price).toFixed(2)}
-                  </span>
-                )}
+                <span className="bg-lime-500 text-black font-black text-base md:text-lg px-3.5 py-1 rounded-xl shadow-xl">
+                  £{Number(product.price).toFixed(2)}
+                </span>
                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg backdrop-blur-md border ${
                   product.inStock !== false 
-                    ? (product.isPoa || product.price === 0 ? 'bg-amber-950/80 text-amber-400 border-amber-500/30' : 'bg-emerald-950/80 text-emerald-400 border-emerald-500/30')
+                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-500/30'
                     : 'bg-rose-950/80 text-rose-400 border-rose-500/30'
                 }`}>
-                  {product.inStock !== false ? ((product.isPoa || product.price === 0) ? 'Custom Order' : 'In Stock') : 'Sold Out'}
+                  {product.inStock !== false ? 'In Stock' : 'Sold Out'}
                 </span>
               </div>
             </div>
 
+            {/* Product Details */}
             <div className="p-6 flex flex-col flex-grow justify-between space-y-4">
               <div>
                 <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">
@@ -791,54 +664,31 @@ export const MerchStoreView = ({
                 </p>
               </div>
 
+              {/* Options Preview */}
               {product.options && product.options.length > 0 && (
                 <div className="pt-2 border-t border-zinc-800/50 flex items-center justify-between text-zinc-400 text-xs">
-                  <span className="font-semibold">{product.optionsLabel || 'Options'}:</span>
-                  <span className="text-zinc-500 text-[11px] font-mono">
+                  <span className="font-semibold text-[11px] uppercase tracking-wider text-zinc-500">{product.optionsLabel || 'Options'}:</span>
+                  <span className="text-zinc-400 text-[11px] font-mono truncate max-w-[180px]">
                     {product.options.join(' • ')}
                   </span>
                 </div>
               )}
 
-              {isApparelCustomizable(product) ? (
-                <div className="space-y-2 pt-1">
-                  <button
-                    onClick={() => openOrderModal(product, false)}
-                    disabled={product.inStock === false}
-                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-2.5 rounded-xl uppercase tracking-wider text-xs transition-all flex items-center justify-center gap-2 border border-zinc-700 hover:border-zinc-600 disabled:opacity-40"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5 text-lime-400" />
-                    Standard Club Edition
-                  </button>
-                  <button
-                    onClick={() => openOrderModal(product, true)}
-                    disabled={product.inStock === false}
-                    className="w-full bg-gradient-to-r from-lime-500 via-emerald-400 to-lime-500 hover:from-lime-400 hover:to-emerald-300 text-black font-black py-3 rounded-xl uppercase tracking-wider text-xs transition-all shadow-lg shadow-lime-500/20 active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-40"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    Purchase a Custom Design
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => openOrderModal(product)}
-                  disabled={product.inStock === false}
-                  className={`w-full font-black py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg flex items-center justify-center gap-2 ${
-                    product.inStock === false
-                      ? 'bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed'
-                      : (product.isPoa || product.price === 0)
-                        ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20 active:scale-[0.99]'
-                        : 'bg-zinc-800 hover:bg-lime-500 text-white hover:text-black group-hover:shadow-lime-500/20 active:scale-[0.99]'
-                  }`}
-                >
-                  {(product.isPoa || product.price === 0) ? (
-                    <><Sparkles className="w-4 h-4" /> Request Quote / Custom Specs (POA)</>
-                  ) : (
-                    <><ShoppingBag className="w-4 h-4" /> {product.inStock !== false ? 'Order / Buy Now' : 'Currently Sold Out'}</>
-                  )}
-                </button>
-              )}
+              {/* Order Button */}
+              <button
+                onClick={() => openOrderModal(product)}
+                disabled={product.inStock === false}
+                className={`w-full font-black py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg flex items-center justify-center gap-2 ${
+                  product.inStock === false
+                    ? 'bg-zinc-800 text-zinc-500 opacity-40 cursor-not-allowed'
+                    : 'bg-zinc-800 hover:bg-lime-500 text-white hover:text-black group-hover:shadow-lime-500/20 active:scale-[0.99]'
+                }`}
+              >
+                <ShoppingBag className="w-4 h-4" />
+                {product.inStock !== false ? 'Order Now' : 'Currently Sold Out'}
+              </button>
 
+              {/* Admin In-Store Quick Actions */}
               {isAdmin && (
                 <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-2">
                   <button
@@ -846,10 +696,9 @@ export const MerchStoreView = ({
                     onClick={() => handleToggleProductStock(product)}
                     className={`text-[10px] font-bold uppercase px-2.5 py-1.5 rounded-xl border transition-colors cursor-pointer ${
                       product.inStock !== false
-                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30 hover:bg-rose-950/60 hover:text-rose-300 hover:border-rose-500/30'
-                        : 'bg-rose-950/60 text-rose-400 border-rose-500/30 hover:bg-emerald-950/60 hover:text-emerald-300 hover:border-emerald-500/30'
+                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30 hover:bg-rose-950/60 hover:text-rose-300'
+                        : 'bg-rose-950/60 text-rose-400 border-rose-500/30 hover:bg-emerald-950/60 hover:text-emerald-300'
                     }`}
-                    title="Click to toggle In Stock / Sold Out"
                   >
                     {product.inStock !== false ? 'In Stock (Toggle)' : 'Sold Out (Toggle)'}
                   </button>
@@ -857,10 +706,9 @@ export const MerchStoreView = ({
                     type="button"
                     onClick={() => openAdminEditProduct(product)}
                     className="bg-lime-500 hover:bg-lime-400 text-black font-black text-[11px] uppercase tracking-wider px-3 py-1.5 rounded-xl transition-all shadow flex items-center gap-1.5 cursor-pointer"
-                    title="Edit and Update this product"
                   >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    Edit / Update Merch
+                    <Edit3 className="w-3 h-3" />
+                    <span>Edit</span>
                   </button>
                 </div>
               )}
@@ -869,166 +717,87 @@ export const MerchStoreView = ({
         ))}
       </div>
 
-      {/* Order Modal with SumUp Checkout */}
+      {/* Product Order Modal */}
       {selectedProduct && (
         <div
-          id="order-modal-backdrop"
-          onClick={(e) => {
-            if (e.target.id === 'order-modal-backdrop') {
-              closeOrderModal();
-            }
-          }}
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 md:p-8 overscroll-contain animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl p-5 sm:p-8 shadow-2xl my-3 sm:my-6 flex flex-col"
-          >
-            {/* Sticky Floating Exit Bar - ALWAYS visible regardless of scroll position */}
-            <div className="sticky top-0 -mt-2 -mr-2 sm:-mt-4 sm:-mr-4 pt-1 pr-1 flex justify-end z-30 pointer-events-none mb-1">
-              <button
-                type="button"
-                onClick={closeOrderModal}
-                className="pointer-events-auto p-2 sm:p-2.5 rounded-2xl bg-zinc-900/95 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-700 shadow-xl transition-all flex items-center gap-1.5 text-xs font-bold active:scale-95 cursor-pointer"
-                title="Exit (Esc or Click outside)"
-                aria-label="Close modal"
-              >
-                <X className="w-4 h-4 text-zinc-300" />
-                <span className="text-[11px] uppercase tracking-wider font-extrabold pr-0.5">Exit</span>
-              </button>
-            </div>
+          <div className="relative bg-zinc-950 border border-zinc-800 rounded-3xl max-w-xl w-full p-6 md:p-8 my-8 shadow-2xl space-y-6">
+            <button
+              onClick={closeOrderModal}
+              className="absolute top-5 right-5 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 p-2 rounded-full transition-colors border border-zinc-800"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
             {completedOrder ? (
               /* Order Completed Screen */
-              completedOrder.isPoa ? (
-                <div className="text-center py-6 space-y-6 animate-in zoom-in-95 duration-500">
-                  <div className="w-20 h-20 bg-amber-500/10 border-2 border-amber-500/30 text-amber-400 rounded-full flex items-center justify-center mx-auto shadow-xl">
-                    <Sparkles className="w-10 h-10" />
-                  </div>
-                  <div>
-                    <span className="bg-amber-500 text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
-                      Custom Quote Request Received
-                    </span>
-                    <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic mt-3">
-                      Quote Request Submitted!
-                    </h2>
-                    <p className="text-zinc-400 text-xs md:text-sm mt-1">
-                      Quote Reference: <span className="font-mono text-amber-400 font-bold">{completedOrder.orderNumber}</span>
-                    </p>
-                  </div>
-
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-left space-y-3">
-                    <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-                      <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Item:</span>
-                      <span className="text-white font-black text-sm">
-                        {completedOrder.product.title} (x{completedOrder.product.quantity}
-                        {completedOrder.product.selectedOption ? ` - ${completedOrder.product.selectedOption}` : ''})
-                      </span>
-                    </div>
-                    {completedOrder.customDesignNotes && (
-                      <div className="border-b border-zinc-800 pb-3">
-                        <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold block mb-1">Your Custom Specifications:</span>
-                        <p className="text-zinc-200 text-xs bg-black/60 p-3 rounded-xl border border-zinc-800 font-mono whitespace-pre-wrap">
-                          {completedOrder.customDesignNotes}
-                        </p>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-                      <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Fulfillment:</span>
-                      <span className="text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                        {completedOrder.fulfillmentType === 'meet_pickup' ? (
-                          <><MapPin className="w-3.5 h-3.5" /> Collection at DRS Meet</>
-                        ) : (
-                          <><Truck className="w-3.5 h-3.5" /> UK Postal Delivery</>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Pricing:</span>
-                      <span className="text-amber-400 font-black text-base">
-                        Price on Application (POA)
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="text-zinc-400 text-xs leading-relaxed max-w-md mx-auto">
-                    Thank you <span className="text-white font-bold">{completedOrder.customerName}</span>! Our team has received your custom design specifications and will contact you at <span className="text-amber-400 font-bold">{completedOrder.customerEmail}</span> with a design proof and direct quote.
-                  </p>
-
-                  <button
-                    onClick={closeOrderModal}
-                    className="bg-amber-500 hover:bg-amber-400 text-black font-black px-8 py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-amber-500/20"
-                  >
-                    Done
-                  </button>
+              <div className="text-center py-6 space-y-6 animate-in zoom-in-95 duration-500">
+                <div className="w-20 h-20 bg-lime-500/10 border-2 border-lime-500/30 text-lime-400 rounded-full flex items-center justify-center mx-auto shadow-xl">
+                  <CheckCircle2 className="w-10 h-10" />
                 </div>
-              ) : (
-                <div className="text-center py-6 space-y-6 animate-in zoom-in-95 duration-500">
-                  <div className="w-20 h-20 bg-lime-500/10 border-2 border-lime-500/30 text-lime-400 rounded-full flex items-center justify-center mx-auto shadow-xl">
-                    <CheckCircle2 className="w-10 h-10" />
-                  </div>
-                  <div>
-                    <span className="bg-lime-500 text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
-                      Payment Confirmed
-                    </span>
-                    <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic mt-3">
-                      Thank You for Your Order!
-                    </h2>
-                    <p className="text-zinc-400 text-xs md:text-sm mt-1">
-                      Order Ref: <span className="font-mono text-lime-400 font-bold">{completedOrder.orderNumber}</span>
-                    </p>
-                  </div>
-
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-left space-y-3">
-                    <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-                      <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Item:</span>
-                      <span className="text-white font-black text-sm">
-                        {completedOrder.product.title} (x{completedOrder.product.quantity}
-                        {completedOrder.product.selectedOption ? ` - ${completedOrder.product.selectedOption}` : ''})
-                      </span>
-                    </div>
-                    {completedOrder.customDesignVariation && (
-                      <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-                        <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Premade Design:</span>
-                        <span className="text-pink-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5" /> {completedOrder.customDesignVariation}
-                          {completedOrder.premadeDesignFee ? ` (+£${Number(completedOrder.premadeDesignFee).toFixed(2)})` : ''}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-                      <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Fulfillment:</span>
-                      <span className="text-lime-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
-                        {completedOrder.fulfillmentType === 'meet_pickup' ? (
-                          <><MapPin className="w-3.5 h-3.5" /> Collection at DRS Meet</>
-                        ) : (
-                          <><Truck className="w-3.5 h-3.5" /> UK Postal Delivery</>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Total Paid:</span>
-                      <span className="text-lime-400 font-black text-lg">
-                        £{Number(completedOrder.grandTotal).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="text-zinc-500 text-xs leading-relaxed max-w-md mx-auto">
-                    A receipt has been sent to <span className="text-zinc-300 font-bold">{completedOrder.customerEmail}</span>. The club organizers have received your order details.
+                <div>
+                  <span className="bg-lime-500 text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+                    {completedOrder.paymentStatus === 'PAID' ? 'Payment Confirmed' : 'Order Reserved'}
+                  </span>
+                  <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic mt-3">
+                    Thank You for Your Order!
+                  </h2>
+                  <p className="text-zinc-400 text-xs md:text-sm mt-1">
+                    Order Ref: <span className="font-mono text-lime-400 font-bold">{completedOrder.orderNumber}</span>
                   </p>
-
-                  <button
-                    onClick={closeOrderModal}
-                    className="bg-lime-500 hover:bg-lime-400 text-black font-black px-8 py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20"
-                  >
-                    Done
-                  </button>
                 </div>
-              )
+
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-left space-y-3">
+                  <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                    <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Item:</span>
+                    <span className="text-white font-black text-sm">
+                      {completedOrder.product.title} (x{completedOrder.product.quantity}
+                      {completedOrder.product.selectedOption ? ` - ${completedOrder.product.selectedOption}` : ''})
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                    <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Fulfillment:</span>
+                    <span className="text-lime-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      {completedOrder.fulfillmentType === 'meet_pickup' ? (
+                        <><MapPin className="w-3.5 h-3.5" /> Collection at Next DRS Meet</>
+                      ) : (
+                        <><Truck className="w-3.5 h-3.5" /> UK Postal Delivery</>
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+                    <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Payment Method:</span>
+                    <span className="text-white font-bold text-xs uppercase tracking-wider">
+                      {completedOrder.paymentMethod === 'SUMUP_CARD' ? 'Paid Online (SumUp)' : 'Cash / Card on Meet Collection'}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Total:</span>
+                    <span className="text-lime-400 font-black text-lg">
+                      £{Number(completedOrder.grandTotal).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-zinc-400 text-xs leading-relaxed max-w-md mx-auto">
+                  A receipt and confirmation have been recorded for <span className="text-white font-bold">{completedOrder.customerEmail}</span>. The club organizers have received your order details.
+                </p>
+
+                <button
+                  onClick={closeOrderModal}
+                  className="bg-lime-500 hover:bg-lime-400 text-black font-black px-8 py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20"
+                >
+                  Done
+                </button>
+              </div>
             ) : sumupCheckoutId ? (
-              /* SumUp Card Payment Widget View */
+              /* SumUp Card Payment Widget */
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="text-center space-y-1">
                   <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
@@ -1061,27 +830,23 @@ export const MerchStoreView = ({
                     onClick={closeOrderModal}
                     className="text-zinc-400 hover:text-rose-400 transition-colors uppercase font-bold text-[11px] tracking-wider"
                   >
-                    Cancel &amp; Exit
+                    Cancel
                   </button>
                 </div>
               </div>
             ) : (
-              /* Order Details & Sizing Form */
+              /* Simplified Order Form */
               <form onSubmit={handleStartCheckout} className="space-y-6">
+                {/* Product Summary Header */}
                 <div className="flex gap-4 items-start border-b border-zinc-800 pb-5">
-                  <div className="relative w-20 h-20 md:w-24 md:h-24 shrink-0">
+                  <div className="relative w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-2xl overflow-hidden bg-black border border-zinc-800">
                     <img
-                      src={isCustomDesignActive && selectedDesign ? selectedDesign.image : selectedProduct.image}
+                      src={selectedProduct.image}
                       alt={selectedProduct.title}
                       loading="lazy"
                       decoding="async"
-                      className="w-full h-full rounded-2xl object-cover border border-zinc-800"
+                      className="w-full h-full object-cover"
                     />
-                    {isCustomDesignActive && (
-                      <span className="absolute -bottom-1.5 -right-1 bg-gradient-to-r from-pink-500 to-lime-400 text-black text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-md">
-                        Custom
-                      </span>
-                    )}
                   </div>
                   <div className="space-y-1 flex-1 min-w-0">
                     <span className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
@@ -1090,149 +855,28 @@ export const MerchStoreView = ({
                     <h3 className="text-xl font-black text-white uppercase tracking-tight truncate">
                       {selectedProduct.title}
                     </h3>
-                    {isCustomDesignActive && selectedDesign && (
-                      <p className="text-xs text-lime-400 font-bold flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-pink-400" />
-                        <span>Artwork: <strong className="text-white font-mono">{selectedDesign.title}</strong></span>
-                      </p>
-                    )}
-                    {isSelectedProductPoa ? (
-                      <p className="text-amber-400 font-black text-base flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4" /> Price on Application (POA)
-                      </p>
-                    ) : (
-                      <div className="flex flex-wrap items-baseline gap-2 pt-0.5">
-                        <p className="text-lime-400 font-black text-lg">
-                          £{effectiveUnitPrice.toFixed(2)}
-                        </p>
-                        {isCustomDesignActive && appliedPremadeFee > 0 && (
-                          <div className="flex flex-wrap gap-1.5 text-[10px] text-zinc-400 font-medium">
-                            <span className="text-pink-400 font-bold">(+£{appliedPremadeFee.toFixed(2)} premade)</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <p className="text-lime-400 font-black text-xl pt-0.5">
+                      £{unitPrice.toFixed(2)}
+                    </p>
                   </div>
                 </div>
 
-                {/* Garment Design Edition Switcher (Standard vs Custom Gallery) */}
-                {isApparel && (
-                  <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                      Print &amp; Graphic Edition:
-                    </label>
-                    <div className="grid grid-cols-2 gap-2 p-1.5 bg-black/60 rounded-2xl border border-zinc-800">
-                      <button
-                        type="button"
-                        onClick={() => setDesignMode('standard')}
-                        className={`py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
-                          designMode === 'standard'
-                            ? 'bg-zinc-800 text-white shadow-md border border-zinc-700'
-                            : 'text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        Official Club Print
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDesignMode('custom')}
-                        className={`py-2.5 px-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 ${
-                          designMode === 'custom'
-                            ? 'bg-gradient-to-r from-pink-500 via-rose-500 to-lime-500 text-black shadow-lg font-black'
-                            : 'text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        Premade Designs ({galleryDesigns.length}) (+£{merchFees.premadeDesignFee.toFixed(2)})
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Preloaded Gallery of Designs + Custom Photo Option */}
-                {isCustomDesignActive && (
-                  <div className="space-y-4 bg-black/40 p-4 rounded-2xl border border-zinc-800/80 animate-in fade-in duration-300">
-                    {galleryDesigns.length > 0 ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold uppercase tracking-wider text-pink-400 flex items-center gap-1.5">
-                            <Sparkles className="w-4 h-4 text-pink-400" /> Choose Premade Design (+£{merchFees.premadeDesignFee.toFixed(2)} Extra):
-                          </label>
-                          <span className="text-[10px] text-zinc-400 font-mono">
-                            {galleryDesigns.length} Variations
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto p-1 pr-2">
-                          {galleryDesigns.map((des) => (
-                            <button
-                              key={des.id}
-                              type="button"
-                              onClick={() => setSelectedDesign(des)}
-                              className={`group relative rounded-2xl overflow-hidden border p-2 text-left transition-all flex flex-col ${
-                                selectedDesign?.id === des.id
-                                  ? 'bg-lime-500/10 border-lime-400 ring-2 ring-lime-400/50 shadow-lg shadow-lime-500/10'
-                                  : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'
-                              }`}
-                            >
-                              <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black mb-1.5 flex items-center justify-center">
-                                <img
-                                  src={des.image}
-                                  alt={des.title}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                />
-                                {selectedDesign?.id === des.id && (
-                                  <div className="absolute top-1.5 right-1.5 bg-lime-500 text-black p-1 rounded-full shadow-md">
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                  </div>
-                                )}
-                                {des.tag && (
-                                  <span className="absolute bottom-1 left-1 bg-black/80 backdrop-blur-xs text-lime-400 text-[8px] font-black uppercase px-1.5 py-0.5 rounded">
-                                    {des.tag}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-white font-bold text-[11px] line-clamp-1 leading-tight">{des.title}</p>
-                              <p className="text-zinc-500 text-[9px] uppercase font-semibold mt-0.5">{des.category}</p>
-                            </button>
-                          ))}
-                        </div>
-
-                        {selectedDesign && (
-                          <div className="p-3 bg-zinc-900/90 rounded-2xl border border-zinc-800/80 flex items-center gap-3">
-                            <img src={selectedDesign.image} alt="" className="w-12 h-12 rounded-xl object-cover border border-zinc-800 shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-lime-400 text-[10px] font-bold uppercase tracking-wider">Active Print Variation</p>
-                              <p className="text-white font-black text-xs truncate">{selectedDesign.title}</p>
-                              <p className="text-zinc-400 text-[11px] line-clamp-1">{selectedDesign.description}</p>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="p-4 text-center text-zinc-400 text-xs bg-zinc-900/60 rounded-xl border border-zinc-800">
-                        No custom premade designs are currently configured. Standard official DRS club graphics will be printed.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Option / Variant Selection (Sizes, Colors) */}
+                {/* Options Selection (e.g. Size) */}
                 {selectedProduct.options && selectedProduct.options.length > 0 && (
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                      Select {selectedProduct.optionsLabel || 'Option'}:
+                      Select {selectedProduct.optionsLabel || 'Size / Option'}:
                     </label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {selectedProduct.options.map((opt) => (
                         <button
                           key={opt}
                           type="button"
                           onClick={() => setSelectedOption(opt)}
-                          className={`px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all border ${
+                          className={`py-2 px-3 rounded-xl text-xs font-bold transition-all truncate text-center ${
                             selectedOption === opt
-                              ? 'bg-lime-500 text-black border-lime-400 shadow-md shadow-lime-500/20 font-black'
-                              : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700'
+                              ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20 font-black'
+                              : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800'
                           }`}
                         >
                           {opt}
@@ -1243,25 +887,25 @@ export const MerchStoreView = ({
                 )}
 
                 {/* Quantity */}
-                <div className="flex items-center justify-between bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
-                  <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                    Quantity
-                  </span>
-                  <div className="flex items-center gap-3">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Quantity:
+                  </label>
+                  <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 p-1.5 rounded-2xl w-fit">
                     <button
                       type="button"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-black flex items-center justify-center transition-colors"
+                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                      className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold flex items-center justify-center transition-colors"
                     >
                       -
                     </button>
-                    <span className="font-mono font-black text-white text-base w-6 text-center">
+                    <span className="text-white font-bold font-mono px-3 text-sm">
                       {quantity}
                     </span>
                     <button
                       type="button"
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="w-8 h-8 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-black flex items-center justify-center transition-colors"
+                      onClick={() => setQuantity(q => q + 1)}
+                      className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold flex items-center justify-center transition-colors"
                     >
                       +
                     </button>
@@ -1271,460 +915,330 @@ export const MerchStoreView = ({
                 {/* Fulfillment Selection */}
                 <div className="space-y-2">
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    Choose Delivery / Collection:
+                    Collection / Delivery Method:
                   </label>
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setFulfillmentType('meet_pickup')}
-                      className={`p-4 rounded-2xl border text-left transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
                         fulfillmentType === 'meet_pickup'
-                          ? 'bg-lime-500/10 border-lime-500 text-white shadow-lg shadow-lime-500/10'
+                          ? 'bg-lime-500/10 border-lime-500 text-white'
                           : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-black text-xs uppercase tracking-wider text-white flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-lime-400" /> Meet Pickup
-                        </span>
-                        <span className="bg-lime-500 text-black text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
-                          FREE
-                        </span>
+                      <MapPin className={`w-5 h-5 shrink-0 mt-0.5 ${fulfillmentType === 'meet_pickup' ? 'text-lime-400' : 'text-zinc-500'}`} />
+                      <div>
+                        <p className="font-bold text-xs uppercase tracking-wider text-white">Collect at Meet (FREE)</p>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">Collect at next scheduled DRS meet</p>
                       </div>
-                      <p className="text-[11px] text-zinc-400">Collect in person at the next official DRS meet.</p>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setFulfillmentType('postal_delivery')}
-                      className={`p-4 rounded-2xl border text-left transition-all ${
+                      className={`p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 ${
                         fulfillmentType === 'postal_delivery'
-                          ? 'bg-lime-500/10 border-lime-500 text-white shadow-lg shadow-lime-500/10'
+                          ? 'bg-lime-500/10 border-lime-500 text-white'
                           : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-black text-xs uppercase tracking-wider text-white flex items-center gap-2">
-                          <Truck className="w-4 h-4 text-lime-400" /> UK Postal Delivery
-                        </span>
-                        <span className="text-lime-400 font-mono text-xs font-bold">
-                          +£3.99
-                        </span>
+                      <Truck className={`w-5 h-5 shrink-0 mt-0.5 ${fulfillmentType === 'postal_delivery' ? 'text-lime-400' : 'text-zinc-500'}`} />
+                      <div>
+                        <p className="font-bold text-xs uppercase tracking-wider text-white">UK Postal Delivery (+£3.99)</p>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">Tracked UK delivery to your door</p>
                       </div>
-                      <p className="text-[11px] text-zinc-400">Royal Mail standard tracked shipping to your home.</p>
                     </button>
                   </div>
                 </div>
 
                 {/* Customer Details */}
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3 pt-2 border-t border-zinc-800">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
-                    Buyer Contact Details
+                    Your Contact Details:
                   </h4>
-                  <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Full Name</label>
                       <input
                         type="text"
-                        required
+                        placeholder="Full Name *"
                         value={customerName}
                         onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder="e.g. John Smith"
-                        className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500"
+                        required
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Email Address</label>
                       <input
                         type="email"
-                        required
+                        placeholder="Email Address *"
                         value={customerEmail}
                         onChange={(e) => setCustomerEmail(e.target.value)}
-                        placeholder="john@example.com"
-                        className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500"
+                        required
                       />
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Mobile / Phone (for order updates)</label>
+                  </div>
+
+                  <div>
+                    <input
+                      type="tel"
+                      placeholder="Mobile / Phone (Optional for collection SMS)"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500"
+                    />
+                  </div>
+
+                  {/* Postal Address (if delivery selected) */}
+                  {fulfillmentType === 'postal_delivery' && (
+                    <div className="space-y-3 p-3.5 bg-zinc-900/60 rounded-2xl border border-zinc-800 animate-in fade-in">
+                      <p className="text-[11px] font-bold text-lime-400 uppercase tracking-wider">
+                        UK Postal Address:
+                      </p>
                       <input
-                        type="tel"
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
-                        placeholder="07123 456789"
-                        className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                        type="text"
+                        placeholder="Street Address *"
+                        value={streetAddress}
+                        onChange={(e) => setStreetAddress(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500"
+                        required
                       />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          placeholder="Town / City *"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500"
+                          required
+                        />
+                        <input
+                          type="text"
+                          placeholder="Postcode *"
+                          value={postcode}
+                          onChange={(e) => setPostcode(e.target.value)}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500 uppercase"
+                          required
+                        />
+                      </div>
                     </div>
+                  )}
+
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Order notes / meet collection notes (Optional)"
+                      value={orderNotes}
+                      onChange={(e) => setOrderNotes(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500"
+                    />
                   </div>
                 </div>
 
-                {/* Delivery Address fields if postal */}
-                {fulfillmentType === 'postal_delivery' && (
-                  <div className="space-y-3 bg-black/40 p-4 rounded-2xl border border-zinc-800/80 animate-in fade-in duration-300">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-lime-400 flex items-center gap-1.5">
-                      <Truck className="w-4 h-4" /> Shipping Address
-                    </h4>
-                    <div>
-                      <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Street Address</label>
-                      <input
-                        type="text"
-                        required
-                        value={streetAddress}
-                        onChange={(e) => setStreetAddress(e.target.value)}
-                        placeholder="12 High Street"
-                        className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
+                {/* Payment Choice */}
+                <div className="space-y-2 pt-2 border-t border-zinc-800">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400">
+                    Payment Method:
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentChoice('sumup')}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 ${
+                        paymentChoice === 'sumup'
+                          ? 'bg-lime-500/10 border-lime-500 text-white'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <CreditCard className={`w-5 h-5 ${paymentChoice === 'sumup' ? 'text-lime-400' : 'text-zinc-500'}`} />
                       <div>
-                        <label className="block text-[11px] font-semibold text-zinc-400 mb-1">City / Town</label>
-                        <input
-                          type="text"
-                          required
-                          value={city}
-                          onChange={(e) => setCity(e.target.value)}
-                          placeholder="Southampton"
-                          className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                        />
+                        <p className="font-bold text-xs uppercase tracking-wider text-white">Pay Online Now</p>
+                        <p className="text-[10px] text-zinc-400">Card / SumUp Secure</p>
                       </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPaymentChoice('cash_meet');
+                        setFulfillmentType('meet_pickup');
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 ${
+                        paymentChoice === 'cash_meet'
+                          ? 'bg-lime-500/10 border-lime-500 text-white'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <Banknote className={`w-5 h-5 ${paymentChoice === 'cash_meet' ? 'text-lime-400' : 'text-zinc-500'}`} />
                       <div>
-                        <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Postcode</label>
-                        <input
-                          type="text"
-                          required
-                          value={postcode}
-                          onChange={(e) => setPostcode(e.target.value)}
-                          placeholder="SO14 0AA"
-                          className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none uppercase"
-                        />
+                        <p className="font-bold text-xs uppercase tracking-wider text-white">Pay at Next Meet</p>
+                        <p className="text-[10px] text-zinc-400">Cash or card on pickup</p>
                       </div>
-                    </div>
+                    </button>
                   </div>
-                )}
+                </div>
 
-                {/* Optional meet note if pickup */}
-                {fulfillmentType === 'meet_pickup' && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-zinc-400 mb-1">
-                      Car / Notes (Optional, helps us spot you at the meet)
-                    </label>
-                    <input
-                      type="text"
-                      value={meetNote}
-                      onChange={(e) => setMeetNote(e.target.value)}
-                      placeholder="e.g. Silver Golf R or Matt's Fiesta"
-                      className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                    />
-                  </div>
-                )}
-
-                {/* Custom Design Notes Input for POA / Made to Order */}
-                {isSelectedProductPoa && (
-                  <div className="space-y-2 bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl animate-in fade-in duration-300">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4" /> Custom Design Specifications
-                      </label>
-                      <span className="text-[10px] bg-amber-500 text-black font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
-                        Required for Quote
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-relaxed">
-                      Please describe your custom design requirements (e.g. text for laser engraving on keyrings, bookmarks or dog tags, pet name & phone numbers, or custom vinyl sign dimensions, fonts & artwork details):
-                    </p>
-                    <textarea
-                      rows={3}
-                      required
-                      value={customDesignNotes}
-                      onChange={(e) => setCustomDesignNotes(e.target.value)}
-                      placeholder="e.g. Stainless dog tag with 'LOKI' on front, '07123 456789' on back / Custom windscreen banner text 'DAILY RIDE' in holographic vinyl..."
-                      className="w-full bg-black border border-zinc-800 focus:border-amber-500 text-white rounded-xl p-3 text-xs outline-none leading-relaxed"
-                    />
-                  </div>
-                )}
-
+                {/* Error Banner */}
                 {checkoutError && (
-                  <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2">
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2 animate-in fade-in">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{checkoutError}</span>
                   </div>
                 )}
 
-                {/* Price Breakdown & Confirm Button */}
-                {isSelectedProductPoa ? (
-                  <div className="border-t border-zinc-800 pt-4 space-y-3">
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Pricing Structure:</span>
-                      <span className="font-mono text-amber-400 font-bold">Price on Application (POA)</span>
-                    </div>
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Fulfillment Preference:</span>
-                      <span className="font-mono text-white">
-                        {fulfillmentType === 'meet_pickup' ? 'Collection at DRS Meet (Free)' : 'UK Postal Delivery (+£3.99 quote)'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-base font-black text-white pt-2 border-t border-zinc-800/60">
-                      <span>Due Today:</span>
-                      <span className="text-amber-400 text-xl font-mono">
-                        £0.00 (Direct Quote)
-                      </span>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={closeOrderModal}
-                        className="px-5 py-3.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold uppercase tracking-wider text-xs transition-colors"
-                      >
-                        Exit
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="flex-1 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-xl shadow-amber-500/20 active:scale-[0.99] flex items-center justify-center gap-2"
-                      >
-                        {isSubmitting ? (
-                          <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting Custom Quote...</>
-                        ) : (
-                          <><Sparkles className="w-4 h-4" /> Submit Custom Design Request (POA)</>
-                        )}
-                      </button>
-                    </div>
+                {/* Order Summary & Submit Button */}
+                <div className="pt-2 border-t border-zinc-800 space-y-4">
+                  <div className="flex justify-between items-center text-sm font-bold">
+                    <span className="text-zinc-400 uppercase tracking-wider text-xs">Total Amount:</span>
+                    <span className="text-lime-400 font-black text-2xl font-mono">
+                      £{grandTotal.toFixed(2)}
+                    </span>
                   </div>
-                ) : (
-                  <div className="border-t border-zinc-800 pt-4 space-y-3">
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Base Garment ({selectedProduct.title} x{quantity}):</span>
-                      <span className="font-mono">£{(selectedProduct.price * quantity).toFixed(2)}</span>
-                    </div>
-                    {isCustomDesignActive && selectedDesign && (
-                      <div className="flex justify-between text-xs text-pink-400 font-semibold bg-pink-500/10 p-2 rounded-lg border border-pink-500/20">
-                        <span>Premade Design ({selectedDesign.title} x{quantity}):</span>
-                        <span className="font-mono font-bold">+£{(appliedPremadeFee * quantity).toFixed(2)}</span>
-                      </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-4 rounded-2xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : paymentChoice === 'cash_meet' ? (
+                      <><Check className="w-4 h-4" /> Reserve for Meet Collection (£{grandTotal.toFixed(2)})</>
+                    ) : (
+                      <><CreditCard className="w-4 h-4" /> Proceed to Secure Card Payment (£{grandTotal.toFixed(2)})</>
                     )}
-                    <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Shipping / Fulfillment:</span>
-                      <span className="font-mono">
-                        {shippingFee > 0 ? `£${shippingFee.toFixed(2)}` : 'FREE'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-base font-black text-white pt-2 border-t border-zinc-800/60">
-                      <span>Total Due:</span>
-                      <span className="text-lime-400 text-xl font-mono">
-                        £{grandTotal.toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={closeOrderModal}
-                        className="px-5 py-3.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 font-bold uppercase tracking-wider text-xs transition-colors"
-                      >
-                        Exit
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmitting}
-                        className="flex-1 bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-4 rounded-xl transition-all uppercase tracking-widest text-xs shadow-xl shadow-lime-500/20 active:scale-[0.99] flex items-center justify-center gap-2"
-                      >
-                        {isSubmitting ? (
-                          <><RefreshCw className="w-4 h-4 animate-spin" /> Preparing Checkout...</>
-                        ) : (
-                          <><ShoppingBag className="w-4 h-4" /> Pay £{grandTotal.toFixed(2)} via SumUp</>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  </button>
+                </div>
               </form>
             )}
           </div>
         </div>
       )}
 
-      {/* Admin Merch In-Store Edit / Update Modal */}
+      {/* Admin Edit Product Modal */}
       {adminEditingProduct && (
         <div
-          id="admin-edit-product-backdrop"
-          onClick={(e) => {
-            if (e.target.id === 'admin-edit-product-backdrop') {
-              setAdminEditingProduct(null);
-            }
-          }}
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/90 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200"
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl my-4 sm:my-8"
-          >
+          <div className="relative bg-zinc-950 border border-zinc-800 rounded-3xl max-w-lg w-full p-6 md:p-8 my-8 shadow-2xl space-y-6">
             <button
-              type="button"
               onClick={() => setAdminEditingProduct(null)}
-              className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800 cursor-pointer"
+              className="absolute top-5 right-5 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 p-2 rounded-full transition-colors border border-zinc-800"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4 flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-lime-400" />
-              {adminEditingProduct.title ? `Edit Merch: ${adminEditingProduct.title}` : 'Add New Merchandise Product'}
-            </h3>
+            <div className="flex items-center gap-3 border-b border-zinc-800 pb-4">
+              <div className="p-2.5 bg-lime-500/10 text-lime-400 rounded-2xl border border-lime-500/20">
+                <Edit3 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">
+                  {adminEditingProduct.title ? 'Edit Product' : 'Add New Product'}
+                </h3>
+                <p className="text-zinc-500 text-xs font-mono">{adminEditingProduct.id}</p>
+              </div>
+            </div>
 
             <form onSubmit={handleSaveAdminProduct} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                  Product Title <span className="text-rose-400">*</span>
+                  Product Title *
                 </label>
                 <input
                   type="text"
-                  required
                   value={adminProductForm.title}
-                  onChange={(e) => setAdminProductForm(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="e.g. DRS Club Classic Hoodie"
-                  className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:border-lime-500 outline-none"
+                  onChange={e => setAdminProductForm({ ...adminProductForm, title: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                  placeholder="e.g. DRS Windproof Jacket"
+                  required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
                     Category
                   </label>
                   <select
                     value={adminProductForm.category}
-                    onChange={(e) => setAdminProductForm(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:border-lime-500 outline-none"
+                    onChange={e => setAdminProductForm({ ...adminProductForm, category: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
                   >
                     <option value="Clothing">Clothing</option>
-                    <option value="Laser Engraving">Laser Engraving</option>
-                    <option value="Vinyl Signs">Vinyl Signs</option>
-                    <option value="Stickers">Stickers</option>
+                    <option value="Headwear">Headwear</option>
                     <option value="Accessories">Accessories</option>
-                    <option value="Special Edition">Special Edition</option>
+                    <option value="Car Accessories">Car Accessories</option>
+                    <option value="Bundles">Bundles</option>
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                    Price (£) {adminProductForm.isPoa && <span className="text-amber-400">(POA active)</span>}
+                    Price (£ GBP) *
                   </label>
                   <input
                     type="number"
-                    step="0.01"
-                    min="0"
-                    disabled={adminProductForm.isPoa}
-                    value={adminProductForm.isPoa ? '' : adminProductForm.price}
-                    onChange={(e) => setAdminProductForm(prev => ({ ...prev, price: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:border-lime-500 outline-none disabled:opacity-40"
+                    step="0.50"
+                    value={adminProductForm.price}
+                    onChange={e => setAdminProductForm({ ...adminProductForm, price: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500 font-mono"
+                    required
                   />
                 </div>
-              </div>
-
-              {/* POA and Custom Design Toggles */}
-              <div className="bg-black/50 border border-zinc-800 rounded-2xl p-3.5 space-y-2.5">
-                <label className="flex items-center gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={adminProductForm.isPoa}
-                    onChange={(e) => setAdminProductForm(prev => ({ ...prev, isPoa: e.target.checked }))}
-                    className="w-4 h-4 accent-amber-500 rounded"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-white uppercase">Price on Application (POA)</span>
-                    <span className="block text-[11px] text-zinc-400">Customer requests a quote rather than direct card payment</span>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer select-none border-t border-zinc-800/60 pt-2">
-                  <input
-                    type="checkbox"
-                    checked={adminProductForm.inStock}
-                    onChange={(e) => setAdminProductForm(prev => ({ ...prev, inStock: e.target.checked }))}
-                    className="w-4 h-4 accent-lime-500 rounded"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-white uppercase">In Stock &amp; Available</span>
-                    <span className="block text-[11px] text-zinc-400">Uncheck to mark product as Sold Out in the store</span>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer select-none border-t border-zinc-800/60 pt-2">
-                  <input
-                    type="checkbox"
-                    checked={adminProductForm.supportsCustomDesign}
-                    onChange={(e) => setAdminProductForm(prev => ({ ...prev, supportsCustomDesign: e.target.checked }))}
-                    className="w-4 h-4 accent-pink-500 rounded"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-white uppercase">Supports Premade Design Variations</span>
-                    <span className="block text-[11px] text-zinc-400">Allows customer to choose from the graphic design variations gallery</span>
-                  </div>
-                </label>
               </div>
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                  Product Image URL or Preset
+                  Image Path or URL
                 </label>
                 <input
                   type="text"
                   value={adminProductForm.image}
-                  onChange={(e) => setAdminProductForm(prev => ({ ...prev, image: e.target.value }))}
-                  placeholder="e.g. /merch/hoodie.svg or image URL"
-                  className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:border-lime-500 outline-none"
+                  onChange={e => setAdminProductForm({ ...adminProductForm, image: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                  placeholder="/merch/jacket.svg or https://..."
                 />
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {[
-                    { label: 'Hoodie', path: '/merch/hoodie.svg' },
-                    { label: 'T-Shirts', path: '/merch/tshirt.svg' },
-                    { label: 'Laser Engraving', path: '/merch/laser-engraving.svg' },
-                    { label: 'Vinyl Signs', path: '/merch/vinyl-signs.svg' },
-                    { label: 'Car Stickers', path: '/merch/car-stickers.svg' },
-                    { label: 'Club Logo', path: '/club-logo.webp' }
-                  ].map(preset => (
-                    <button
-                      key={preset.path}
-                      type="button"
-                      onClick={() => setAdminProductForm(prev => ({ ...prev, image: preset.path }))}
-                      className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all cursor-pointer ${
-                        adminProductForm.image === preset.path
-                          ? 'bg-lime-500 text-black border-lime-400'
-                          : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Options (Comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={adminProductForm.optionsText}
+                  onChange={e => setAdminProductForm({ ...adminProductForm, optionsText: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                  placeholder="S, M, L, XL, 2XL, 3XL"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                    Options Label
+                    Tag / Badge
                   </label>
                   <input
                     type="text"
-                    value={adminProductForm.optionsLabel}
-                    onChange={(e) => setAdminProductForm(prev => ({ ...prev, optionsLabel: e.target.value }))}
-                    placeholder="e.g. Size or Finish"
-                    className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:border-lime-500 outline-none"
+                    value={adminProductForm.tag}
+                    onChange={e => setAdminProductForm({ ...adminProductForm, tag: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                    placeholder="Bestseller, Weatherproof"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1">
-                    Options (comma-separated)
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={adminProductForm.inStock}
+                      onChange={e => setAdminProductForm({ ...adminProductForm, inStock: e.target.checked })}
+                      className="rounded border-zinc-700 text-lime-500 focus:ring-lime-500 w-4 h-4 bg-zinc-900"
+                    />
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">In Stock</span>
                   </label>
-                  <input
-                    type="text"
-                    value={adminProductForm.optionsText}
-                    onChange={(e) => setAdminProductForm(prev => ({ ...prev, optionsText: e.target.value }))}
-                    placeholder="S, M, L, XL, 2XL"
-                    className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:border-lime-500 outline-none"
-                  />
                 </div>
               </div>
 
@@ -1733,46 +1247,36 @@ export const MerchStoreView = ({
                   Description
                 </label>
                 <textarea
-                  rows={3}
                   value={adminProductForm.description}
-                  onChange={(e) => setAdminProductForm(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Describe this official merchandise product..."
-                  className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-white text-sm focus:border-lime-500 outline-none resize-none"
+                  onChange={e => setAdminProductForm({ ...adminProductForm, description: e.target.value })}
+                  rows={3}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500 resize-none"
+                  placeholder="Product description..."
                 />
               </div>
 
               {adminProductSaveError && (
-                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{adminProductSaveError}</span>
-                </div>
+                <p className="text-rose-400 text-xs font-bold">{adminProductSaveError}</p>
               )}
-
               {adminProductSaveSuccess && (
-                <div className="bg-lime-500/10 border border-lime-500/30 rounded-xl p-3 text-lime-400 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{adminProductSaveSuccess}</span>
-                </div>
+                <p className="text-emerald-400 text-xs font-bold">{adminProductSaveSuccess}</p>
               )}
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
                 <button
                   type="button"
                   onClick={() => setAdminEditingProduct(null)}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3.5 rounded-xl uppercase tracking-wider text-xs transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isAdminSavingProduct}
-                  className="flex-1 bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-3.5 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-lime-500 hover:bg-lime-400 text-black shadow-lg shadow-lime-500/20 transition-all flex items-center gap-2"
                 >
-                  {isAdminSavingProduct ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" /> Updating Merch...</>
-                  ) : (
-                    <><Save className="w-4 h-4" /> Save &amp; Update Merch</>
-                  )}
+                  {isAdminSavingProduct ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Save Product
                 </button>
               </div>
             </form>
@@ -1783,10 +1287,7 @@ export const MerchStoreView = ({
   );
 };
 
-/* =========================================================================
-   ADMIN MERCHANDISE MANAGEMENT SECTION (Inside Club Control Panel)
-   Includes the requested Live / Inactive store toggle + Orders & Product Manager
-   ========================================================================= */
+// Admin Merchandise Control Panel Section
 export const AdminMerchSection = ({
   isMerchActive,
   onToggleMerchActive,
@@ -1801,718 +1302,287 @@ export const AdminMerchSection = ({
   const [products, setProducts] = useState(DEFAULT_MERCH_PRODUCTS);
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSyncingDefaults, setIsSyncingDefaults] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState('');
 
-  // Gallery Designs Management State
-  const [galleryDesigns, setGalleryDesigns] = useState(DEFAULT_GALLERY_DESIGNS);
-  const [editingDesign, setEditingDesign] = useState(null);
-  const [isCreatingDesign, setIsCreatingDesign] = useState(false);
-  const [designForm, setDesignForm] = useState({
-    title: '',
-    category: 'Custom Graphics',
-    image: '/merch/designs/neon-drift.svg',
-    tag: ''
-  });
-  const [isSavingDesign, setIsSavingDesign] = useState(false);
-  const [designSaveError, setDesignSaveError] = useState('');
-  const [designSaveSuccess, setDesignSaveSuccess] = useState('');
-  const [designImageUploading, setDesignImageUploading] = useState(false);
-  const [designImageProgress, setDesignImageProgress] = useState(0);
-  const [designImageError, setDesignImageError] = useState('');
-  const designFileInputRef = useRef(null);
-
-  // Bulk Design Upload State
-  const [isBulkUploading, setIsBulkUploading] = useState(false);
-  const [bulkQueue, setBulkQueue] = useState([]); // [{ id, file, preview, title }]
-  const [bulkCategory, setBulkCategory] = useState('Custom Graphics');
-  const [isProcessingBulk, setIsProcessingBulk] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState(0);
-  const [bulkError, setBulkError] = useState('');
-  const [bulkSuccess, setBulkSuccess] = useState('');
-  const bulkFileInputRef = useRef(null);
-
-  // Product edit / create modal
+  // Editing or creating product modal
   const [editingProduct, setEditingProduct] = useState(null);
-  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [productForm, setProductForm] = useState({
     title: '',
-    category: 'Laser Engraving',
-    price: 0,
-    isPoa: false,
-    poaLabel: 'POA / Custom Quote',
-    supportsCustomDesign: false,
+    category: 'Clothing',
+    price: 20.00,
     description: '',
     image: '',
-    optionsLabel: 'Options',
-    optionsText: '',
+    optionsLabel: 'Size',
+    optionsText: 'S, M, L, XL, 2XL, 3XL',
     inStock: true,
     tag: ''
   });
-
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState('');
 
-  // Image Upload State
-  const [imageUploading, setImageUploading] = useState(false);
-  const [imageUploadProgress, setImageUploadProgress] = useState(0);
-  const [imageUploadError, setImageUploadError] = useState('');
-  const fileInputRef = useRef(null);
-
-  // Auth context
-  const currentUser = auth?.currentUser;
-
-  // Design Extra Fees (Premade default £3, Custom default £5, customizable by admin)
-  const [merchFees, setMerchFees] = useState({
-    premadeDesignFee: 3.00,
-    customDesignFee: 5.00
-  });
-  const [feeInputs, setFeeInputs] = useState({
-    premadeDesignFee: '3.00',
-    customDesignFee: '5.00'
-  });
-  const [isSavingFees, setIsSavingFees] = useState(false);
-  const [feeSaveSuccess, setFeeSaveSuccess] = useState('');
-  const [feeSaveError, setFeeSaveError] = useState('');
-
-  // Sync Merch Fee Settings from Firestore
-  useEffect(() => {
-    if (!db || !appId) return;
-    const unsub = onSnapshot(
-      doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'merchFees'),
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          const pFee = data.premadeDesignFee !== undefined ? Number(data.premadeDesignFee) : 3.00;
-          const cFee = data.customDesignFee !== undefined ? Number(data.customDesignFee) : 5.00;
-          setMerchFees({ premadeDesignFee: pFee, customDesignFee: cFee });
-          setFeeInputs({
-            premadeDesignFee: pFee.toFixed(2),
-            customDesignFee: cFee.toFixed(2)
-          });
-        }
-      },
-      (err) => console.warn("Error fetching admin merch fees:", err)
-    );
-    return () => unsub();
-  }, [db, appId]);
-
-  const handleSaveFees = async (e) => {
-    if (e) e.preventDefault();
-    if (!db || !appId) return;
-    const p = parseFloat(feeInputs.premadeDesignFee);
-    const c = parseFloat(feeInputs.customDesignFee);
-    if (isNaN(p) || p < 0 || isNaN(c) || c < 0) {
-      setFeeSaveError("Please enter valid non-negative numbers for fees.");
-      return;
-    }
-    setIsSavingFees(true);
-    setFeeSaveError('');
-    setFeeSaveSuccess('');
-    try {
-      await setDoc(
-        doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'merchFees'),
-        {
-          premadeDesignFee: p,
-          customDesignFee: c,
-          updatedAt: new Date().toISOString()
-        },
-        { merge: true }
-      );
-      setFeeSaveSuccess("Design extra pricing saved successfully!");
-      setTimeout(() => setFeeSaveSuccess(''), 3500);
-    } catch (err) {
-      console.error("Failed to save design fees:", err);
-      setFeeSaveError("Failed to save pricing: " + err.message);
-    } finally {
-      setIsSavingFees(false);
-    }
-  };
-
-  // Escape key handler for admin modals (safely declared after all modal state hooks)
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (isBulkUploading && !isProcessingBulk) setIsBulkUploading(false);
-        if (isCreatingDesign && !isSavingDesign) { setIsCreatingDesign(false); setEditingDesign(null); }
-        if (isCreatingProduct && !isSavingProduct) { setIsCreatingProduct(false); setEditingProduct(null); }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isBulkUploading, isProcessingBulk, isCreatingDesign, isSavingDesign, isCreatingProduct, isSavingProduct]);
-
-  // Sync Orders from Firestore
+  // Load orders
   useEffect(() => {
     if (!db || !appId) return;
     const unsub = onSnapshot(
       collection(db, 'artifacts', appId, 'public', 'data', 'merch_orders'),
       (snap) => {
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
         setOrders(list);
       },
-      (err) => console.error("Error fetching merch orders:", err)
+      (err) => console.error("Error loading merch orders:", err)
     );
     return () => unsub();
   }, [db, appId]);
 
-  // Sync Products from Firestore
+  // Load products
   useEffect(() => {
     if (!db || !appId) return;
     const unsub = onSnapshot(
       collection(db, 'artifacts', appId, 'public', 'data', 'merch_products'),
       (snap) => {
         if (!snap.empty) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          setProducts(list);
+          const list = snap.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(p => !OBSOLETE_PRODUCT_IDS.includes(p.id) && !p.isPoa);
+
+          if (list.length > 0) {
+            setProducts(list);
+          } else {
+            setProducts(DEFAULT_MERCH_PRODUCTS);
+          }
+        } else {
+          setProducts(DEFAULT_MERCH_PRODUCTS);
         }
       },
-      (err) => console.error("Error fetching admin products:", err)
+      (err) => console.error("Error loading products:", err)
     );
     return () => unsub();
   }, [db, appId]);
 
-  // Sync Designs from Firestore
-  useEffect(() => {
+  // Sync / Reset to official price list
+  const handleSyncOfficialList = async () => {
     if (!db || !appId) return;
-    const unsub = onSnapshot(
-      collection(db, 'artifacts', appId, 'public', 'data', 'merch_designs'),
-      (snap) => {
-        if (!snap.empty) {
-          const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          const customIds = new Set(list.map(d => d.id));
-          const combined = [...list, ...DEFAULT_GALLERY_DESIGNS.filter(d => !customIds.has(d.id))];
-          setGalleryDesigns(combined);
-        }
-      },
-      (err) => console.error("Error fetching admin merch designs:", err)
-    );
-    return () => unsub();
-  }, [db, appId]);
+    if (!window.confirm("Sync all 9 official products and 4 bundles to Firestore? This will update the catalogue to the official price list.")) {
+      return;
+    }
+    setIsSyncingDefaults(true);
+    setSyncStatusMsg('Syncing official price list...');
 
+    try {
+      // Write each default product
+      for (const prod of DEFAULT_MERCH_PRODUCTS) {
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', prod.id),
+          { ...prod, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      }
+
+      // Delete obsolete products from Firestore if they exist
+      for (const obsId of OBSOLETE_PRODUCT_IDS) {
+        try {
+          await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', obsId));
+        } catch (e) {
+          // ignore if already deleted
+        }
+      }
+
+      setSyncStatusMsg('Successfully updated to official price list!');
+      setTimeout(() => setSyncStatusMsg(''), 3000);
+    } catch (err) {
+      console.error("Sync error:", err);
+      setSyncStatusMsg('Sync error: ' + err.message);
+    } finally {
+      setIsSyncingDefaults(false);
+    }
+  };
+
+  // Toggle inStock
+  const handleToggleStock = async (product) => {
+    const nextVal = product.inStock === false;
+    try {
+      if (db && appId) {
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', product.id),
+          { inStock: nextVal, updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      }
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, inStock: nextVal } : p));
+    } catch (err) {
+      console.error("Error toggling stock:", err);
+    }
+  };
+
+  // Update order status
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
-      if (!db || !appId) return;
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_orders', orderId), {
-        fulfillmentStatus: newStatus
-      });
+      if (db && appId) {
+        await updateDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_orders', orderId),
+          { fulfillmentStatus: newStatus, updatedAt: new Date().toISOString() }
+        );
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, fulfillmentStatus: newStatus } : o));
     } catch (err) {
-      console.error("Failed to update order status:", err);
+      console.error("Error updating order status:", err);
     }
   };
 
-  const handleImageFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!storage) {
-      setImageUploadError("Storage service is not connected. You can enter an image URL directly.");
-      return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-      setImageUploadError("Please select a valid image file (PNG, JPG, WEBP, SVG).");
-      return;
-    }
-
-    if (file.size > 12 * 1024 * 1024) {
-      setImageUploadError("Image size must be under 12MB.");
-      return;
-    }
-
-    setImageUploading(true);
-    setImageUploadProgress(0);
-    setImageUploadError('');
-
+  // Delete product
+  const handleDeleteProduct = async (productId) => {
+    if (!window.confirm("Are you sure you want to remove this product?")) return;
     try {
-      const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const uploaderId = currentUser?.uid || 'admin';
-      const storagePath = `artifacts/${appId || 'daily-ride-south'}/merch/${uploaderId}_${Date.now()}_${cleanFileName}`;
-      const fileRef = ref(storage, storagePath);
-      const uploadTask = uploadBytesResumable(fileRef, file);
-
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setImageUploadProgress(Math.round(progress));
-        },
-        (err) => {
-          console.error("Image upload failed:", err);
-          setImageUploadError(err.message || "Failed to upload image.");
-          setImageUploading(false);
-        },
-        async () => {
-          try {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            setProductForm(prev => ({ ...prev, image: downloadUrl }));
-            setImageUploading(false);
-            setImageUploadProgress(0);
-          } catch (urlErr) {
-            console.error("Error retrieving download URL:", urlErr);
-            setImageUploadError("Image uploaded but failed to retrieve public URL.");
-            setImageUploading(false);
-          }
-        }
-      );
+      if (db && appId) {
+        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', productId));
+      }
+      setProducts(prev => prev.filter(p => p.id !== productId));
     } catch (err) {
-      console.error("Upload error:", err);
-      setImageUploadError(err.message || "Could not process image upload.");
-      setImageUploading(false);
+      console.error("Error deleting product:", err);
     }
   };
 
-  const handleSaveProduct = async (e) => {
-    e.preventDefault();
+  // Open edit modal
+  const handleOpenEditProduct = (product) => {
+    setEditingProduct(product);
+    setProductForm({
+      title: product.title || '',
+      category: product.category || 'Clothing',
+      price: product.price ?? 20.00,
+      description: product.description || '',
+      image: product.image || '',
+      optionsLabel: product.optionsLabel || 'Size',
+      optionsText: (product.options || []).join(', '),
+      inStock: product.inStock !== false,
+      tag: product.tag || ''
+    });
     setSaveError('');
     setSaveSuccess('');
+  };
 
-    if (!productForm.title || !productForm.title.trim()) {
-      setSaveError("Please enter a product title.");
-      return;
-    }
+  // Save product from admin section
+  const handleSaveProduct = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingProduct) return;
 
-    const isPoa = Boolean(productForm.isPoa);
-    if (!isPoa) {
-      const numericPrice = parseFloat(productForm.price);
-      if (isNaN(numericPrice) || numericPrice < 0) {
-        setSaveError("Please enter a valid price (or enable 'Price on Application (POA)' for custom quotes).");
-        return;
-      }
-    }
-
-    if (!db || !appId) {
-      setSaveError("Database connection is not available. Please refresh the page.");
+    if (!productForm.title.trim()) {
+      setSaveError("Please enter a title.");
       return;
     }
 
     setIsSavingProduct(true);
-
-    const parsedOptions = productForm.optionsText
-      ? productForm.optionsText.split(',').map(s => s.trim()).filter(Boolean)
-      : [];
-
-    const targetId = editingProduct?.id || `drs-merch-${Date.now()}`;
-
-    const productPayload = {
-      id: targetId,
-      title: productForm.title.trim(),
-      category: productForm.category,
-      price: isPoa ? 0 : Number(parseFloat(productForm.price).toFixed(2)),
-      isPoa: isPoa,
-      poaLabel: productForm.poaLabel || 'POA / Custom Quote',
-      supportsCustomDesign: Boolean(productForm.supportsCustomDesign),
-      description: (productForm.description || '').trim(),
-      image: productForm.image || '/merch/laser-engraving.svg',
-      optionsLabel: (productForm.optionsLabel || 'Options').trim(),
-      options: parsedOptions,
-      inStock: Boolean(productForm.inStock),
-      tag: (productForm.tag || '').trim(),
-      updatedAt: new Date().toISOString()
-    };
+    setSaveError('');
+    setSaveSuccess('');
 
     try {
-      await setDoc(
-        doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', targetId),
-        productPayload,
-        { merge: true }
-      );
+      const parsedOptions = productForm.optionsText
+        ? productForm.optionsText.split(',').map(o => o.trim()).filter(Boolean)
+        : [];
 
-      // Optimistically update local state immediately
+      const payload = {
+        id: editingProduct.id,
+        title: productForm.title.trim(),
+        category: productForm.category || 'Clothing',
+        price: parseFloat(productForm.price) || 0,
+        description: productForm.description.trim(),
+        image: productForm.image.trim() || editingProduct.image || '/merch/tshirt.svg',
+        optionsLabel: productForm.optionsLabel.trim() || 'Options',
+        options: parsedOptions,
+        inStock: Boolean(productForm.inStock),
+        tag: productForm.tag.trim(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (db && appId) {
+        await setDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', editingProduct.id),
+          payload,
+          { merge: true }
+        );
+      }
+
       setProducts(prev => {
-        const idx = prev.findIndex(p => p.id === targetId);
+        const idx = prev.findIndex(p => p.id === editingProduct.id);
         if (idx >= 0) {
-          const updated = [...prev];
-          updated[idx] = productPayload;
-          return updated;
+          const next = [...prev];
+          next[idx] = payload;
+          return next;
         }
-        return [productPayload, ...prev];
+        return [payload, ...prev];
       });
 
       setSaveSuccess("Product saved successfully!");
       setTimeout(() => {
-        setIsCreatingProduct(false);
         setEditingProduct(null);
         setSaveSuccess('');
-      }, 500);
+      }, 600);
     } catch (err) {
-      console.error("Failed to save product:", err);
-      setSaveError("Failed to save product: " + (err.message || 'Unknown database error'));
+      console.error("Save error:", err);
+      setSaveError("Failed to save product: " + (err.message || 'Unknown error'));
     } finally {
       setIsSavingProduct(false);
     }
   };
 
-  const handleDeleteProduct = async (prodId) => {
-    if (!window.confirm("Are you sure you want to delete this merchandise product?")) return;
-    try {
-      if (!db || !appId) return;
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', prodId));
-    } catch (err) {
-      console.error("Failed to delete product:", err);
-    }
-  };
-
-  const handleSeedDefaults = async () => {
-    if (!db || !appId) return;
-    if (!window.confirm("Sync official DRS merchandise lineup (Laser Engraving, Vinyl Signs, Hoodie, T-Shirts, Car Stickers) to your database?")) return;
-    try {
-      // Clear legacy items if any
-      const currentSnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'merch_products'));
-      for (const d of currentSnap.docs) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', d.id));
-      }
-      // Seed current 5 products
-      for (const p of DEFAULT_MERCH_PRODUCTS) {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_products', p.id), p);
-      }
-      alert("Merchandise catalog synchronized to official 5 products successfully!");
-    } catch (err) {
-      console.error("Failed to seed merch:", err);
-      alert("Error syncing products: " + err.message);
-    }
-  };
-
-  const handleDesignImageFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setDesignImageError("Please select a valid image file (PNG, JPG, WEBP, SVG).");
-      return;
-    }
-
-    if (file.size > 12 * 1024 * 1024) {
-      setDesignImageError("Image size must be under 12MB.");
-      return;
-    }
-
-    setDesignImageUploading(true);
-    setDesignImageProgress(0);
-    setDesignImageError('');
-
-    try {
-      if (storage) {
-        const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const storagePath = `merch/designs/${Date.now()}_${cleanFileName}`;
-        const imageRef = ref(storage, storagePath);
-        const uploadTask = uploadBytesResumable(imageRef, file);
-
-        uploadTask.on(
-          'state_changed',
-          (snap) => {
-            const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-            setDesignImageProgress(pct);
-          },
-          (err) => {
-            console.warn("Storage upload failed, fallback to DataURL:", err);
-            const reader = new FileReader();
-            reader.onload = () => {
-              setDesignForm(prev => ({ ...prev, image: reader.result }));
-              setDesignImageUploading(false);
-            };
-            reader.readAsDataURL(file);
-          },
-          async () => {
-            try {
-              const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-              setDesignForm(prev => ({ ...prev, image: downloadUrl }));
-              setDesignImageUploading(false);
-              setDesignImageProgress(0);
-            } catch (urlErr) {
-              console.error("Error retrieving download URL:", urlErr);
-              const reader = new FileReader();
-              reader.onload = () => {
-                setDesignForm(prev => ({ ...prev, image: reader.result }));
-                setDesignImageUploading(false);
-              };
-              reader.readAsDataURL(file);
-            }
-          }
-        );
-      } else {
-        const reader = new FileReader();
-        reader.onload = () => {
-          setDesignForm(prev => ({ ...prev, image: reader.result }));
-          setDesignImageUploading(false);
-        };
-        reader.readAsDataURL(file);
-      }
-    } catch (err) {
-      console.error("Upload error:", err);
-      setDesignImageError(err.message || "Could not process image upload.");
-      setDesignImageUploading(false);
-    }
-  };
-
-  const handleSaveDesign = async (e) => {
-    e.preventDefault();
-    setDesignSaveError('');
-    setDesignSaveSuccess('');
-
-    if (!designForm.title || !designForm.title.trim()) {
-      setDesignSaveError("Please enter a design title.");
-      return;
-    }
-
-    if (!db || !appId) {
-      setDesignSaveError("Database connection is not available.");
-      return;
-    }
-
-    setIsSavingDesign(true);
-    const targetId = editingDesign?.id || `drs-design-${Date.now()}`;
-
-    // Leave out description as requested, only store title, category, badge, image
-    const designPayload = {
-      id: targetId,
-      title: designForm.title.trim(),
-      category: designForm.category || 'Custom Graphics',
-      image: designForm.image || '/merch/designs/neon-drift.svg',
-      tag: (designForm.tag || '').trim(),
-      updatedAt: new Date().toISOString()
-    };
-
-    try {
-      await setDoc(
-        doc(db, 'artifacts', appId, 'public', 'data', 'merch_designs', targetId),
-        designPayload,
-        { merge: true }
-      );
-
-      setGalleryDesigns(prev => {
-        const idx = prev.findIndex(d => d.id === targetId);
-        if (idx >= 0) {
-          const updated = [...prev];
-          updated[idx] = designPayload;
-          return updated;
-        }
-        return [designPayload, ...prev];
-      });
-
-      setDesignSaveSuccess("Gallery design saved successfully!");
-      setTimeout(() => {
-        setIsCreatingDesign(false);
-        setEditingDesign(null);
-        setDesignSaveSuccess('');
-      }, 500);
-    } catch (err) {
-      console.error("Failed to save design:", err);
-      setDesignSaveError("Failed to save design: " + (err.message || 'Unknown database error'));
-    } finally {
-      setIsSavingDesign(false);
-    }
-  };
-
-  const handleDeleteDesign = async (designId) => {
-    if (!window.confirm("Are you sure you want to delete this custom design variation from the gallery?")) return;
-    try {
-      if (db && appId) {
-        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'merch_designs', designId));
-      }
-      setGalleryDesigns(prev => prev.filter(d => d.id !== designId));
-    } catch (err) {
-      console.error("Failed to delete design:", err);
-      alert("Error deleting design: " + err.message);
-    }
-  };
-
-  // Convert raw filename to clean display title (e.g. "kanjo_drift_spec.png" -> "Kanjo Drift Spec")
-  const formatTitleFromFileName = (fileName) => {
-    if (!fileName) return 'Custom Design';
-    const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
-    const cleanWords = nameWithoutExt.replace(/[_-]+/g, " ").trim();
-    return cleanWords
-      .split(/\s+/)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(" ") || "Custom Design";
-  };
-
-  // Handle multi-file selection for bulk design uploads
-  const handleBulkFilesSelect = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-
-    setBulkError('');
-    setBulkSuccess('');
-
-    const newItems = files.map((file, idx) => {
-      const id = `bulk-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`;
-      const title = formatTitleFromFileName(file.name);
-      let preview;
-      try {
-        preview = URL.createObjectURL(file);
-      } catch {
-        preview = '';
-      }
-      return {
-        id,
-        file,
-        preview,
-        title
-      };
-    });
-
-    setBulkQueue(prev => [...prev, ...newItems]);
-    if (e.target) e.target.value = '';
-  };
-
-  const handleUpdateBulkTitle = (id, newTitle) => {
-    setBulkQueue(prev => prev.map(item => item.id === id ? { ...item, title: newTitle } : item));
-  };
-
-  const handleRemoveBulkItem = (id) => {
-    setBulkQueue(prev => prev.filter(item => item.id !== id));
-  };
-
-  // Upload and persist all queued design variations (with titles only, omitting descriptions)
-  const handleProcessBulkUpload = async () => {
-    if (!bulkQueue.length) {
-      setBulkError("Please select at least one design image to upload.");
-      return;
-    }
-
-    if (!db || !appId) {
-      setBulkError("Database connection is not available.");
-      return;
-    }
-
-    setIsProcessingBulk(true);
-    setBulkError('');
-    setBulkSuccess('');
-    setBulkProgress(0);
-
-    const savedDesigns = [];
-    let completedCount = 0;
-
-    for (let i = 0; i < bulkQueue.length; i++) {
-      const item = bulkQueue[i];
-      const designId = `drs-design-${Date.now()}-${i}`;
-      const title = (item.title && item.title.trim()) || formatTitleFromFileName(item.file.name);
-
-      try {
-        let imageUrl = '';
-        if (storage) {
-          try {
-            const cleanFileName = item.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const storagePath = `merch/designs/${Date.now()}_${i}_${cleanFileName}`;
-            const imageRef = ref(storage, storagePath);
-            const uploadRes = await uploadBytesResumable(imageRef, item.file);
-            imageUrl = await getDownloadURL(uploadRes.ref);
-          } catch (storageErr) {
-            console.warn("Storage upload failed, falling back to dataURL:", storageErr);
-            imageUrl = await new Promise((resolve) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result);
-              reader.onerror = () => resolve('/merch/designs/neon-drift.svg');
-              reader.readAsDataURL(item.file);
-            });
-          }
-        } else {
-          imageUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => resolve('/merch/designs/neon-drift.svg');
-            reader.readAsDataURL(item.file);
-          });
-        }
-
-        // Schema leaves out description, just includes title, category, and image
-        const payload = {
-          id: designId,
-          title: title,
-          category: bulkCategory || 'Custom Graphics',
-          image: imageUrl,
-          updatedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString()
-        };
-
-        await setDoc(
-          doc(db, 'artifacts', appId, 'public', 'data', 'merch_designs', designId),
-          payload,
-          { merge: true }
-        );
-
-        savedDesigns.push(payload);
-        completedCount++;
-        setBulkProgress(completedCount);
-      } catch (err) {
-        console.error(`Error saving design variation ${item.title}:`, err);
-      }
-    }
-
-    setGalleryDesigns(prev => [...savedDesigns, ...prev]);
-    setIsProcessingBulk(false);
-    setBulkSuccess(`Successfully uploaded and added ${completedCount} design variations!`);
-
-    setTimeout(() => {
-      setIsBulkUploading(false);
-      setBulkQueue([]);
-      setBulkSuccess('');
-      setBulkProgress(0);
-    }, 1200);
-  };
-
-
-
-
-  const pendingOrdersCount = orders.filter(o => o.fulfillmentStatus === 'Pending').length;
-
+  // Filtered orders
   const filteredOrders = useMemo(() => {
-    return orders.filter(o => {
-      const matchStatus = filterStatus === 'All' || o.fulfillmentStatus === filterStatus;
-      const q = searchQuery.toLowerCase();
-      const matchSearch = !q || 
-        (o.orderNumber && o.orderNumber.toLowerCase().includes(q)) ||
-        (o.customerName && o.customerName.toLowerCase().includes(q)) ||
-        (o.customerEmail && o.customerEmail.toLowerCase().includes(q)) ||
-        (o.product?.title && o.product.title.toLowerCase().includes(q));
-      return matchStatus && matchSearch;
+    return orders.filter(order => {
+      if (filterStatus !== 'All' && order.fulfillmentStatus !== filterStatus) {
+        return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const ref = (order.orderNumber || '').toLowerCase();
+        const name = (order.customerName || '').toLowerCase();
+        const email = (order.customerEmail || '').toLowerCase();
+        const item = (order.product?.title || '').toLowerCase();
+        return ref.includes(q) || name.includes(q) || email.includes(q) || item.includes(q);
+      }
+      return true;
     });
   }, [orders, filterStatus, searchQuery]);
 
   return (
-    <section className="bg-zinc-900 p-6 md:p-8 rounded-2xl border border-zinc-800 space-y-6 shadow-xl relative overflow-hidden">
-      <div className={`absolute top-0 left-0 w-1.5 h-full ${isMerchActive ? 'bg-lime-500' : 'bg-amber-500'}`} />
+    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 md:p-8 space-y-6 shadow-xl relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-1.5 h-full bg-lime-500"></div>
 
-      {/* Header with Title & Active Toggle */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-zinc-800 pb-6">
+      {/* Header & Main Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
         <div>
-          <div className="flex items-center gap-3">
-            <ShoppingBag className="w-6 h-6 text-lime-400" />
-            <h3 className="text-xl font-black text-white uppercase tracking-widest">
-              Club Merchandise &amp; Store Management
-            </h3>
+          <div className="inline-flex items-center gap-2 bg-lime-500/10 border border-lime-500/30 px-3 py-0.5 rounded-full text-lime-400 text-[10px] font-bold uppercase tracking-widest mb-1">
+            Store Management
           </div>
+          <h3 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-3">
+            <ShoppingBag className="w-6 h-6 text-lime-400" /> Merchandise Control
+          </h3>
           <p className="text-zinc-400 text-xs mt-1">
-            Toggle your store live or inactive, view customer orders, and manage stock variants.
+            Manage your store availability, orders, and products.
           </p>
         </div>
 
-        {/* --- TOGGLE BUTTON TO MAKE MERCH PAGE LIVE OR INACTIVE --- */}
-        <div className="bg-black/60 border border-zinc-800 p-4 rounded-2xl flex items-center justify-between gap-6">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 block">
-              Merch Page Status
-            </span>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${isMerchActive ? 'bg-lime-400 shadow-[0_0_8px_rgba(125,220,9,0.8)]' : 'bg-amber-400'}`} />
-              <span className={`text-sm font-black uppercase tracking-wider ${isMerchActive ? 'text-lime-400' : 'text-amber-400'}`}>
-                {isMerchActive ? 'STORE IS LIVE' : 'STORE IS INACTIVE'}
-              </span>
-            </div>
+        {/* Global Store Switch */}
+        <div className="flex items-center gap-3 bg-zinc-950 p-3 rounded-2xl border border-zinc-800">
+          <div className="text-right">
+            <p className="text-xs font-bold uppercase tracking-wider text-white">Store Availability</p>
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${isMerchActive ? 'text-lime-400' : 'text-rose-400'}`}>
+              {isMerchActive ? 'Online (Accepting Orders)' : 'Closed (Admin Preview)'}
+            </p>
           </div>
-
           <button
             type="button"
-            onClick={() => onToggleMerchActive(!isMerchActive)}
-            className={`px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg active:scale-95 ${
-              isMerchActive
-                ? 'bg-zinc-800 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                : 'bg-lime-500 hover:bg-lime-400 text-black shadow-lime-500/25'
+            onClick={onToggleMerchActive}
+            className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+              isMerchActive ? 'bg-lime-500' : 'bg-zinc-800'
             }`}
           >
-            {isMerchActive ? 'Make Inactive' : 'Turn Store Live'}
+            <div
+              className={`bg-black w-6 h-6 rounded-full shadow-md transform transition-transform ${
+                isMerchActive ? 'translate-x-6' : 'translate-x-0'
+              }`}
+            />
           </button>
         </div>
       </div>
@@ -2521,354 +1591,141 @@ export const AdminMerchSection = ({
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-4">
         <div className="flex gap-2">
           <button
-            type="button"
             onClick={() => setActiveTab('orders')}
             className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
               activeTab === 'orders'
-                ? 'bg-lime-500 text-black shadow-md'
-                : 'bg-zinc-800/80 text-zinc-400 hover:text-white'
+                ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20'
+                : 'bg-zinc-800 text-zinc-400 hover:text-white'
             }`}
           >
             <Package className="w-4 h-4" />
-            Customer Orders
-            {pendingOrdersCount > 0 && (
-              <span className="bg-black text-lime-400 px-2 py-0.5 rounded-full text-[10px] font-black">
-                {pendingOrdersCount}
-              </span>
-            )}
+            Orders ({orders.length})
           </button>
-
           <button
-            type="button"
             onClick={() => setActiveTab('products')}
             className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
               activeTab === 'products'
-                ? 'bg-lime-500 text-black shadow-md'
-                : 'bg-zinc-800/80 text-zinc-400 hover:text-white'
+                ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20'
+                : 'bg-zinc-800 text-zinc-400 hover:text-white'
             }`}
           >
             <Tag className="w-4 h-4" />
-            Products &amp; Inventory ({products.length})
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('designs')}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
-              activeTab === 'designs'
-                ? 'bg-gradient-to-r from-pink-500 via-rose-500 to-lime-400 text-black shadow-md font-black'
-                : 'bg-zinc-800/80 text-zinc-400 hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            Design Gallery ({galleryDesigns.length})
+            Products ({products.length})
           </button>
         </div>
 
-        {activeTab === 'products' && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSeedDefaults}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-zinc-700"
-            >
-              Reload DRS Catalog
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingProduct(null);
-                setProductForm({
-                  title: '',
-                  category: 'Clothing',
-                  price: 25.00,
-                  isPoa: false,
-                  poaLabel: 'POA / Custom Quote',
-                  supportsCustomDesign: false,
-                  description: '',
-                  image: '',
-                  optionsLabel: 'Size',
-                  optionsText: 'S, M, L, XL, 2XL',
-                  inStock: true,
-                  tag: 'New'
-                });
-                setIsCreatingProduct(true);
-              }}
-              className="bg-lime-500 hover:bg-lime-400 text-black font-black px-4 py-2 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" /> Add Product
-            </button>
-          </div>
-        )}
-
-        {activeTab === 'designs' && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => {
-                setBulkQueue([]);
-                setBulkError('');
-                setBulkSuccess('');
-                setBulkProgress(0);
-                setIsBulkUploading(true);
-              }}
-              className="bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 hover:from-pink-400 hover:to-amber-400 text-white font-black px-3.5 py-2 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5"
-            >
-              <UploadCloud className="w-4 h-4" /> Bulk Create Premade Designs
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingDesign(null);
-                setDesignForm({
-                  title: '',
-                  category: 'Custom Graphics',
-                  image: '/merch/designs/neon-drift.svg',
-                  tag: ''
-                });
-                setDesignSaveError('');
-                setDesignSaveSuccess('');
-                setDesignImageError('');
-                setIsCreatingDesign(true);
-              }}
-              className="bg-lime-500 hover:bg-lime-400 text-black font-black px-3.5 py-2 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" /> Add Single Design
-            </button>
-          </div>
-        )}
+        {/* Sync button */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSyncOfficialList}
+            disabled={isSyncingDefaults}
+            className="px-3 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 transition-colors flex items-center gap-1.5"
+            title="Reset/write all official price list products into Firestore"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncingDefaults ? 'animate-spin' : ''}`} />
+            Sync Official Price List
+          </button>
+          {syncStatusMsg && (
+            <span className="text-xs text-lime-400 font-bold">{syncStatusMsg}</span>
+          )}
+        </div>
       </div>
 
-      {/* --- TAB CONTENT: ORDERS --- */}
+      {/* ORDERS TAB */}
       {activeTab === 'orders' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {['All', 'Pending', 'Dispatched', 'Collected'].map(st => (
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+            <input
+              type="text"
+              placeholder="Search by order ref, customer name, email..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-lime-500 w-full sm:w-72"
+            />
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {['All', 'Pending', 'Awaiting Collection', 'Fulfilled', 'Cancelled'].map(st => (
                 <button
                   key={st}
-                  type="button"
                   onClick={() => setFilterStatus(st)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${
                     filterStatus === st
                       ? 'bg-zinc-700 text-white'
-                      : 'bg-zinc-800/50 text-zinc-400 hover:text-white'
+                      : 'bg-zinc-950 text-zinc-400 hover:text-white border border-zinc-800'
                   }`}
                 >
                   {st}
                 </button>
               ))}
             </div>
-            <input
-              type="text"
-              placeholder="Search by name, order # or item..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-black border border-zinc-800 text-white rounded-xl px-4 py-2 text-xs focus:border-lime-500 outline-none w-full sm:w-64"
-            />
           </div>
 
           {filteredOrders.length === 0 ? (
-            <div className="bg-black/40 border border-zinc-800/80 rounded-2xl p-10 text-center space-y-2">
-              <Package className="w-10 h-10 text-zinc-600 mx-auto" />
-              <p className="text-white font-bold text-sm uppercase tracking-wider">No Orders Found</p>
-              <p className="text-zinc-500 text-xs">
-                {orders.length === 0
-                  ? "When members order merchandise through the store, their orders will appear here automatically."
-                  : "No orders match the selected filter."}
-              </p>
+            <div className="text-center py-12 bg-zinc-950/60 rounded-2xl border border-zinc-800 text-zinc-500 text-xs">
+              No orders found matching your search.
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredOrders.map((order) => (
+              {filteredOrders.map(order => (
                 <div
                   key={order.id}
-                  className="bg-black/60 border border-zinc-800 rounded-2xl p-5 space-y-4 hover:border-zinc-700 transition-colors"
+                  className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-zinc-700 transition-colors"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/60 pb-3">
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-xs font-black text-lime-400 bg-lime-500/10 px-2.5 py-1 rounded-lg border border-lime-500/20">
+                  <div className="space-y-1.5 flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-lime-400 font-bold text-xs bg-lime-500/10 px-2 py-0.5 rounded border border-lime-500/20">
                         {order.orderNumber || order.id}
                       </span>
-                      <span className="text-zinc-400 text-xs">
-                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {(order.isPoa || order.paymentStatus === 'POA_INQUIRY') && (
-                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-500 text-black flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> Custom Quote
-                        </span>
-                      )}
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
-                        order.fulfillmentStatus === 'Pending' || order.fulfillmentStatus === 'Quote Pending'
-                          ? 'bg-amber-950/80 text-amber-400 border-amber-500/40'
-                          : order.fulfillmentStatus === 'Quote Sent'
-                          ? 'bg-cyan-950/80 text-cyan-400 border-cyan-500/40'
-                          : order.fulfillmentStatus === 'In Production'
-                          ? 'bg-purple-950/80 text-purple-400 border-purple-500/40'
-                          : order.fulfillmentStatus === 'Dispatched'
-                          ? 'bg-blue-950/80 text-blue-400 border-blue-500/40'
-                          : 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40'
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        order.paymentStatus === 'PAID'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                       }`}>
-                        {order.fulfillmentStatus || 'Pending'}
+                        {order.paymentStatus || 'UNPAID'}
                       </span>
-                      <span className="text-zinc-400 font-mono text-xs font-black">
-                        {order.isPoa ? 'POA' : `£${Number(order.grandTotal).toFixed(2)}`}
+                      <span className="text-zinc-500 text-[10px]">
+                        {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB') : ''}
                       </span>
                     </div>
+
+                    <p className="text-white font-black text-sm">
+                      {order.product?.title || 'Merch Item'} (x{order.product?.quantity || 1}
+                      {order.product?.selectedOption ? ` - ${order.product.selectedOption}` : ''})
+                    </p>
+
+                    <div className="text-zinc-400 text-xs flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span>👤 {order.customerName}</span>
+                      <span>✉️ {order.customerEmail}</span>
+                      {order.customerPhone && <span>📞 {order.customerPhone}</span>}
+                    </div>
+
+                    {order.fulfillmentType === 'postal_delivery' && order.shippingAddress && (
+                      <p className="text-zinc-400 text-[11px]">
+                        📦 <strong>Post:</strong> {order.shippingAddress.street}, {order.shippingAddress.city}, {order.shippingAddress.postcode}
+                      </p>
+                    )}
+                    {order.orderNotes && (
+                      <p className="text-zinc-500 text-[11px] italic">
+                        Note: &ldquo;{order.orderNotes}&rdquo;
+                      </p>
+                    )}
                   </div>
 
-                  {order.customDesignNotes && (
-                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs space-y-1">
-                      <span className="text-amber-400 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> Customer Specifications / Design Notes:
-                      </span>
-                      <p className="text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed text-xs">
-                        {order.customDesignNotes}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="grid md:grid-cols-3 gap-4 text-xs">
-                    {/* Customer */}
-                    <div className="space-y-1">
-                      <p className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Customer</p>
-                      <p className="text-white font-bold">{order.customerName}</p>
-                      <p className="text-zinc-400 flex items-center gap-1.5"><Mail className="w-3 h-3 text-zinc-500" /> {order.customerEmail}</p>
-                      {order.customerPhone && (
-                        <p className="text-zinc-400 flex items-center gap-1.5"><Phone className="w-3 h-3 text-zinc-500" /> {order.customerPhone}</p>
-                      )}
-                    </div>
-
-                    {/* Item */}
-                    <div className="space-y-1">
-                      <p className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Product</p>
-                      <p className="text-white font-bold">{order.product?.title || 'Club Merch'}</p>
-                      <p className="text-zinc-400">
-                        Qty: <span className="text-white font-bold">{order.product?.quantity || 1}</span>
-                        {order.product?.selectedOption && ` • Variant: ${order.product.selectedOption}`}
-                      </p>
-                      {order.customDesignVariation && (
-                        <p className="text-lime-400 font-bold text-[11px] flex items-center gap-1 mt-1">
-                          <Sparkles className="w-3 h-3 text-pink-400 shrink-0" />
-                          <span>Artwork: <span className="text-white">{order.customDesignVariation}</span></span>
-                        </p>
-                      )}
-                      {order.hasCustomUserImage && (
-                        <div className="pt-1 space-y-1">
-                          <span className="inline-block bg-lime-500/20 text-lime-400 border border-lime-500/30 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider">
-                            +£5 Custom Photo Attached
-                          </span>
-                          {order.customUserImageUrl && (
-                            <a
-                              href={order.customUserImageUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-2 bg-black/60 p-1.5 rounded-lg border border-zinc-800 hover:border-lime-500 transition-colors group"
-                            >
-                              <img
-                                src={order.customUserImageUrl}
-                                alt="Customer upload"
-                                className="w-9 h-9 rounded object-cover border border-zinc-700 shrink-0"
-                              />
-                              <div className="text-[10px] min-w-0">
-                                <p className="text-lime-400 font-bold group-hover:underline flex items-center gap-1">
-                                  View / Download Photo
-                                </p>
-                                <p className="text-zinc-500 text-[9px]">Click to inspect customer image</p>
-                              </div>
-                            </a>
-                          )}
-                          {order.customUserImageNotes && (
-                            <p className="text-[10px] text-zinc-400 italic">
-                              Note: &quot;{order.customUserImageNotes}&quot;
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Fulfillment Details */}
-                    <div className="space-y-1">
-                      <p className="text-zinc-500 font-bold uppercase tracking-wider text-[10px]">Fulfillment</p>
-                      {order.fulfillmentType === 'meet_pickup' ? (
-                        <div>
-                          <p className="text-lime-400 font-bold flex items-center gap-1">
-                            <MapPin className="w-3 h-3" /> Meet Pickup
-                          </p>
-                          <p className="text-zinc-400 italic text-[11px]">{order.meetNote || 'Collection at DRS meet'}</p>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-blue-400 font-bold flex items-center gap-1">
-                            <Truck className="w-3 h-3" /> Postal Delivery
-                          </p>
-                          {order.shippingAddress ? (
-                            <p className="text-zinc-300 text-[11px] leading-tight">
-                              {order.shippingAddress.street}, {order.shippingAddress.city}, {order.shippingAddress.postcode}
-                            </p>
-                          ) : (
-                            <p className="text-zinc-500 italic">No postal address recorded</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="pt-2 border-t border-zinc-800/50 flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-[10px] text-zinc-500 font-mono">
-                      Ref: {order.orderNumber || order.id} • {order.paymentStatus || 'Verified'}
+                  {/* Status & Actions */}
+                  <div className="flex sm:flex-col items-end gap-2 shrink-0">
+                    <span className="text-lime-400 font-black text-lg font-mono">
+                      £{Number(order.grandTotal || 0).toFixed(2)}
                     </span>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {order.fulfillmentStatus !== 'Quote Sent' && (order.isPoa || order.paymentStatus === 'POA_INQUIRY') && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateOrderStatus(order.id, 'Quote Sent')}
-                          className="bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors"
-                        >
-                          Mark Quote Sent
-                        </button>
-                      )}
-                      {order.fulfillmentStatus !== 'In Production' && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateOrderStatus(order.id, 'In Production')}
-                          className="bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors"
-                        >
-                          In Production
-                        </button>
-                      )}
-                      {order.fulfillmentStatus !== 'Dispatched' && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateOrderStatus(order.id, 'Dispatched')}
-                          className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors"
-                        >
-                          Mark Dispatched
-                        </button>
-                      )}
-                      {order.fulfillmentStatus !== 'Collected' && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateOrderStatus(order.id, 'Collected')}
-                          className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors"
-                        >
-                          Mark Collected
-                        </button>
-                      )}
-                      {order.fulfillmentStatus !== 'Pending' && order.fulfillmentStatus !== 'Quote Pending' && (
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateOrderStatus(order.id, order.isPoa ? 'Quote Pending' : 'Pending')}
-                          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-400 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors"
-                        >
-                          Reset Status
-                        </button>
-                      )}
-                    </div>
+                    <select
+                      value={order.fulfillmentStatus || 'Pending'}
+                      onChange={e => handleUpdateOrderStatus(order.id, e.target.value)}
+                      className="bg-zinc-900 border border-zinc-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-lime-500"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Awaiting Collection">Awaiting Collection</option>
+                      <option value="Fulfilled">Fulfilled</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
                   </div>
                 </div>
               ))}
@@ -2877,248 +1734,90 @@ export const AdminMerchSection = ({
         </div>
       )}
 
-      {/* --- TAB CONTENT: PRODUCTS --- */}
+      {/* PRODUCTS TAB */}
       {activeTab === 'products' && (
         <div className="space-y-4">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {products.map((p) => (
-              <div
-                key={p.id}
-                className="bg-black/60 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between p-4 space-y-3"
-              >
-                <div className="flex gap-3">
-                  <img
-                    src={p.image}
-                    alt={p.title}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-16 h-16 rounded-xl object-cover border border-zinc-800 shrink-0"
-                  />
-                  <div className="space-y-0.5 overflow-hidden">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 block">
-                      {p.category}
-                    </span>
-                    <h4 className="text-white font-black text-sm truncate">{p.title}</h4>
-                    {p.isPoa || Number(p.price) === 0 ? (
-                      <p className="text-amber-400 font-mono font-bold text-xs flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" /> POA / Quote
-                      </p>
-                    ) : (
-                      <p className="text-lime-400 font-mono font-bold text-xs">
-                        £{Number(p.price).toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/60 pt-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
-                      p.inStock !== false ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
-                    }`}>
-                      {p.inStock !== false ? 'In Stock' : 'Sold Out'}
-                    </span>
-                    {(p.isPoa || Number(p.price) === 0) && (
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                        POA
-                      </span>
-                    )}
-                    {Boolean(p.supportsCustomDesign) && (
-                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/30">
-                        Designs
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingProduct(p);
-                        setProductForm({
-                          title: p.title,
-                          category: p.category || 'Laser Engraving',
-                          price: p.price ?? 0,
-                          isPoa: Boolean(p.isPoa || Number(p.price) === 0),
-                          poaLabel: p.poaLabel || 'POA / Custom Quote',
-                          supportsCustomDesign: Boolean(p.supportsCustomDesign),
-                          description: p.description || '',
-                          image: p.image || '',
-                          optionsLabel: p.optionsLabel || 'Options',
-                          optionsText: (p.options || []).join(', '),
-                          inStock: p.inStock !== false,
-                          tag: p.tag || ''
-                        });
-                        setSaveError('');
-                        setSaveSuccess('');
-                        setImageUploadError('');
-                        setIsCreatingProduct(true);
-                      }}
-                      className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-                      title="Edit Product"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteProduct(p.id)}
-                      className="p-1.5 rounded-lg bg-zinc-800 text-rose-400 hover:text-rose-300 transition-colors"
-                      title="Delete Product"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* --- TAB CONTENT: DESIGNS GALLERY --- */}
-      {activeTab === 'designs' && (
-        <div className="space-y-4">
-          {/* Design Pricing Configuration Card (Configurable by Admin) */}
-          <div className="bg-black/60 border border-zinc-800 rounded-2xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-lg">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-pink-400" />
-                <h4 className="text-sm font-black text-white uppercase tracking-wider">
-                  Store Design Extra Pricing Configuration
-                </h4>
-              </div>
-              <p className="text-xs text-zinc-400 max-w-xl">
-                Premade designs default as <span className="text-pink-400 font-bold">£3 extra</span> and custom user photo uploads default as <span className="text-lime-400 font-bold">£5 extra</span>. Set your preferred fees below and click Save.
-              </p>
-            </div>
-
-            <form onSubmit={handleSaveFees} className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
-                <label htmlFor="premade-fee-input" className="text-[11px] font-bold uppercase text-pink-400">Premade (+£):</label>
-                <input
-                  id="premade-fee-input"
-                  type="number"
-                  step="0.50"
-                  min="0"
-                  value={feeInputs.premadeDesignFee}
-                  onChange={(e) => setFeeInputs(prev => ({ ...prev, premadeDesignFee: e.target.value }))}
-                  className="w-16 bg-black border border-zinc-700 text-white rounded-lg px-2 py-1 text-xs font-bold text-center focus:border-pink-500 outline-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2">
-                <label htmlFor="custom-fee-input" className="text-[11px] font-bold uppercase text-lime-400">Custom (+£):</label>
-                <input
-                  id="custom-fee-input"
-                  type="number"
-                  step="0.50"
-                  min="0"
-                  value={feeInputs.customDesignFee}
-                  onChange={(e) => setFeeInputs(prev => ({ ...prev, customDesignFee: e.target.value }))}
-                  className="w-16 bg-black border border-zinc-700 text-white rounded-lg px-2 py-1 text-xs font-bold text-center focus:border-lime-500 outline-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSavingFees}
-                className="bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-              >
-                {isSavingFees ? (
-                  <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Saving...</>
-                ) : (
-                  <><Save className="w-3.5 h-3.5" /> Save Pricing</>
-                )}
-              </button>
-            </form>
-          </div>
-
-          {feeSaveSuccess && (
-            <div className="bg-lime-500/10 border border-lime-500/30 rounded-xl p-3 text-lime-400 text-xs flex items-center gap-2 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{feeSaveSuccess}</span>
-            </div>
-          )}
-
-          {feeSaveError && (
-            <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{feeSaveError}</span>
-            </div>
-          )}
-
-          <div className="bg-black/40 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div>
-              <h4 className="text-white font-black text-sm uppercase tracking-wider flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-pink-400" /> Premade Designs Gallery (+£{merchFees.premadeDesignFee.toFixed(2)} Extra)
-              </h4>
-              <p className="text-zinc-400 text-xs mt-0.5">
-                These graphic variations appear when customers choose &ldquo;Premade Designs&rdquo; on hoodies or t-shirts.
-              </p>
-            </div>
-            <div className="text-xs text-lime-400 font-mono font-bold bg-lime-500/10 px-3 py-1.5 rounded-xl border border-lime-500/20 whitespace-nowrap">
-              {galleryDesigns.length} Active Variations
-            </div>
+          <div className="flex justify-between items-center">
+            <p className="text-zinc-400 text-xs">
+              Showing active merchandise products ({products.length})
+            </p>
+            <button
+              onClick={() => {
+                setEditingProduct({ id: `drs-prod-${Date.now()}` });
+                setProductForm({
+                  title: '',
+                  category: 'Clothing',
+                  price: 20.00,
+                  description: '',
+                  image: '',
+                  optionsLabel: 'Size',
+                  optionsText: 'S, M, L, XL, 2XL, 3XL',
+                  inStock: true,
+                  tag: 'New'
+                });
+                setSaveError('');
+                setSaveSuccess('');
+              }}
+              className="bg-lime-500 hover:bg-lime-400 text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Product
+            </button>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {galleryDesigns.map((des) => (
+            {products.map(prod => (
               <div
-                key={des.id}
-                className="bg-black/60 border border-zinc-800 rounded-2xl overflow-hidden flex flex-col justify-between p-4 space-y-3"
+                key={prod.id}
+                className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col justify-between space-y-3"
               >
-                <div className="flex gap-3">
-                  <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-black border border-zinc-800 shrink-0">
+                <div className="flex gap-3 items-start">
+                  <div className="w-16 h-16 rounded-xl bg-black border border-zinc-800 overflow-hidden shrink-0">
                     <img
-                      src={des.image}
-                      alt={des.title}
-                      loading="lazy"
+                      src={prod.image}
+                      alt={prod.title}
                       className="w-full h-full object-cover"
                     />
-                    {des.tag && (
-                      <span className="absolute bottom-1 left-1 bg-black/80 text-lime-400 text-[8px] font-black uppercase px-1.5 py-0.5 rounded">
-                        {des.tag}
-                      </span>
-                    )}
                   </div>
-                  <div className="space-y-1 overflow-hidden flex-1 min-w-0">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 block">
-                      {des.category || 'Custom Graphics'}
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-bold text-zinc-500">
+                      {prod.category}
                     </span>
-                    <h4 className="text-white font-black text-sm truncate">{des.title}</h4>
+                    <h4 className="text-sm font-black text-white truncate">
+                      {prod.title}
+                    </h4>
+                    <p className="text-lime-400 font-bold text-sm">
+                      £{Number(prod.price).toFixed(2)}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-zinc-400 border-t border-zinc-800/60 pt-2">
-                  <span className="text-[10px] text-lime-400 font-mono">
-                    ID: {des.id}
-                  </span>
+                <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleStock(prod)}
+                    className={`text-[10px] font-bold uppercase px-2 py-1 rounded-lg border transition-colors ${
+                      prod.inStock !== false
+                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-500/30'
+                        : 'bg-rose-950/60 text-rose-400 border-rose-500/30'
+                    }`}
+                  >
+                    {prod.inStock !== false ? 'In Stock' : 'Sold Out'}
+                  </button>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingDesign(des);
-                        setDesignForm({
-                          title: des.title,
-                          category: des.category || 'Custom Graphics',
-                          image: des.image || '',
-                          tag: des.tag || ''
-                        });
-                        setDesignSaveError('');
-                        setDesignSaveSuccess('');
-                        setDesignImageError('');
-                        setIsCreatingDesign(true);
-                      }}
-                      className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
-                      title="Edit Design"
+                      onClick={() => handleOpenEditProduct(prod)}
+                      className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition-colors"
+                      title="Edit"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDeleteDesign(des.id)}
-                      className="p-1.5 rounded-lg bg-zinc-800 text-rose-400 hover:text-rose-300 transition-colors"
-                      title="Delete Design"
+                      onClick={() => handleDeleteProduct(prod.id)}
+                      className="p-1.5 bg-zinc-800 hover:bg-rose-900/60 text-zinc-400 hover:text-rose-400 rounded-lg transition-colors"
+                      title="Delete"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -3130,785 +1829,159 @@ export const AdminMerchSection = ({
         </div>
       )}
 
-      {/* Product Edit / Create Modal */}
-      {isCreatingProduct && (
+      {/* Product Edit Modal from Admin Section */}
+      {editingProduct && (
         <div
-          id="product-modal-backdrop"
-          onClick={(e) => {
-            if (e.target.id === 'product-modal-backdrop') {
-              setIsCreatingProduct(false);
-              setEditingProduct(null);
-            }
-          }}
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl my-4 sm:my-8"
-          >
+          <div className="relative bg-zinc-950 border border-zinc-800 rounded-3xl max-w-md w-full p-6 my-8 shadow-2xl space-y-4">
             <button
-              type="button"
-              onClick={() => { setIsCreatingProduct(false); setEditingProduct(null); }}
-              className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white"
+              onClick={() => setEditingProduct(null)}
+              className="absolute top-5 right-5 text-zinc-400 hover:text-white bg-zinc-900 p-2 rounded-full border border-zinc-800"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
 
-            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4">
-              {editingProduct ? 'Edit Merchandise Product' : 'Add New Merchandise Product'}
+            <h3 className="text-xl font-black text-white uppercase tracking-tight">
+              {editingProduct.title ? 'Edit Product' : 'Add New Product'}
             </h3>
 
-            <form onSubmit={handleSaveProduct} className="space-y-4">
+            <form onSubmit={handleSaveProduct} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Product Title</label>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Title
+                </label>
                 <input
                   type="text"
-                  required
                   value={productForm.title}
                   onChange={e => setProductForm({ ...productForm, title: e.target.value })}
-                  placeholder="e.g. DRS Custom Laser Engraving or Vinyl Sunstrip"
-                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                  required
                 />
-              </div>
-
-              {/* Category & POA Switch */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">Category</label>
-                  <select
-                    value={productForm.category}
-                    onChange={e => setProductForm({ ...productForm, category: e.target.value })}
-                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                  >
-                    <option value="Laser Engraving">Laser Engraving</option>
-                    <option value="Vinyl Signs">Vinyl Signs</option>
-                    <option value="Hoodies">Hoodies</option>
-                    <option value="T-Shirts">T-Shirts</option>
-                    <option value="Car Stickers">Car Stickers</option>
-                    <option value="Accessories">Accessories</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">
-                    {productForm.isPoa ? 'Price Structure' : 'Price (£ GBP)'}
-                  </label>
-                  {productForm.isPoa ? (
-                    <div className="w-full bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-xl p-3 text-sm font-bold flex items-center justify-between">
-                      <span>POA / Quote</span>
-                      <span className="text-[10px] uppercase tracking-wider font-normal text-amber-400/80">No fixed price</span>
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      min="0"
-                      value={productForm.price}
-                      onChange={e => setProductForm({ ...productForm, price: e.target.value })}
-                      placeholder="e.g. 25.00"
-                      className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* POA / Made to Order Switch */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      Price on Application (POA)
-                    </span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={productForm.isPoa}
-                      onChange={(e) => setProductForm({ ...productForm, isPoa: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-black after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Enable for bespoke items (laser engraving on keyrings, bookmarks, dog tags, or custom vinyl signs made to customer specs). Customers submit requirements and receive a quote instead of an immediate charge.
-                </p>
-              </div>
-
-              {/* Custom Design Variations Switch */}
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-pink-400" />
-                    <span className="text-xs font-bold text-white uppercase tracking-wider">
-                      Custom Design Variations &amp; Photo Upload
-                    </span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={productForm.supportsCustomDesign}
-                      onChange={(e) => setProductForm({ ...productForm, supportsCustomDesign: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-black after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-500"></div>
-                  </label>
-                </div>
-                <p className="text-[11px] text-zinc-400 leading-relaxed">
-                  Enable for apparel (e.g. Hoodies, T-Shirts). Customers can select preloaded gallery graphics and have the option to provide their own photo/artwork for +£5.
-                </p>
-              </div>
-
-              {/* Merch Image Upload & Asset Picker */}
-              <div className="space-y-2 bg-zinc-900/70 border border-zinc-800 rounded-2xl p-3.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                    <Camera className="w-3.5 h-3.5 text-lime-400" /> Product Image
-                  </label>
-                  {productForm.image && (
-                    <span className="text-[10px] text-lime-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Image Selected
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 items-start">
-                  {productForm.image ? (
-                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-zinc-700 shrink-0 bg-black">
-                      <img
-                        src={productForm.image}
-                        alt="Product Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setProductForm({ ...productForm, image: '' })}
-                        className="absolute top-1 right-1 p-1 rounded-lg bg-black/80 text-rose-400 hover:text-rose-300 transition-colors"
-                        title="Remove Image"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-zinc-800 flex flex-col items-center justify-center text-zinc-500 shrink-0 bg-zinc-950">
-                      <ImageIcon className="w-6 h-6 mb-1 text-zinc-600" />
-                      <span className="text-[9px] uppercase font-bold text-zinc-500">No Image</span>
-                    </div>
-                  )}
-
-                  <div className="flex-1 space-y-2 w-full">
-                    {/* Hidden file input */}
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageFileChange}
-                      accept="image/*"
-                      className="hidden"
-                    />
-
-                    {/* Upload from device button or custom ImageUploadComponent */}
-                    {ImageUploadComponent ? (
-                      <div className="w-full">
-                        <ImageUploadComponent
-                          label="Upload Image (Auto-Compress)"
-                          onUploadSuccess={(url) => {
-                            setProductForm(prev => ({ ...prev, image: url }));
-                            setImageUploadError('');
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={imageUploading}
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                      >
-                        {imageUploading ? (
-                          <><RefreshCw className="w-3.5 h-3.5 animate-spin text-lime-400" /> Uploading {imageUploadProgress}%...</>
-                        ) : (
-                          <><Upload className="w-3.5 h-3.5 text-lime-400" /> Upload Image from Device</>
-                        )}
-                      </button>
-                    )}
-
-                    {imageUploadError && (
-                      <p className="text-[11px] text-rose-400 font-medium">{imageUploadError}</p>
-                    )}
-
-                    {/* Manual URL input fallback */}
-                    <input
-                      type="text"
-                      value={productForm.image}
-                      onChange={e => setProductForm({ ...productForm, image: e.target.value })}
-                      placeholder="Or enter URL / file path"
-                      className="w-full bg-black border border-zinc-800 text-white rounded-xl p-2.5 text-xs focus:border-lime-500 outline-none font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Preset SVG Icons */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase mr-1">Presets:</span>
-                  {[
-                    { label: 'Laser Engraving', path: '/merch/laser-engraving.svg' },
-                    { label: 'Vinyl Signs', path: '/merch/vinyl-signs.svg' },
-                    { label: 'Hoodie', path: '/merch/hoodie.svg' },
-                    { label: 'T-Shirts', path: '/merch/tshirt.svg' },
-                    { label: 'Car Stickers', path: '/merch/car-stickers.svg' }
-                  ].map(preset => (
-                    <button
-                      key={preset.path}
-                      type="button"
-                      onClick={() => setProductForm({ ...productForm, image: preset.path })}
-                      className={`text-[10px] font-bold px-2 py-1 rounded-lg border transition-all ${
-                        productForm.image === preset.path
-                          ? 'bg-lime-500 text-black border-lime-400'
-                          : 'bg-black text-zinc-400 border-zinc-800 hover:text-white'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">Options Label</label>
-                  <input
-                    type="text"
-                    value={productForm.optionsLabel}
-                    onChange={e => setProductForm({ ...productForm, optionsLabel: e.target.value })}
-                    placeholder="e.g. Item Type or Size"
-                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                  />
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={productForm.category}
+                    onChange={e => setProductForm({ ...productForm, category: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                  >
+                    <option value="Clothing">Clothing</option>
+                    <option value="Headwear">Headwear</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Car Accessories">Car Accessories</option>
+                    <option value="Bundles">Bundles</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">Badge / Tag (Optional)</label>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                    Price (£)
+                  </label>
                   <input
-                    type="text"
-                    value={productForm.tag}
-                    onChange={e => setProductForm({ ...productForm, tag: e.target.value })}
-                    placeholder="e.g. Made to Order or Popular"
-                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                    type="number"
+                    step="0.50"
+                    value={productForm.price}
+                    onChange={e => setProductForm({ ...productForm, price: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500 font-mono"
+                    required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">
-                  Options List (Comma separated)
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Image URL or Path
+                </label>
+                <input
+                  type="text"
+                  value={productForm.image}
+                  onChange={e => setProductForm({ ...productForm, image: e.target.value })}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                  placeholder="/merch/jacket.svg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Options (Comma-separated)
                 </label>
                 <input
                   type="text"
                   value={productForm.optionsText}
                   onChange={e => setProductForm({ ...productForm, optionsText: e.target.value })}
-                  placeholder="e.g. Keyring, Bookmark, Dog Tag or Small, Medium, Large"
-                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Description</label>
-                <textarea
-                  rows={2}
-                  value={productForm.description}
-                  onChange={e => setProductForm({ ...productForm, description: e.target.value })}
-                  placeholder="Custom design details, materials, specs..."
-                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="inStockCheck"
-                  checked={productForm.inStock}
-                  onChange={e => setProductForm({ ...productForm, inStock: e.target.checked })}
-                  className="w-4 h-4 accent-lime-500 rounded cursor-pointer"
-                />
-                <label htmlFor="inStockCheck" className="text-xs font-bold text-white uppercase tracking-wider cursor-pointer">
-                  In Stock &amp; Available for Order
-                </label>
-              </div>
-
-              {saveError && (
-                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{saveError}</span>
-                </div>
-              )}
-
-              {saveSuccess && (
-                <div className="bg-lime-500/10 border border-lime-500/30 rounded-xl p-3 text-lime-400 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{saveSuccess}</span>
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => { setIsCreatingProduct(false); setEditingProduct(null); }}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3.5 rounded-xl uppercase tracking-wider text-xs transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSavingProduct || imageUploading}
-                  className="flex-1 bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-3.5 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                >
-                  {isSavingProduct ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" /> {editingProduct ? 'Updating Merch...' : 'Saving Merch...'}</>
-                  ) : (
-                    <><Save className="w-4 h-4" /> {editingProduct ? 'Save & Update Merch' : 'Save New Merch'}</>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Design Gallery Edit / Create Modal */}
-      {isCreatingDesign && (
-        <div
-          id="design-modal-backdrop"
-          onClick={(e) => {
-            if (e.target.id === 'design-modal-backdrop' && !isSavingDesign) {
-              setIsCreatingDesign(false);
-              setEditingDesign(null);
-            }
-          }}
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-lg bg-zinc-950 border border-zinc-800 rounded-3xl p-6 md:p-8 shadow-2xl my-4 sm:my-8"
-          >
-            <button
-              type="button"
-              onClick={() => { setIsCreatingDesign(false); setEditingDesign(null); }}
-              className="absolute top-6 right-6 p-2 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-xl font-black text-white uppercase tracking-tight mb-4 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-pink-400" />
-              {editingDesign ? 'Edit Gallery Design Variation' : 'Add New Gallery Design Variation'}
-            </h3>
-
-            <form onSubmit={handleSaveDesign} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-zinc-400 mb-1">Design Title</label>
-                <input
-                  type="text"
-                  required
-                  value={designForm.title}
-                  onChange={e => setDesignForm({ ...designForm, title: e.target.value })}
-                  placeholder="e.g. Neon Drift, Kanjo Night, Turbo Blueprint"
-                  className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">Category</label>
-                  <select
-                    value={designForm.category}
-                    onChange={e => setDesignForm({ ...designForm, category: e.target.value })}
-                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-                  >
-                    <option value="Cyberpunk & Drift">Cyberpunk & Drift</option>
-                    <option value="JDM Heritage">JDM Heritage</option>
-                    <option value="Engineering & Tech">Engineering & Tech</option>
-                    <option value="Retro Motorsport">Retro Motorsport</option>
-                    <option value="Custom Graphics">Custom Graphics</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-zinc-400 mb-1">Badge Tag (Optional)</label>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                    Tag / Badge
+                  </label>
                   <input
                     type="text"
-                    value={designForm.tag}
-                    onChange={e => setDesignForm({ ...designForm, tag: e.target.value })}
-                    placeholder="e.g. Popular, Best Seller, New"
-                    className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
+                    value={productForm.tag}
+                    onChange={e => setProductForm({ ...productForm, tag: e.target.value })}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500"
+                    placeholder="Bestseller"
                   />
                 </div>
-              </div>
-
-              {/* Design Image Upload & Preset Selector */}
-              <div className="space-y-2 bg-zinc-900/70 border border-zinc-800 rounded-2xl p-3.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                    <Camera className="w-3.5 h-3.5 text-lime-400" /> Design Artwork Graphic
-                  </label>
-                  {designForm.image && (
-                    <span className="text-[10px] text-lime-400 font-bold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Image Selected
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 items-start">
-                  {designForm.image ? (
-                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-zinc-700 shrink-0 bg-black">
-                      <img
-                        src={designForm.image}
-                        alt="Design Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setDesignForm({ ...designForm, image: '' })}
-                        className="absolute top-1 right-1 p-1 rounded-lg bg-black/80 text-rose-400 hover:text-rose-300 transition-colors"
-                        title="Remove Image"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl border-2 border-dashed border-zinc-800 flex flex-col items-center justify-center text-zinc-500 shrink-0 bg-zinc-950">
-                      <ImageIcon className="w-6 h-6 mb-1 text-zinc-600" />
-                      <span className="text-[9px] font-bold">No Image</span>
-                    </div>
-                  )}
-
-                  <div className="flex-1 space-y-2 w-full">
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
-                      type="file"
-                      ref={designFileInputRef}
-                      onChange={handleDesignImageFileChange}
-                      accept="image/png, image/jpeg, image/webp, image/svg+xml"
-                      className="hidden"
+                      type="checkbox"
+                      checked={productForm.inStock}
+                      onChange={e => setProductForm({ ...productForm, inStock: e.target.checked })}
+                      className="rounded border-zinc-700 text-lime-500 focus:ring-lime-500 w-4 h-4 bg-zinc-900"
                     />
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => designFileInputRef.current?.click()}
-                        disabled={designImageUploading}
-                        className="bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-colors shadow-sm"
-                      >
-                        <UploadCloud className="w-3.5 h-3.5" />
-                        {designImageUploading ? 'Uploading...' : 'Upload Design Image'}
-                      </button>
-
-                      {/* Quick Presets */}
-                      <button
-                        type="button"
-                        onClick={() => setDesignForm({ ...designForm, image: '/merch/designs/neon-drift.svg' })}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2.5 py-2 rounded-xl text-[11px] font-medium border border-zinc-700"
-                      >
-                        Neon Drift SVG
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDesignForm({ ...designForm, image: '/merch/designs/kanjo-night.svg' })}
-                        className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2.5 py-2 rounded-xl text-[11px] font-medium border border-zinc-700"
-                      >
-                        Kanjo SVG
-                      </button>
-                    </div>
-
-                    {designImageUploading && (
-                      <div className="space-y-1 pt-1">
-                        <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="bg-lime-500 h-1.5 rounded-full transition-all duration-300"
-                            style={{ width: `${designImageProgress}%` }}
-                          />
-                        </div>
-                        <p className="text-[10px] text-zinc-400">Processing artwork image: {designImageProgress}%</p>
-                      </div>
-                    )}
-
-                    {designImageError && (
-                      <p className="text-[11px] text-rose-400 flex items-center gap-1 font-medium">
-                        <AlertCircle className="w-3 h-3 shrink-0" /> {designImageError}
-                      </p>
-                    )}
-
-                    <div>
-                      <input
-                        type="text"
-                        value={designForm.image}
-                        onChange={e => setDesignForm({ ...designForm, image: e.target.value })}
-                        placeholder="Or paste artwork URL..."
-                        className="w-full bg-black/80 border border-zinc-800 text-white rounded-xl px-3 py-1.5 text-xs focus:border-lime-500 outline-none"
-                      />
-                    </div>
-                  </div>
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">In Stock</span>
+                  </label>
                 </div>
               </div>
 
-              {designSaveError && (
-                <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{designSaveError}</span>
-                </div>
-              )}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={productForm.description}
+                  onChange={e => setProductForm({ ...productForm, description: e.target.value })}
+                  rows={2}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-lime-500 resize-none"
+                />
+              </div>
 
-              {designSaveSuccess && (
-                <div className="bg-lime-500/10 border border-lime-500/30 rounded-xl p-3 text-lime-400 text-xs flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{designSaveSuccess}</span>
-                </div>
-              )}
+              {saveError && <p className="text-rose-400 text-xs font-bold">{saveError}</p>}
+              {saveSuccess && <p className="text-emerald-400 text-xs font-bold">{saveSuccess}</p>}
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => { setIsCreatingDesign(false); setEditingDesign(null); }}
-                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black py-3.5 rounded-xl uppercase tracking-wider text-xs transition-colors"
+                  onClick={() => setEditingProduct(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSavingDesign || designImageUploading}
-                  className="flex-1 bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-3.5 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2 transition-all"
+                  disabled={isSavingProduct}
+                  className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-lime-500 hover:bg-lime-400 text-black shadow-lg"
                 >
-                  {isSavingDesign ? (
-                    <><RefreshCw className="w-4 h-4 animate-spin" /> Saving Design...</>
-                  ) : (
-                    <><Save className="w-4 h-4" /> Save Gallery Design</>
-                  )}
+                  Save
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
-      {/* Bulk Design Variations Upload Modal */}
-      {isBulkUploading && (
-        <div
-          id="bulk-design-modal-backdrop"
-          onClick={(e) => {
-            if (e.target.id === 'bulk-design-modal-backdrop' && !isProcessingBulk) {
-              setIsBulkUploading(false);
-            }
-          }}
-          className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex justify-center items-start p-3 sm:p-6 overscroll-contain animate-in fade-in duration-200"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl my-4 sm:my-8 space-y-6"
-          >
-            {/* Header */}
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-800/80 pb-4">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-pink-400 block mb-1">
-                  Design Variations Catalog
-                </span>
-                <h3 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-                  <UploadCloud className="w-6 h-6 text-lime-400" />
-                  Bulk Create Premade Designs
-                </h3>
-                <p className="text-zinc-400 text-xs mt-1">
-                  Select multiple design graphics at once to add as premade designs (defaults to +£{merchFees.premadeDesignFee.toFixed(2)} extra for shoppers). Titles are auto-generated from file names and can be edited below.
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={isProcessingBulk}
-                onClick={() => setIsBulkUploading(false)}
-                className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors disabled:opacity-40"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Batch Category Selector */}
-            <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1.5 uppercase tracking-wider">
-                Category for this batch:
-              </label>
-              <select
-                value={bulkCategory}
-                onChange={(e) => setBulkCategory(e.target.value)}
-                disabled={isProcessingBulk}
-                className="w-full bg-black border border-zinc-800 text-white rounded-xl p-3 text-sm focus:border-lime-500 outline-none"
-              >
-                <option value="Custom Graphics">Custom Graphics</option>
-                <option value="Cyberpunk & Drift">Cyberpunk & Drift</option>
-                <option value="JDM Heritage">JDM Heritage</option>
-                <option value="Engineering & Tech">Engineering & Tech</option>
-                <option value="Retro Motorsport">Retro Motorsport</option>
-              </select>
-            </div>
-
-            {/* Hidden multi-file input */}
-            <input
-              type="file"
-              ref={bulkFileInputRef}
-              onChange={handleBulkFilesSelect}
-              multiple
-              accept="image/*"
-              className="hidden"
-            />
-
-            {/* File Drop / Select Area */}
-            <div
-              onClick={() => {
-                if (!isProcessingBulk) bulkFileInputRef.current?.click();
-              }}
-              className="border-2 border-dashed border-zinc-700 hover:border-lime-500/70 bg-black/50 hover:bg-black/80 rounded-2xl p-6 text-center cursor-pointer transition-all group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-zinc-900 group-hover:bg-lime-500/10 border border-zinc-800 group-hover:border-lime-500/30 text-zinc-400 group-hover:text-lime-400 flex items-center justify-center mx-auto mb-3 transition-colors">
-                <UploadCloud className="w-6 h-6" />
-              </div>
-              <p className="text-white text-sm font-bold">
-                Click to browse &amp; select multiple design image files
-              </p>
-              <p className="text-zinc-500 text-xs mt-1">
-                Supports PNG, JPG, WEBP, SVG • Select 1, 5, 10, or more graphics together
-              </p>
-            </div>
-
-            {/* Queue List */}
-            {bulkQueue.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                    Selected Designs to Upload ({bulkQueue.length}):
-                  </h4>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={isProcessingBulk}
-                      onClick={() => bulkFileInputRef.current?.click()}
-                      className="text-xs text-lime-400 hover:underline font-bold"
-                    >
-                      + Add More Files
-                    </button>
-                    <span className="text-zinc-700">•</span>
-                    <button
-                      type="button"
-                      disabled={isProcessingBulk}
-                      onClick={() => setBulkQueue([])}
-                      className="text-xs text-rose-400 hover:underline"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-                </div>
-
-                <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1 divide-y divide-zinc-800/40">
-                  {bulkQueue.map((item) => (
-                    <div
-                      key={item.id}
-                      className="pt-2.5 flex items-center gap-3 bg-black/40 border border-zinc-800/80 rounded-xl p-2.5"
-                    >
-                      <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-black border border-zinc-700 shrink-0">
-                        {item.preview ? (
-                          <img
-                            src={item.preview}
-                            alt="preview"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-zinc-600">
-                            <ImageIcon className="w-5 h-5" />
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <label className="block text-[10px] uppercase font-bold text-zinc-400 mb-0.5">
-                          Design Title (Required):
-                        </label>
-                        <input
-                          type="text"
-                          value={item.title}
-                          disabled={isProcessingBulk}
-                          onChange={(e) => handleUpdateBulkTitle(item.id, e.target.value)}
-                          placeholder="e.g. Neon Horizon"
-                          className="w-full bg-zinc-900 border border-zinc-700 text-white rounded-lg px-2.5 py-1.5 text-xs focus:border-lime-500 outline-none"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={isProcessingBulk}
-                        onClick={() => handleRemoveBulkItem(item.id)}
-                        className="p-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-rose-400 transition-colors shrink-0"
-                        title="Remove from batch"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Error and Success Banners */}
-            {bulkError && (
-              <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-3 text-rose-400 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{bulkError}</span>
-              </div>
-            )}
-
-            {bulkSuccess && (
-              <div className="bg-lime-500/10 border border-lime-500/30 rounded-xl p-3 text-lime-400 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>{bulkSuccess}</span>
-              </div>
-            )}
-
-            {/* Upload Progress Bar */}
-            {isProcessingBulk && (
-              <div className="space-y-1.5 bg-black/60 p-3 rounded-xl border border-zinc-800">
-                <div className="flex justify-between text-xs text-zinc-300 font-bold">
-                  <span>Saving Designs to Gallery...</span>
-                  <span className="font-mono text-lime-400">{bulkProgress} / {bulkQueue.length}</span>
-                </div>
-                <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-pink-500 to-lime-400 h-2 rounded-full transition-all duration-300"
-                    style={{
-                      width: `${bulkQueue.length ? Math.round((bulkProgress / bulkQueue.length) * 100) : 0}%`
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Footer Buttons */}
-            <div className="flex gap-3 pt-2 border-t border-zinc-800/80">
-              <button
-                type="button"
-                disabled={isProcessingBulk}
-                onClick={() => setIsBulkUploading(false)}
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-white font-black py-3.5 rounded-xl uppercase tracking-wider text-xs transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isProcessingBulk || bulkQueue.length === 0}
-                onClick={handleProcessBulkUpload}
-                className="flex-1 bg-gradient-to-r from-pink-500 to-lime-400 hover:from-pink-400 hover:to-lime-300 disabled:opacity-50 text-black font-black py-3.5 rounded-xl uppercase tracking-wider text-xs shadow-lg shadow-lime-500/20 flex items-center justify-center gap-2 transition-all"
-              >
-                {isProcessingBulk ? (
-                  <><RefreshCw className="w-4 h-4 animate-spin" /> Creating ({bulkProgress}/{bulkQueue.length})...</>
-                ) : (
-                  <><Save className="w-4 h-4" /> Upload &amp; Create All ({bulkQueue.length}) Premade Designs</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
+    </div>
   );
 };
+
+export default MerchStoreView;

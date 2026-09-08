@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <radialGradient id="mug-bg" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#181c24" />
+      <stop offset="60%" stop-color="#0e1014" />
+      <stop offset="100%" stop-color="#060708" />
+    </radialGradient>
+    <linearGradient id="ceramic-gloss" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#262b35" />
+      <stop offset="20%" stop-color="#111317" />
+      <stop offset="60%" stop-color="#090a0d" />
+      <stop offset="85%" stop-color="#1d2129" />
+      <stop offset="90%" stop-color="#3d4452" />
+      <stop offset="100%" stop-color="#15171d" />
+    </linearGradient>
+    <linearGradient id="wood-table" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2d1e18" />
+      <stop offset="40%" stop-color="#1d130f" />
+      <stop offset="100%" stop-color="#0d0806" />
+    </linearGradient>
+    <filter id="mug-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="30" stdDeviation="30" flood-color="#000" flood-opacity="0.9" />
+    </filter>
+  </defs>
+
+  <rect width="800" height="800" fill="url(#mug-bg)" />
+  
+  <!-- Wooden Table Surface -->
+  <path d="M 0 540 L 800 540 L 800 800 L 0 800 Z" fill="url(#wood-table)" />
+  <line x1="0" y1="540" x2="800" y2="540" stroke="#4a3328" stroke-width="2" />
+  <ellipse cx="400" cy="590" rx="260" ry="30" fill="#000" opacity="0.6" />
+
+  <g transform="translate(180, 140)" filter="url(#mug-shadow)">
+    <!-- Mug Handle -->
+    <path d="M 330 160 C 440 160 450 360 330 360 L 320 315 C 390 315 385 205 320 205 Z" fill="url(#ceramic-gloss)" stroke="#2b313d" stroke-width="2" />
+    <!-- Handle inner highlight -->
+    <path d="M 330 205 C 380 205 380 315 330 315" fill="none" stroke="#4c566a" stroke-width="1.5" opacity="0.4" />
+
+    <!-- Mug Main Cylinder -->
+    <rect x="50" y="80" width="290" height="400" rx="30" fill="url(#ceramic-gloss)" stroke="#222731" stroke-width="2" />
+
+    <!-- Mug Rim & Inside Opening -->
+    <ellipse cx="195" cy="80" rx="145" ry="32" fill="#181b22" stroke="#3d4452" stroke-width="3" />
+    <ellipse cx="195" cy="84" rx="132" ry="24" fill="#090a0d" />
+
+    <!-- Ceramic Gloss Highlight Streak -->
+    <path d="M 285 85 L 285 470" stroke="#ffffff" stroke-width="8" opacity="0.15" stroke-linecap="round" />
+    <path d="M 270 90 L 270 460" stroke="#ffffff" stroke-width="3" opacity="0.08" />
+
+    <!-- DRS Logo Print on Mug Body -->
+    <g transform="translate(85, 195) scale(0.68)">
+      <!-- Frame -->
+      <path d="M 25 45 L 50 20 L 270 20 L 295 45 L 295 120 L 270 145 L 50 145 L 25 120 Z"
+            fill="none" stroke="#84cc16" stroke-width="8" stroke-linejoin="round" />
+      <line x1="8" y1="82" x2="25" y2="82" stroke="#84cc16" stroke-width="8" />
+      <line x1="295" y1="82" x2="312" y2="82" stroke="#84cc16" stroke-width="8" />
+
+      <!-- DRS Letters -->
+      <text x="45" y="105" font-family="'Impact', Arial Black, sans-serif" font-size="86" font-style="italic" fill="#a3e635">D</text>
+      <text x="120" y="105" font-family="'Impact', Arial Black, sans-serif" font-size="86" font-style="italic" fill="#ec4899">R</text>
+      <text x="195" y="105" font-family="'Impact', Arial Black, sans-serif" font-size="86" font-style="italic" fill="#a3e635">S</text>
+
+      <!-- Underline & Title -->
+      <text x="160" y="172" font-family="Arial, sans-serif" font-size="20" font-weight="900" font-style="italic" fill="#84cc16" text-anchor="middle" letter-spacing="3">DAILY RIDE SOUTH</text>
+      <line x1="30" y1="185" x2="290" y2="185" stroke="#84cc16" stroke-width="4" />
+    </g>
+  </g>
+</svg>
