@@ -6,7 +6,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import {
   ShoppingBag, Package, Truck, AlertCircle, Tag,
   ChevronLeft, Plus, Trash2, Edit3, X, CheckCircle2,
-  RefreshCw, EyeOff, Sparkles, Filter, MapPin,
+  RefreshCw, Eye, EyeOff, Sparkles, Filter, MapPin,
   Save, Check, CreditCard, Banknote, UploadCloud, Link2
 } from 'lucide-react';
 import { DEFAULT_MERCH_PRODUCTS } from '../data/defaultMerch';
@@ -448,20 +448,36 @@ export const MerchStoreView = ({
     if (user?.email && !customerEmail) setCustomerEmail(user.email);
   }, [userProfile, user, customerName, customerEmail]);
 
-  // Categories list
+  // Admin toggle to preview out-of-stock items on the merch page if needed
+  const [adminShowOutOfStock, setAdminShowOutOfStock] = useState(false);
+
+  // Count out of stock items
+  const outOfStockCount = useMemo(() => {
+    return products.filter(p => p.inStock === false).length;
+  }, [products]);
+
+  // Available products: when an item is marked as out of stock, it does not show in the shop or on the merch page.
+  const visibleProducts = useMemo(() => {
+    if (isAdmin && adminShowOutOfStock) {
+      return products;
+    }
+    return products.filter(p => p.inStock !== false);
+  }, [products, isAdmin, adminShowOutOfStock]);
+
+  // Categories list based on visible in-stock items
   const categories = useMemo(() => {
     const cats = ['All'];
-    products.forEach(p => {
+    visibleProducts.forEach(p => {
       if (p.category && !cats.includes(p.category)) cats.push(p.category);
     });
     return cats;
-  }, [products]);
+  }, [visibleProducts]);
 
   // Filtered products list
   const filteredProducts = useMemo(() => {
-    if (activeCategory === 'All') return products;
-    return products.filter(p => p.category === activeCategory);
-  }, [products, activeCategory]);
+    if (activeCategory === 'All') return visibleProducts;
+    return visibleProducts.filter(p => p.category === activeCategory);
+  }, [visibleProducts, activeCategory]);
 
   const openOrderModal = (product) => {
     setSelectedProduct(product);
@@ -880,6 +896,31 @@ export const MerchStoreView = ({
           </button>
         ))}
 
+        {isAdmin && outOfStockCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setAdminShowOutOfStock(!adminShowOutOfStock)}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border cursor-pointer ${
+              adminShowOutOfStock
+                ? 'bg-rose-950/70 border-rose-500/50 text-rose-300'
+                : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+            }`}
+            title="Admin preview: view or toggle out of stock products"
+          >
+            {adminShowOutOfStock ? (
+              <>
+                <EyeOff className="w-3.5 h-3.5" />
+                <span>Hide Out of Stock ({outOfStockCount})</span>
+              </>
+            ) : (
+              <>
+                <Eye className="w-3.5 h-3.5" />
+                <span>Show Out of Stock ({outOfStockCount} hidden)</span>
+              </>
+            )}
+          </button>
+        )}
+
         {isAdmin && (
           <button
             type="button"
@@ -908,7 +949,29 @@ export const MerchStoreView = ({
       </div>
 
       {/* Products Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {filteredProducts.length === 0 ? (
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-3xl p-12 text-center space-y-3">
+          <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-zinc-700/50 text-zinc-400 flex items-center justify-center mx-auto">
+            <ShoppingBag className="w-6 h-6" />
+          </div>
+          <h3 className="text-white text-base font-bold uppercase tracking-wider">No Items Currently In Stock</h3>
+          <p className="text-zinc-400 text-xs max-w-md mx-auto">
+            {activeCategory !== 'All'
+              ? `There are currently no items in stock for "${activeCategory}". Try selecting another category or check back soon!`
+              : 'Official club merchandise is currently being restocked. Check back soon for the next drop!'}
+          </p>
+          {activeCategory !== 'All' && (
+            <button
+              type="button"
+              onClick={() => setActiveCategory('All')}
+              className="mt-2 text-xs font-black uppercase tracking-wider text-lime-400 hover:text-lime-300 underline cursor-pointer"
+            >
+              View All Categories
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProducts.map((product) => (
           <div
             key={product.id}
@@ -1012,7 +1075,8 @@ export const MerchStoreView = ({
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Product Order Modal */}
       {selectedProduct && (
