@@ -953,7 +953,7 @@ const GalleryView = ({ members, onImageClick }) => {
   );
 };
 
-const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMemberClick, members, onImageClick }) => {
+const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMemberClick, members, onImageClick, isMerchActive, isAdmin }) => {
   const allImages = useMemo(() => {
     const imgs = [];
     members.forEach(m => {
@@ -1044,7 +1044,7 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
         </div>
       </div>
       
-      <div onClick={() => window.location.hash = 'competitions'} className="bg-gradient-to-r from-lime-500 via-lime-600 to-emerald-600 text-black rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-lime-500/25 mb-10 group border border-lime-400/60">
+      <div onClick={() => window.location.hash = 'competitions'} className="bg-gradient-to-r from-lime-500 via-lime-600 to-emerald-600 text-black rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-lime-500/25 mb-6 group border border-lime-400/60">
         <div className="flex items-center gap-4 md:gap-6">
           <div className="bg-white/20 p-3 md:p-4 rounded-full shadow-inner">
             <Trophy className="w-8 h-8 md:w-10 md:h-10 text-black" />
@@ -1056,6 +1056,24 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
         </div>
         <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-black group-hover:translate-x-2 transition-transform shrink-0" />
       </div>
+
+      {(isMerchActive || isAdmin) && (
+        <div onClick={() => window.location.hash = 'merch'} className="bg-gradient-to-r from-pink-600 via-rose-600 to-amber-600 text-white rounded-3xl p-6 md:p-8 flex items-center justify-between cursor-pointer hover:scale-[1.02] transition-transform shadow-xl shadow-pink-500/20 mb-10 group border border-pink-400/50 relative overflow-hidden">
+          <div className="flex items-center gap-4 md:gap-6 relative z-10">
+            <div className="bg-white/20 p-3 md:p-4 rounded-full shadow-inner">
+              <ShoppingBag className="w-8 h-8 md:w-10 md:h-10 text-white" />
+            </div>
+            <div>
+              <div className="inline-flex items-center gap-1.5 bg-black/30 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest text-pink-200 mb-1">
+                Official Drop {!isMerchActive && '(Admin Preview)'}
+              </div>
+              <h3 className="text-xl md:text-3xl font-black text-white uppercase tracking-tighter">Club Merch &amp; Apparel</h3>
+              <p className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-widest mt-0.5">Official DRS hoodies, tees, stickers &amp; accessories • Pick up or UK delivery</p>
+            </div>
+          </div>
+          <ChevronRight className="w-8 h-8 md:w-10 md:h-10 text-white group-hover:translate-x-2 transition-transform shrink-0 relative z-10" />
+        </div>
+      )}
       
       {spotlightMember && (
         <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => onMemberClick(spotlightMember)}>
@@ -2426,6 +2444,8 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   const [raffleWinners, setRaffleWinners] = useState({});
   const [editDescription, setEditDescription] = useState(clubDescription || '');
   const [editSpotlightId, setEditSpotlightId] = useState(spotlightMemberId || '');
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsSavedSuccess, setSettingsSavedSuccess] = useState(false);
   const [memberRoles, setMemberRoles] = useState({});
   const [memberRanks, setMemberRanks] = useState({});
   
@@ -2686,13 +2706,20 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
   };
   
   const handleUpdateSettings = async () => {
+    setIsSavingSettings(true);
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), { 
         description: editDescription,
-        spotlightMemberId: editSpotlightId 
+        spotlightMemberId: editSpotlightId,
+        isMerchActive: Boolean(isMerchActive)
       }, { merge: true });
+      setSettingsSavedSuccess(true);
+      setTimeout(() => setSettingsSavedSuccess(false), 3000);
     } catch (err) {
       console.error("Error saving settings:", err);
+      alert("Failed to save settings: " + (err?.message || "Please check connection"));
+    } finally {
+      setIsSavingSettings(false);
     }
   };
   
@@ -3533,11 +3560,54 @@ const AdminView = ({ members, combinedEvents, raffles, clubDescription, userProf
                 className="w-full bg-black border border-zinc-800 text-white rounded-xl p-4 outline-none focus:border-lime-500 transition-all h-32 whitespace-pre-wrap"
               />
             </div>
+
+            {/* Merch Store Availability Toggle in Homepage Settings */}
+            <div className="bg-black/60 border border-zinc-800 rounded-2xl p-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                  <ShoppingBag className="w-3.5 h-3.5 text-lime-400" /> Merchandise Shop Visibility
+                </p>
+                <p className="text-[10px] text-zinc-400 mt-0.5">
+                  {isMerchActive ? (
+                    <span className="text-lime-400 font-semibold">Store is Online — visible to all members and guests.</span>
+                  ) : (
+                    <span className="text-rose-400 font-semibold">Store is Closed — hidden from users (Admin Preview only).</span>
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onToggleMerchActive && onToggleMerchActive(!isMerchActive)}
+                className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors cursor-pointer shrink-0 ${
+                  isMerchActive ? 'bg-lime-500' : 'bg-zinc-800'
+                }`}
+                title={isMerchActive ? "Click to set store offline" : "Click to set store online"}
+              >
+                <div
+                  className={`bg-black w-6 h-6 rounded-full shadow-md transform transition-transform ${
+                    isMerchActive ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
             <button 
               onClick={handleUpdateSettings}
-              className="w-full bg-lime-500 hover:bg-lime-400 text-black font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-lime-500/20 active:scale-[0.98]"
+              disabled={isSavingSettings}
+              className="w-full bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black py-3 rounded-xl transition-all uppercase tracking-widest text-xs shadow-lg shadow-lime-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
             >
-              Update Homepage Settings
+              {isSavingSettings ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  Saving Settings...
+                </>
+              ) : settingsSavedSuccess ? (
+                <>
+                  <Check className="w-4 h-4" /> Settings Saved!
+                </>
+              ) : (
+                'Update Homepage Settings'
+              )}
             </button>
           </div>
         </section>
@@ -3695,7 +3765,15 @@ const MainApp = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [clubDescription, setClubDescription] = useState("It started simply enough: just a petrol-head couple bonded by a shared love for burning fuel and draining bank accounts.");
   const [spotlightMemberId, setSpotlightMemberId] = useState(null);
-  const [isMerchActive, setIsMerchActive] = useState(false);
+  const [isMerchActive, setIsMerchActive] = useState(() => {
+    try {
+      const cached = localStorage.getItem('drs_merch_active');
+      if (cached !== null) return cached === 'true';
+    } catch (_err) {
+      // Ignore localStorage availability errors
+    }
+    return false;
+  });
   const [birthdayIndex, setBirthdayIndex] = useState(0);
   const [globalSelectedMember, setGlobalSelectedMember] = useState(null);
   const [globalViewingCar, setGlobalViewingCar] = useState(null);
@@ -3703,6 +3781,30 @@ const MainApp = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [activeTab]);
+
+  // --- REAL-TIME PUBLIC CLUB SETTINGS SYNC (MERCH STATUS, DESCRIPTION, SPOTLIGHT) ---
+  useEffect(() => {
+    const unsubInfo = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), d => {
+      if (d.exists()) {
+        const data = d.data();
+        if (data.description) setClubDescription(data.description);
+        if (data.spotlightMemberId) setSpotlightMemberId(data.spotlightMemberId);
+        if (data.isMerchActive !== undefined) {
+          const active = Boolean(data.isMerchActive);
+          setIsMerchActive(active);
+          try {
+            localStorage.setItem('drs_merch_active', String(active));
+          } catch (_err) {
+            // Ignore localStorage errors
+          }
+        }
+      }
+    }, err => {
+      console.warn("Public clubInfo sync notice:", err?.message || err);
+    });
+
+    return () => unsubInfo();
+  }, [appId]);
 
   // --- SUMUP GLOBAL SCRIPT ---
   useEffect(() => {
@@ -3809,10 +3911,17 @@ const MainApp = () => {
     
     const unsubInfo = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), d => {
       if (d.exists()) {
-        if (d.data().description) setClubDescription(d.data().description);
-        if (d.data().spotlightMemberId) setSpotlightMemberId(d.data().spotlightMemberId);
-        if (typeof d.data().isMerchActive === 'boolean') {
-          setIsMerchActive(d.data().isMerchActive);
+        const data = d.data();
+        if (data.description) setClubDescription(data.description);
+        if (data.spotlightMemberId) setSpotlightMemberId(data.spotlightMemberId);
+        if (data.isMerchActive !== undefined) {
+          const active = Boolean(data.isMerchActive);
+          setIsMerchActive(active);
+          try {
+            localStorage.setItem('drs_merch_active', String(active));
+          } catch (_err) {
+            // Ignore localStorage errors
+          }
         }
       }
     });
@@ -3887,13 +3996,27 @@ const MainApp = () => {
   };
 
   const toggleMerchActive = async (newStatus) => {
-    setIsMerchActive(newStatus);
+    const targetStatus = typeof newStatus === 'boolean' ? newStatus : !isMerchActive;
+    setIsMerchActive(targetStatus);
+    try {
+      localStorage.setItem('drs_merch_active', String(targetStatus));
+    } catch (_err) {
+      // Ignore localStorage errors
+    }
+
     try {
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'clubInfo'), {
-        isMerchActive: newStatus
+        isMerchActive: targetStatus
       }, { merge: true });
     } catch (err) {
-      console.error("Failed to update merch active status:", err);
+      console.error("Failed to update merch active status in Firestore:", err);
+      setIsMerchActive(!targetStatus);
+      try {
+        localStorage.setItem('drs_merch_active', String(!targetStatus));
+      } catch (_err) {
+        // Ignore localStorage errors
+      }
+      alert("Failed to save store availability: " + (err?.message || "Please check connection or admin permissions"));
     }
   };
 
@@ -3950,7 +4073,18 @@ const MainApp = () => {
     }
     
     switch (activeTab) {
-      case 'home': return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberModal} members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
+      case 'home': return (
+        <HomeView
+          clubDescription={clubDescription}
+          spotlightMember={spotlightMember}
+          isBirthdaySpotlight={isBirthdaySpotlight}
+          onMemberClick={handleMemberModal}
+          members={sortedMembers}
+          onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }}
+          isMerchActive={isMerchActive}
+          isAdmin={currentUserProfile?.role === 'Admin'}
+        />
+      );
       case 'events': return <EventsView title="Upcoming Events" events={upcomingEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={false} onMemberClick={handleMemberModal} />;
       case 'past_events': return <EventsView title="Past Events Gallery" events={pastEvents} cloudRsvps={cloudRsvps} cloudMembers={cloudMembers} user={user} userProfile={currentUserProfile} toggleRsvp={toggleRsvp} isPast={true} onMemberClick={handleMemberModal} />;
       case 'gallery': return <GalleryView members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
@@ -3970,6 +4104,7 @@ const MainApp = () => {
           appId={appId}
           ImageUploadComponent={ImageUpload}
           onNavigateToAdmin={() => { window.location.hash = 'admin'; }}
+          onToggleMerchActive={toggleMerchActive}
         />
       );
       case 'charity': return <CharityView />;
@@ -3999,7 +4134,18 @@ const MainApp = () => {
             />
           );
         }
-        return <HomeView clubDescription={clubDescription} spotlightMember={spotlightMember} isBirthdaySpotlight={isBirthdaySpotlight} onMemberClick={handleMemberModal} members={sortedMembers} onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }} />;
+        return (
+          <HomeView
+            clubDescription={clubDescription}
+            spotlightMember={spotlightMember}
+            isBirthdaySpotlight={isBirthdaySpotlight}
+            onMemberClick={handleMemberModal}
+            members={sortedMembers}
+            onImageClick={img => { window.history.pushState({modal:'image'}, ''); setEnlargedImage(img); }}
+            isMerchActive={isMerchActive}
+            isAdmin={currentUserProfile?.role === 'Admin'}
+          />
+        );
     }
   };
 

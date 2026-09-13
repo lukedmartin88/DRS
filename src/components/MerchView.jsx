@@ -375,7 +375,8 @@ export const MerchStoreView = ({
   auth,
   appId,
   ImageUploadComponent,
-  onNavigateToAdmin
+  onNavigateToAdmin,
+  onToggleMerchActive
 }) => {
   const [products, setProducts] = useState(DEFAULT_MERCH_PRODUCTS);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -834,16 +835,51 @@ export const MerchStoreView = ({
                 Store is Inactive (Admin Preview Mode)
               </p>
               <p className="text-zinc-400 text-xs">
-                Only verified admins can see this page right now. Activate it in the Admin Control Panel whenever you are ready to accept orders.
+                Only verified admins can see this page right now. Other users cannot see the shop until you activate it.
               </p>
             </div>
           </div>
-          {onNavigateToAdmin && (
+          <div className="flex items-center gap-2">
+            {onToggleMerchActive && (
+              <button
+                onClick={() => onToggleMerchActive(true)}
+                className="bg-lime-500 hover:bg-lime-400 text-black font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl transition-all whitespace-nowrap shadow-md cursor-pointer active:scale-95"
+              >
+                Go Live Now
+              </button>
+            )}
+            {onNavigateToAdmin && (
+              <button
+                onClick={onNavigateToAdmin}
+                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl transition-all whitespace-nowrap shadow-md border border-zinc-700 active:scale-95"
+              >
+                Go to Admin
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Admin Live Notice */}
+      {isMerchActive && isAdmin && (
+        <div className="bg-lime-500/10 border border-lime-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-lime-400 animate-pulse shrink-0" />
+            <div>
+              <p className="text-lime-400 font-bold text-xs uppercase tracking-wider">
+                Store is LIVE &amp; Visible to Everyone
+              </p>
+              <p className="text-zinc-400 text-xs">
+                All club members can see the Merch tab in the menu and place orders.
+              </p>
+            </div>
+          </div>
+          {onToggleMerchActive && (
             <button
-              onClick={onNavigateToAdmin}
-              className="bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl transition-all whitespace-nowrap shadow-md"
+              onClick={() => onToggleMerchActive(false)}
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-bold text-xs uppercase tracking-widest px-4 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer active:scale-95"
             >
-              Go to Admin Toggle
+              Turn Store Offline
             </button>
           )}
         </div>
@@ -1930,7 +1966,7 @@ export const AdminMerchSection = ({
           </div>
           <button
             type="button"
-            onClick={onToggleMerchActive}
+            onClick={() => onToggleMerchActive && onToggleMerchActive(!isMerchActive)}
             className={`w-14 h-8 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
               isMerchActive ? 'bg-lime-500' : 'bg-zinc-800'
             }`}
