@@ -7,7 +7,8 @@ import {
   ShoppingBag, Package, Truck, AlertCircle, Tag,
   ChevronLeft, Plus, Trash2, Edit3, X, CheckCircle2,
   RefreshCw, Eye, EyeOff, Sparkles, Filter, MapPin,
-  Save, Check, CreditCard, Banknote, UploadCloud, Link2
+  Save, Check, CreditCard, Landmark, UploadCloud, Link2,
+  Copy, CheckCheck
 } from 'lucide-react';
 import { DEFAULT_MERCH_PRODUCTS } from '../data/defaultMerch';
 
@@ -384,7 +385,52 @@ export const MerchStoreView = ({
   const [selectedOption, setSelectedOption] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [fulfillmentType, setFulfillmentType] = useState('meet_pickup'); // 'meet_pickup' | 'postal_delivery'
-  const [paymentChoice, setPaymentChoice] = useState('sumup'); // 'sumup' | 'cash_meet'
+  const [paymentChoice, setPaymentChoice] = useState('sumup'); // 'sumup' | 'bacs'
+
+  // BACS Bank Transfer Details (Synced from Firestore settings)
+  const [bacsConfig, setBacsConfig] = useState({
+    accountName: 'Daily Ride South',
+    bankName: 'Barclays Bank',
+    sortCode: '20-45-45',
+    accountNumber: '83920184',
+    instructions: 'Please include your unique DRS Order Reference in your bank transfer.'
+  });
+  const [isCopiedRef, setIsCopiedRef] = useState(false);
+  const [isCopiedBank, setIsCopiedBank] = useState(false);
+
+  // Sync BACS settings in real-time
+  useEffect(() => {
+    if (!db || !appId) return;
+    const unsub = onSnapshot(
+      doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'bacsConfig'),
+      (snap) => {
+        if (snap.exists()) {
+          setBacsConfig(prev => ({ ...prev, ...snap.data() }));
+        }
+      },
+      (err) => {
+        console.warn("BACS config notice:", err);
+      }
+    );
+    return () => unsub();
+  }, [db, appId]);
+
+  const copyToClipboard = (text, type = 'ref') => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(text);
+        if (type === 'ref') {
+          setIsCopiedRef(true);
+          setTimeout(() => setIsCopiedRef(false), 2500);
+        } else {
+          setIsCopiedBank(true);
+          setTimeout(() => setIsCopiedBank(false), 2500);
+        }
+      }
+    } catch (_err) {
+      // Ignore clipboard errors
+    }
+  };
 
   // Admin In-Store Product Editing State
   const [adminEditingProduct, setAdminEditingProduct] = useState(null);
@@ -642,14 +688,15 @@ export const MerchStoreView = ({
       }
     }
 
-    // CASH AT NEXT MEET FLOW (Direct Reservation)
-    if (paymentChoice === 'cash_meet') {
+    // BACS BANK TRANSFER FLOW
+    if (paymentChoice === 'bacs') {
       setIsSubmitting(true);
       setCheckoutError('');
 
       try {
+        const orderNum = `DRS-${Math.floor(100000 + Math.random() * 900000)}`;
         const orderData = {
-          orderNumber: `DRS-${Math.floor(100000 + Math.random() * 900000)}`,
+          orderNumber: orderNum,
           createdAt: new Date().toISOString(),
           customerId: user?.uid || 'guest',
           customerName: customerName.trim(),
@@ -665,13 +712,20 @@ export const MerchStoreView = ({
             quantity: quantity
           },
           itemsSubtotal: Number(itemsSubtotal.toFixed(2)),
-          shippingFee: 0,
-          grandTotal: Number(itemsSubtotal.toFixed(2)),
-          fulfillmentType: 'meet_pickup',
+          shippingFee: Number(shippingFee.toFixed(2)),
+          grandTotal: Number(grandTotal.toFixed(2)),
+          fulfillmentType: fulfillmentType,
+          shippingAddress: fulfillmentType === 'postal_delivery' ? {
+            street: streetAddress.trim(),
+            city: city.trim(),
+            postcode: postcode.trim().toUpperCase(),
+            country: 'United Kingdom'
+          } : null,
           orderNotes: orderNotes.trim() || null,
-          paymentMethod: 'CASH_OR_CARD_ON_COLLECTION',
-          paymentStatus: 'UNPAID',
-          fulfillmentStatus: 'Awaiting Collection'
+          paymentMethod: 'BACS_TRANSFER',
+          paymentStatus: 'AWAITING_BACS',
+          fulfillmentStatus: fulfillmentType === 'meet_pickup' ? 'Awaiting Collection' : 'Pending',
+          bacsReference: orderNum
         };
 
         if (db && appId) {
@@ -679,8 +733,8 @@ export const MerchStoreView = ({
         }
         setCompletedOrder(orderData);
       } catch (err) {
-        console.error("Failed to reserve order:", err);
-        setCheckoutError(err.message || 'Failed to complete reservation. Please try again.');
+        console.error("Failed to place BACS order:", err);
+        setCheckoutError(err.message || 'Failed to complete BACS order. Please try again.');
       } finally {
         setIsSubmitting(false);
       }
@@ -908,7 +962,7 @@ export const MerchStoreView = ({
           </div>
           <div className="text-left">
             <p className="text-white text-xs font-bold uppercase tracking-wider">Meet Pickup or UK Post</p>
-            <p className="text-zinc-500 text-[10px] tracking-wide">SumUp Card or Cash at Meet</p>
+            <p className="text-zinc-500 text-[10px] tracking-wide">SumUp Card or BACS</p>
           </div>
         </div>
       </div>
@@ -1133,19 +1187,106 @@ export const MerchStoreView = ({
               /* Order Completed Screen */
               <div className="text-center py-6 space-y-6 animate-in zoom-in-95 duration-500">
                 <div className="w-20 h-20 bg-lime-500/10 border-2 border-lime-500/30 text-lime-400 rounded-full flex items-center justify-center mx-auto shadow-xl">
-                  <CheckCircle2 className="w-10 h-10" />
+                  {completedOrder.paymentMethod === 'BACS_TRANSFER' ? (
+                    <Landmark className="w-10 h-10" />
+                  ) : (
+                    <CheckCircle2 className="w-10 h-10" />
+                  )}
                 </div>
                 <div>
-                  <span className="bg-lime-500 text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
-                    {completedOrder.paymentStatus === 'PAID' ? 'Payment Confirmed' : 'Order Reserved'}
+                  <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                    completedOrder.paymentStatus === 'PAID'
+                      ? 'bg-lime-500 text-black'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  }`}>
+                    {completedOrder.paymentStatus === 'PAID' ? 'Payment Confirmed' : 'Awaiting BACS Payment'}
                   </span>
                   <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic mt-3">
-                    Thank You for Your Order!
+                    {completedOrder.paymentMethod === 'BACS_TRANSFER'
+                      ? 'Order Placed!'
+                      : 'Thank You for Your Order!'}
                   </h2>
                   <p className="text-zinc-400 text-xs md:text-sm mt-1">
                     Order Ref: <span className="font-mono text-lime-400 font-bold">{completedOrder.orderNumber}</span>
                   </p>
                 </div>
+
+                {/* BACS Transfer Instructions Box */}
+                {completedOrder.paymentMethod === 'BACS_TRANSFER' && (
+                  <div className="bg-gradient-to-b from-zinc-900 to-zinc-950 border border-lime-500/40 rounded-2xl p-5 text-left space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-lime-500/10 text-lime-400 rounded-xl border border-lime-500/20">
+                          <Landmark className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-white font-black text-xs uppercase tracking-wider">BACS Bank Transfer</p>
+                          <p className="text-zinc-400 text-[10px]">Transfer via your mobile banking app or online banking</p>
+                        </div>
+                      </div>
+                      <span className="text-lime-400 font-mono font-black text-lg">
+                        £{Number(completedOrder.grandTotal).toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex justify-between items-center bg-black/60 p-2.5 rounded-xl border border-zinc-800">
+                        <span className="text-zinc-400 text-[11px] font-bold uppercase">Payment Reference:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-lime-400 font-black text-sm select-all">
+                            {completedOrder.orderNumber}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(completedOrder.orderNumber, 'ref')}
+                            className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg transition-colors cursor-pointer"
+                            title="Copy reference"
+                          >
+                            {isCopiedRef ? <Check className="w-3.5 h-3.5 text-lime-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-zinc-800/80">
+                          <p className="text-zinc-500 text-[10px] uppercase font-bold">Account Name</p>
+                          <p className="text-white font-bold text-xs mt-0.5">{bacsConfig.accountName || 'Daily Ride South'}</p>
+                        </div>
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-zinc-800/80">
+                          <p className="text-zinc-500 text-[10px] uppercase font-bold">Bank</p>
+                          <p className="text-white font-bold text-xs mt-0.5">{bacsConfig.bankName || 'Barclays Bank'}</p>
+                        </div>
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-zinc-800/80">
+                          <p className="text-zinc-500 text-[10px] uppercase font-bold">Sort Code</p>
+                          <p className="text-lime-400 font-mono font-bold text-xs mt-0.5">{bacsConfig.sortCode || '20-45-45'}</p>
+                        </div>
+                        <div className="bg-black/40 p-2.5 rounded-xl border border-zinc-800/80">
+                          <p className="text-zinc-500 text-[10px] uppercase font-bold">Account Number</p>
+                          <p className="text-lime-400 font-mono font-bold text-xs mt-0.5">{bacsConfig.accountNumber || '83920184'}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const bankText = `DRS Club Merch BACS Transfer\nOrder Ref: ${completedOrder.orderNumber}\nAmount: £${Number(completedOrder.grandTotal).toFixed(2)}\nAccount Name: ${bacsConfig.accountName || 'Daily Ride South'}\nBank: ${bacsConfig.bankName || 'Barclays Bank'}\nSort Code: ${bacsConfig.sortCode || '20-45-45'}\nAccount No: ${bacsConfig.accountNumber || '83920184'}`;
+                          copyToClipboard(bankText, 'bank');
+                        }}
+                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold py-2.5 rounded-xl border border-zinc-700 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      >
+                        {isCopiedBank ? (
+                          <><CheckCheck className="w-4 h-4 text-lime-400" /> Bank Details Copied to Clipboard!</>
+                        ) : (
+                          <><Copy className="w-4 h-4 text-zinc-400" /> Copy Bank Details &amp; Reference</>
+                        )}
+                      </button>
+
+                      <p className="text-[11px] text-zinc-400 text-center pt-1 leading-relaxed">
+                        ⚠️ Please quote reference <strong className="text-white font-mono">{completedOrder.orderNumber}</strong> so we can match your transfer to your order.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-left space-y-3">
                   <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
@@ -1169,8 +1310,12 @@ export const MerchStoreView = ({
 
                   <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
                     <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Payment Method:</span>
-                    <span className="text-white font-bold text-xs uppercase tracking-wider">
-                      {completedOrder.paymentMethod === 'SUMUP_CARD' ? 'Paid Online (SumUp)' : 'Cash / Card on Meet Collection'}
+                    <span className="text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      {completedOrder.paymentMethod === 'SUMUP_CARD' ? (
+                        <><CreditCard className="w-3.5 h-3.5 text-lime-400" /> Paid Online (SumUp)</>
+                      ) : (
+                        <><Landmark className="w-3.5 h-3.5 text-lime-400" /> BACS Bank Transfer</>
+                      )}
                     </span>
                   </div>
 
@@ -1188,7 +1333,7 @@ export const MerchStoreView = ({
 
                 <button
                   onClick={closeOrderModal}
-                  className="bg-lime-500 hover:bg-lime-400 text-black font-black px-8 py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20"
+                  className="bg-lime-500 hover:bg-lime-400 text-black font-black px-8 py-3.5 rounded-xl uppercase tracking-widest text-xs transition-all shadow-lg shadow-lime-500/20 cursor-pointer"
                 >
                   Done
                 </button>
@@ -1457,23 +1602,31 @@ export const MerchStoreView = ({
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setPaymentChoice('cash_meet');
-                        setFulfillmentType('meet_pickup');
-                      }}
-                      className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 ${
-                        paymentChoice === 'cash_meet'
+                      onClick={() => setPaymentChoice('bacs')}
+                      className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                        paymentChoice === 'bacs'
                           ? 'bg-lime-500/10 border-lime-500 text-white'
                           : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
                       }`}
                     >
-                      <Banknote className={`w-5 h-5 ${paymentChoice === 'cash_meet' ? 'text-lime-400' : 'text-zinc-500'}`} />
+                      <Landmark className={`w-5 h-5 ${paymentChoice === 'bacs' ? 'text-lime-400' : 'text-zinc-500'}`} />
                       <div>
-                        <p className="font-bold text-xs uppercase tracking-wider text-white">Pay at Next Meet</p>
-                        <p className="text-[10px] text-zinc-400">Cash or card on pickup</p>
+                        <p className="font-bold text-xs uppercase tracking-wider text-white">BACS Bank Transfer</p>
+                        <p className="text-[10px] text-zinc-400">Direct UK bank transfer</p>
                       </div>
                     </button>
                   </div>
+
+                  {paymentChoice === 'bacs' && (
+                    <div className="bg-zinc-900/90 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 space-y-1 animate-in fade-in">
+                      <div className="flex items-center gap-1.5 text-lime-400 font-bold text-[11px] uppercase tracking-wider">
+                        <Landmark className="w-3.5 h-3.5" /> BACS Transfer Details
+                      </div>
+                      <p className="text-zinc-400 text-[11px] leading-relaxed">
+                        Bank details ({bacsConfig.bankName || 'Barclays'} • Sort: {bacsConfig.sortCode || '20-45-45'} • Acc: {bacsConfig.accountNumber || '83920184'}) and your unique payment reference will appear immediately after placing your order.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Error Banner */}
@@ -1500,8 +1653,8 @@ export const MerchStoreView = ({
                   >
                     {isSubmitting ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : paymentChoice === 'cash_meet' ? (
-                      <><Check className="w-4 h-4" /> Reserve for Meet Collection (£{grandTotal.toFixed(2)})</>
+                    ) : paymentChoice === 'bacs' ? (
+                      <><Landmark className="w-4 h-4" /> Place Order with BACS Transfer (£{grandTotal.toFixed(2)})</>
                     ) : (
                       <><CreditCard className="w-4 h-4" /> Proceed to Secure Card Payment (£{grandTotal.toFixed(2)})</>
                     )}
@@ -1690,13 +1843,75 @@ export const AdminMerchSection = ({
   appId,
   ImageUploadComponent
 }) => {
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'products'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'products' | 'bacs'
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState(DEFAULT_MERCH_PRODUCTS);
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSyncingDefaults, setIsSyncingDefaults] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState('');
+
+  // BACS Settings State
+  const [bacsSettings, setBacsSettings] = useState({
+    accountName: 'Daily Ride South',
+    bankName: 'Barclays Bank',
+    sortCode: '20-45-45',
+    accountNumber: '83920184',
+    instructions: 'Please include your unique DRS Order Reference in your transfer.'
+  });
+  const [isSavingBacs, setIsSavingBacs] = useState(false);
+  const [bacsSaveSuccess, setBacsSaveSuccess] = useState(false);
+
+  // Sync BACS settings in admin
+  useEffect(() => {
+    if (!db || !appId) return;
+    const unsub = onSnapshot(
+      doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'bacsConfig'),
+      (snap) => {
+        if (snap.exists()) {
+          setBacsSettings(prev => ({ ...prev, ...snap.data() }));
+        }
+      },
+      (err) => console.warn("Error loading BACS config in admin:", err)
+    );
+    return () => unsub();
+  }, [db, appId]);
+
+  const handleSaveBacsSettings = async (e) => {
+    if (e) e.preventDefault();
+    if (!db || !appId) return;
+    setIsSavingBacs(true);
+    try {
+      await setDoc(
+        doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'bacsConfig'),
+        { ...bacsSettings, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+      setBacsSaveSuccess(true);
+      setTimeout(() => setBacsSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error("Failed to save BACS settings:", err);
+      alert("Failed to save BACS details: " + err.message);
+    } finally {
+      setIsSavingBacs(false);
+    }
+  };
+
+  // Toggle order payment status (Paid / Unpaid)
+  const handleTogglePaymentStatus = async (orderId, currentStatus) => {
+    const newStatus = currentStatus === 'PAID' ? 'AWAITING_BACS' : 'PAID';
+    try {
+      if (db && appId) {
+        await updateDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'merch_orders', orderId),
+          { paymentStatus: newStatus, updatedAt: new Date().toISOString() }
+        );
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: newStatus } : o));
+    } catch (err) {
+      console.error("Error updating payment status:", err);
+    }
+  };
 
   // Editing or creating product modal
   const [editingProduct, setEditingProduct] = useState(null);
@@ -1982,10 +2197,10 @@ export const AdminMerchSection = ({
 
       {/* Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setActiveTab('orders')}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'orders'
                 ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20'
                 : 'bg-zinc-800 text-zinc-400 hover:text-white'
@@ -1996,7 +2211,7 @@ export const AdminMerchSection = ({
           </button>
           <button
             onClick={() => setActiveTab('products')}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === 'products'
                 ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20'
                 : 'bg-zinc-800 text-zinc-400 hover:text-white'
@@ -2004,6 +2219,17 @@ export const AdminMerchSection = ({
           >
             <Tag className="w-4 h-4" />
             Products ({products.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('bacs')}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === 'bacs'
+                ? 'bg-lime-500 text-black shadow-lg shadow-lime-500/20'
+                : 'bg-zinc-800 text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Landmark className="w-4 h-4" />
+            BACS Bank Details
           </button>
         </div>
 
@@ -2069,12 +2295,25 @@ export const AdminMerchSection = ({
                       <span className="font-mono text-lime-400 font-bold text-xs bg-lime-500/10 px-2 py-0.5 rounded border border-lime-500/20">
                         {order.orderNumber || order.id}
                       </span>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                        order.paymentMethod === 'BACS_TRANSFER'
+                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                          : 'bg-zinc-800 text-zinc-300 border border-zinc-700'
+                      }`}>
+                        {order.paymentMethod === 'BACS_TRANSFER' ? (
+                          <><Landmark className="w-3 h-3" /> BACS Transfer</>
+                        ) : order.paymentMethod === 'SUMUP_CARD' ? (
+                          <><CreditCard className="w-3 h-3" /> SumUp Card</>
+                        ) : (
+                          order.paymentMethod || 'Online'
+                        )}
+                      </span>
                       <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                         order.paymentStatus === 'PAID'
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                           : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                       }`}>
-                        {order.paymentStatus || 'UNPAID'}
+                        {order.paymentStatus === 'PAID' ? 'PAID' : 'AWAITING PAYMENT'}
                       </span>
                       <span className="text-zinc-500 text-[10px]">
                         {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-GB') : ''}
@@ -2109,16 +2348,37 @@ export const AdminMerchSection = ({
                     <span className="text-lime-400 font-black text-lg font-mono">
                       £{Number(order.grandTotal || 0).toFixed(2)}
                     </span>
-                    <select
-                      value={order.fulfillmentStatus || 'Pending'}
-                      onChange={e => handleUpdateOrderStatus(order.id, e.target.value)}
-                      className="bg-zinc-900 border border-zinc-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-lime-500"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="Awaiting Collection">Awaiting Collection</option>
-                      <option value="Fulfilled">Fulfilled</option>
-                      <option value="Cancelled">Cancelled</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      {order.paymentStatus !== 'PAID' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePaymentStatus(order.id, order.paymentStatus)}
+                          className="px-2.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-wider rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow"
+                          title="Click once you have verified the BACS transfer in the club bank account"
+                        >
+                          <Check className="w-3 h-3" /> Mark Paid
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleTogglePaymentStatus(order.id, order.paymentStatus)}
+                          className="text-[10px] text-zinc-400 hover:text-zinc-200 underline cursor-pointer py-1 px-1"
+                          title="Click to revert to Unpaid"
+                        >
+                          Undo Paid
+                        </button>
+                      )}
+                      <select
+                        value={order.fulfillmentStatus || 'Pending'}
+                        onChange={e => handleUpdateOrderStatus(order.id, e.target.value)}
+                        className="bg-zinc-900 border border-zinc-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-lime-500 cursor-pointer"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Awaiting Collection">Awaiting Collection</option>
+                        <option value="Fulfilled">Fulfilled</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2367,6 +2627,113 @@ export const AdminMerchSection = ({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* BACS BANK DETAILS TAB */}
+      {activeTab === 'bacs' && (
+        <div className="space-y-6 max-w-2xl bg-zinc-950/80 border border-zinc-800 p-6 md:p-8 rounded-3xl shadow-xl">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-lime-500/10 border border-lime-500/30 px-3 py-0.5 rounded-full text-lime-400 text-[10px] font-bold uppercase tracking-widest mb-2">
+              Payment Configuration
+            </div>
+            <h4 className="text-xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+              <Landmark className="w-5 h-5 text-lime-400" /> Club BACS Bank Details
+            </h4>
+            <p className="text-zinc-400 text-xs mt-1 leading-relaxed">
+              These details will be displayed to customers during checkout and on their order confirmation receipt when choosing BACS Bank Transfer.
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveBacsSettings} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Account Name *
+                </label>
+                <input
+                  type="text"
+                  value={bacsSettings.accountName}
+                  onChange={e => setBacsSettings({ ...bacsSettings, accountName: e.target.value })}
+                  placeholder="e.g. Daily Ride South"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-lime-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Bank Name *
+                </label>
+                <input
+                  type="text"
+                  value={bacsSettings.bankName}
+                  onChange={e => setBacsSettings({ ...bacsSettings, bankName: e.target.value })}
+                  placeholder="e.g. Barclays Bank"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-lime-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Sort Code *
+                </label>
+                <input
+                  type="text"
+                  value={bacsSettings.sortCode}
+                  onChange={e => setBacsSettings({ ...bacsSettings, sortCode: e.target.value })}
+                  placeholder="e.g. 20-45-45"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-lime-500 font-mono"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                  Account Number *
+                </label>
+                <input
+                  type="text"
+                  value={bacsSettings.accountNumber}
+                  onChange={e => setBacsSettings({ ...bacsSettings, accountNumber: e.target.value })}
+                  placeholder="e.g. 83920184"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-lime-500 font-mono"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1">
+                Customer Reference Instructions
+              </label>
+              <textarea
+                value={bacsSettings.instructions}
+                onChange={e => setBacsSettings({ ...bacsSettings, instructions: e.target.value })}
+                rows={2}
+                placeholder="e.g. Please include your DRS order number in your transfer reference."
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-lime-500 resize-none"
+              />
+            </div>
+
+            {bacsSaveSuccess && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400 text-xs flex items-center gap-2">
+                <Check className="w-4 h-4" /> BACS details saved and updated across the shop!
+              </div>
+            )}
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={isSavingBacs}
+                className="bg-lime-500 hover:bg-lime-400 disabled:opacity-50 text-black font-black px-6 py-3 rounded-xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-lg shadow-lime-500/20"
+              >
+                {isSavingBacs ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save BACS Details
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
