@@ -176,7 +176,52 @@ const compressImageFromUrl = async (url, maxWidth = 1080, maxHeight = 1080, qual
 const CLUB_LOGO = "/club-logo.webp";
 const CLUB_HERO = "/club-hero.webp";
 const DEFAULT_AVATAR = "/default-avatar.webp";
-const DEFAULT_CAR = "https://images.unsplash.com/photo-1502877338535-494e509f583b?auto=format&fit=crop&q=80&w=800";
+const DEFAULT_CAR = "/default-car.webp";
+
+// Map canonical event titles to high-definition local posters that never expire
+const EVENT_IMAGES_BY_TITLE = {
+  'tunerfest south': '/events/tunerfest.jpg',
+  'isle of wight takeover': '/events/iow-takeover.jpg',
+  'trax': '/events/trax.jpg',
+  'ford fair': '/events/ford-fair.jpg',
+  'ford power live': '/events/ford-power-live.jpg',
+  'lancing motor show': '/events/lancing-motor-show.jpg',
+};
+
+// Robust detector for dead, expired, or blocked external CDN links (e.g. expired Facebook CDN tokens)
+const isBrokenImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return true;
+  const trimmed = url.trim();
+  if (!trimmed) return true;
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('fbcdn.net') || lower.includes('facebook.com')) return true;
+  if (lower.includes('photo-1502877338535-494e509f583b')) return true;
+  return false;
+};
+
+const getAvatarUrl = (url) => {
+  if (isBrokenImageUrl(url)) return DEFAULT_AVATAR;
+  return url;
+};
+
+const getCarImageUrl = (url) => {
+  if (isBrokenImageUrl(url)) return DEFAULT_CAR;
+  return url;
+};
+
+const getEventImageUrl = (event) => {
+  if (!event) return DEFAULT_CAR;
+  const titleKey = (event.title || '').toLowerCase().trim();
+  if (EVENT_IMAGES_BY_TITLE[titleKey]) {
+    if (isBrokenImageUrl(event.image)) {
+      return EVENT_IMAGES_BY_TITLE[titleKey];
+    }
+  }
+  if (isBrokenImageUrl(event.image)) {
+    return EVENT_IMAGES_BY_TITLE[titleKey] || DEFAULT_CAR;
+  }
+  return event.image;
+};
 
 // --- GLOBAL ROBUST TICKET & COMPETITION AGGREGATOR ---
 // Used for the live draw drum: only includes participants who answered correctly!
@@ -204,7 +249,7 @@ const parseRaffleReservations = (raffle, cloudMembers) => {
       list.push({
         id: uid,
         name: m.name || m.email || 'Pending Setup',
-        avatar: m.avatar || DEFAULT_AVATAR,
+        avatar: getAvatarUrl(m.avatar),
         ticketCount: count,
         type: 'app',
         isCorrect: true
@@ -262,7 +307,7 @@ const parseCompetitionEntries = (raffle, cloudMembers) => {
         id: key,
         userId: entry.userId,
         name: entry.name || (membersById[entry.userId]?.name) || 'Club Member',
-        avatar: entry.avatar || (membersById[entry.userId]?.avatar) || DEFAULT_AVATAR,
+        avatar: getAvatarUrl(entry.avatar || (membersById[entry.userId]?.avatar)),
         ticketCount: entry.ticketCount || entry.quantity || 1,
         selectedAnswer: entry.answer || entry.selectedAnswer || '',
         isCorrect: entry.isCorrect !== undefined ? entry.isCorrect : true,
@@ -289,7 +334,7 @@ const parseCompetitionEntries = (raffle, cloudMembers) => {
         id: uid,
         userId: uid,
         name: m.name || m.email || 'Club Member',
-        avatar: m.avatar || DEFAULT_AVATAR,
+        avatar: getAvatarUrl(m.avatar),
         ticketCount: parseInt(appRes[uid]) || 0,
         selectedAnswer: raffle.correctAnswer || 'Correct',
         isCorrect: true,
@@ -460,7 +505,7 @@ const STATIC_EVENTS = [
     time: "09:00 AM",
     location: "Brands Hatch Circuit, Kent",
     description: "Celebrating the UK's tuning scene with Time Attack, drifting, and massive club displays. An action-packed day out.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/615332601_1303146985173729_7017742900608760889_n.jpg?_nc_cat=111&ccb=1-7&_nc_sid=2a1932&_nc_ohc=9lMQN9k9fWwQ7kNvwEUw7bF&_nc_oc=Adrt86yG2RX2lia1fFym533-vAHlszAQe8vVA64q3g8wkzt7Jfx1KDqJcB-lJSwDnykrci9OoljCxIr8bzEGJz-K&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=2KM11XS369ylUsSZzTmGew&_nc_ss=7b2a8&oh=00_Af6PNVmhDJzfZrZCfLJXUNXvnrBMD-3wj8UQvYTlsocLqg&oe=6A067D2C",
+    image: "/events/tunerfest.jpg",
     link: "https://www.brandshatch.co.uk/2026/june/tunerfest-south",
     isStatic: true
   },
@@ -471,7 +516,7 @@ const STATIC_EVENTS = [
     time: "10:00 AM",
     location: "Isle of Wight",
     description: "The ultimate weekend away for car enthusiasts. Join our club stand as we head over on the ferry for a massive island takeover.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/370897411_788936759904376_6556989917387874387_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=1d70fc&_nc_ohc=BAm1Zb4f-a8Q7kNvwF4HI_P&_nc_oc=AdoHjuaouRTMphGXdxORfQlSFYaOroD7I3nl0lfqQkZpAyG2i1rLmcZEMgm5HRjZLJl3rYRR_4AemK172VSwxXe1&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=EmZtuaqTOlSEllcyBAYDPA&_nc_ss=7b2a8&oh=00_Af5oVHzQmfxAuzDJ3SjQBwDnCKIR9t4QvxmZImjX9Z_j3w&oe=6A0678E0",
+    image: "/events/iow-takeover.jpg",
     link: "https://www.iowtakeover.co.uk/",
     isStatic: true
   },
@@ -482,7 +527,7 @@ const STATIC_EVENTS = [
     time: "09:00 AM",
     location: "Silverstone Circuit",
     description: "Britain's biggest performance car show. We will have a dedicated club stand. Features live track time and professional drifting displays.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597894646_1257634839745045_372102352193919714_n.jpg?_nc_cat=100&ccb=1-7&_nc_sid=2a1932&_nc_ohc=35X4SY7dnmkQ7kNvwEwboEG&_nc_oc=Adpg8NNV3a0AdvHzh8yEsEk_Qa3DtyI9a-SuyKblDuqTTqFiV8iWIqHOWc0djpS_gQ6z0ZS327EGchEspfksXzEf&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=kofn6rvocXLB_bC8mS405w&_nc_ss=7b2a8&oh=00_Af6xgBQDE6Ks8tXI5Q5WdNok7Nw_o37QF3mqQJXef9ayuA&oe=6A069083",
+    image: "/events/trax.jpg",
     link: "https://traxshows.co.uk/",
     isStatic: true
   },
@@ -493,7 +538,7 @@ const STATIC_EVENTS = [
     time: "08:30 AM",
     location: "Silverstone Circuit",
     description: "The biggest and best Ford festival in Europe. Expect thousands of club cars, intense track action, and huge retail villages.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/597864318_1331850388984316_4749659490145813671_n.jpg?_nc_cat=103&ccb=1-7&_nc_sid=2a1932&_nc_ohc=Eyzst_iXSeEQ7kNvwF165SD&_nc_oc=AdoDsCCTTBzrUNBCRp75jZ0jIv8H2XjTev23iPy3bQNpiE5djXJXpSvQo0oJpyfotxjSytru99gpgebiIDOv8cQJ&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=9XwwuzQfNhIwISHL8RR-KA&_nc_ss=7b2a8&oh=00_Af5tVKR_W4mxaLAaIVKvPgimkVJs48pQ6CJ_NztkYJQ3zw&oe=6A068DDB",
+    image: "/events/ford-fair.jpg",
     link: "https://fordshows.co.uk/ford-fair",
     isStatic: true
   },
@@ -504,7 +549,7 @@ const STATIC_EVENTS = [
     time: "09:00 AM",
     location: "Brands Hatch Circuit, Kent",
     description: "A dedicated celebration of all things Ford, from classic RS models to the latest STs taking to the famous Indy circuit.",
-    image: "https://i.ibb.co/Nd6d6L3m/Untitled-design-9.png",
+    image: "/events/ford-power-live.jpg",
     link: "https://www.fordpowerlive.co.uk/",
     isStatic: true
   },
@@ -515,7 +560,7 @@ const STATIC_EVENTS = [
     time: "09:00 AM",
     location: "Lancing Beach Green, West Sussex",
     description: "600+ cars on display at Lancing Beach Green. FREE ENTRY to public, with Children's Amusements, Trade Stalls, Hot & Cold Drinks, Food refreshments and much more to see and do on the day. A display of motoring excellence.",
-    image: "https://scontent.fltn4-1.fna.fbcdn.net/v/t39.30808-6/673478652_1411226824381514_8742350712894671620_n.png?_nc_cat=108&ccb=1-7&_nc_sid=2a1932&_nc_ohc=HIDGrimsPmAQ7kNvwHOoubY&_nc_oc=AdrAY5sMilU7z84ghmC3VwRtoff35i3jmKvEEdmM2bUFHGBX7AS-wl4iiBmxSBroVyo6SJgOSKceHXnT3-telYcb&_nc_zt=23&_nc_ht=scontent.fltn4-1.fna&_nc_gid=ZjADEz4Aukm54gCOUIAKUw&_nc_ss=7b2a8&oh=00_Af58pi1U-_VlcuRajrZMqDu2Gk0NK83QXmn8qD7jv7Q01g&oe=6A06721B",
+    image: "/events/lancing-motor-show.jpg",
     link: "https://lancingmotorshow.onlineticketseller.com/",
     isStatic: true
   }
@@ -644,6 +689,7 @@ const SplashView = () => {
             loading="eager"
             fetchPriority="high"
             decoding="async"
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/club-logo.webp'; }}
             className="w-36 h-36 md:w-40 md:h-40 rounded-3xl object-cover border-2 border-lime-500/40 shadow-2xl shadow-lime-500/25" 
             alt="Daily Ride South Logo" 
           />
@@ -795,7 +841,14 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
         <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Back
       </button>
       <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800 flex flex-col md:flex-row gap-6 items-start shadow-2xl">
-        <img src={member.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" alt={member.name} className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800" />
+        <img 
+          src={getAvatarUrl(member.avatar)} 
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }} 
+          loading="lazy" 
+          decoding="async" 
+          alt={member.name || 'Member'} 
+          className="w-32 h-32 rounded-full object-cover border-4 border-zinc-800 bg-zinc-800 shrink-0" 
+        />
         <div>
           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
             {member.name || 'Pending Setup'}
@@ -829,8 +882,15 @@ const MemberProfileModal = ({ member, onClose, onCarClick }) => {
       <div className="grid gap-6 md:grid-cols-2">
         {cars.map((car, idx) => (
           <div key={idx} onClick={() => onCarClick(car)} className="bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 cursor-pointer hover:border-lime-500 transition-all transform hover:-translate-y-1 group">
-            <div className="h-64 overflow-hidden relative">
-              <img src={car.image || DEFAULT_CAR} loading="lazy" decoding="async" alt={`${car.make} ${car.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            <div className="h-64 overflow-hidden relative bg-black">
+              <img 
+                src={getCarImageUrl(car.image)} 
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }} 
+                loading="lazy" 
+                decoding="async" 
+                alt={`${car.make} ${car.model}`} 
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent opacity-80 group-hover:opacity-60 transition-opacity"></div>
               <div className="absolute bottom-4 left-4 right-4">
                 <div className="flex justify-between items-end mb-1">
@@ -872,9 +932,24 @@ const CarGalleryModal = ({ viewingCar, onClose }) => {
           {viewingCar.mods && <p className="text-lime-400 mt-4 text-sm font-medium">Mods: <span className="text-zinc-300 font-normal">{viewingCar.mods}</span></p>}
         </div>
         <div className="space-y-8">
-          <img src={viewingCar.image || DEFAULT_CAR} loading="lazy" decoding="async" className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt="Main vehicle profile" />
+          <img 
+            src={getCarImageUrl(viewingCar.image)} 
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }} 
+            loading="lazy" 
+            decoding="async" 
+            className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" 
+            alt="Main vehicle profile" 
+          />
           {viewingCar.gallery && viewingCar.gallery.map((img, i) => (
-            <img key={i} src={img} loading="lazy" decoding="async" className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" alt={`Gallery item ${i+1}`} />
+            <img 
+              key={i} 
+              src={getCarImageUrl(img)} 
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }} 
+              loading="lazy" 
+              decoding="async" 
+              className="w-full rounded-2xl object-cover shadow-2xl border border-zinc-800" 
+              alt={`Gallery item ${i+1}`} 
+            />
           ))}
           {(!viewingCar.gallery || viewingCar.gallery.length === 0) && viewingCar.image && (
             <p className="text-zinc-600 text-center uppercase tracking-[0.3em] text-xs font-bold py-16">End of Gallery</p>
@@ -894,11 +969,25 @@ const EnlargedImageModal = ({ imageObj, onClose, onMemberClick }) => {
       </button>
       <div className="relative max-w-full max-h-full flex flex-col items-center">
         <div className="relative group overflow-hidden rounded-2xl border border-zinc-800 shadow-2xl">
-          <img src={imageObj.url} loading="lazy" decoding="async" alt={imageObj.carName} className="max-w-full max-h-[85vh] object-contain rounded-2xl" />
+          <img 
+            src={getCarImageUrl(imageObj.url)} 
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }} 
+            loading="lazy" 
+            decoding="async" 
+            alt={imageObj.carName} 
+            className="max-w-full max-h-[85vh] object-contain rounded-2xl" 
+          />
           <div onClick={() => onMemberClick(imageObj.member)} className="absolute top-4 left-4 flex items-center gap-3 bg-black/40 backdrop-blur-md p-2 pr-5 rounded-full border border-white/10 hover:bg-lime-500 hover:text-black transition-all cursor-pointer group/member z-[130] shadow-2xl">
-            <img src={imageObj.member.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" className="w-12 h-12 rounded-full border-2 border-white/20 object-cover" alt="" />
+            <img 
+              src={getAvatarUrl(imageObj.member?.avatar)} 
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }} 
+              loading="lazy" 
+              decoding="async" 
+              className="w-12 h-12 rounded-full border-2 border-white/20 object-cover bg-zinc-800" 
+              alt="" 
+            />
             <div className="flex flex-col">
-              <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member.name || 'Pending Setup'}</span>
+              <span className="text-white font-black text-xs uppercase tracking-tighter leading-none">{imageObj.member?.name || 'Pending Setup'}</span>
               <span className="text-white/60 group-hover/member:text-white/80 text-[8px] uppercase font-bold tracking-widest mt-1">View Garage</span>
             </div>
           </div>
@@ -916,9 +1005,11 @@ const GalleryView = ({ members, onImageClick }) => {
     const images = [];
     members.forEach(member => {
       (member.cars || []).forEach(car => {
-        if (car.image) images.push({ url: car.image, member, carName: `${car.make} ${car.model}` });
+        const cImg = getCarImageUrl(car.image);
+        if (cImg) images.push({ url: cImg, member, carName: `${car.make} ${car.model}` });
         (car.gallery || []).forEach(url => {
-          if (url) images.push({ url, member, carName: `${car.make} ${car.model}` });
+          const gImg = getCarImageUrl(url);
+          if (gImg) images.push({ url: gImg, member, carName: `${car.make} ${car.model}` });
         });
       });
     });
@@ -936,9 +1027,10 @@ const GalleryView = ({ members, onImageClick }) => {
           <div key={img.url + i} onClick={() => onImageClick(img)} className="relative group rounded-2xl overflow-hidden cursor-pointer border border-zinc-800 hover:border-lime-500 transition-all shadow-lg inline-block w-full bg-zinc-900/40 min-h-[140px]">
             <img 
               src={img.url} 
-              alt="" 
+              alt={img.carName || "Club Vehicle"} 
               loading="lazy"
               decoding="async"
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }}
               className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105 block" 
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
@@ -958,12 +1050,24 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
     const imgs = [];
     members.forEach(m => {
       (m.cars || []).forEach(c => {
-        if(c.image) imgs.push({url: c.image, member: m, carName: `${c.make} ${c.model}`});
+        const cImg = getCarImageUrl(c.image);
+        if (cImg) imgs.push({ url: cImg, member: m, carName: `${c.make} ${c.model}` });
         (c.gallery || []).forEach(g => {
-          if(g) imgs.push({url: g, member: m, carName: `${c.make} ${c.model}`});
+          const gImg = getCarImageUrl(g);
+          if (gImg) imgs.push({ url: gImg, member: m, carName: `${c.make} ${c.model}` });
         });
       });
     });
+    // If no member garage photos yet, supply club event showcases
+    if (imgs.length === 0) {
+      imgs.push(
+        { url: '/events/tunerfest.jpg', member: { name: 'Daily Ride South' }, carName: 'Tunerfest Showcase' },
+        { url: '/events/trax.jpg', member: { name: 'Daily Ride South' }, carName: 'Silverstone TRAX' },
+        { url: '/events/ford-fair.jpg', member: { name: 'Daily Ride South' }, carName: 'Ford Fair Meet' },
+        { url: '/events/lancing-motor-show.jpg', member: { name: 'Daily Ride South' }, carName: 'Lancing Display' },
+        { url: DEFAULT_CAR, member: { name: 'Daily Ride South' }, carName: 'Club Showcase' }
+      );
+    }
     return imgs;
   }, [members]);
 
@@ -1022,6 +1126,7 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
           loading="eager" 
           fetchPriority="high" 
           decoding="async" 
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/club-hero.webp'; }}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
         />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-black/40 to-black/20"></div>
@@ -1030,6 +1135,7 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
           loading="eager" 
           fetchPriority="high" 
           decoding="async" 
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/club-logo.webp'; }}
           className="relative z-10 w-32 h-32 md:w-44 md:h-44 rounded-3xl object-cover border-4 border-black/50 shadow-2xl" 
           alt="Daily Ride South Logo" 
         />
@@ -1076,23 +1182,25 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
       )}
       
       {spotlightMember && (
-        <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group" onClick={() => onMemberClick(spotlightMember)}>
+        <div className="mb-6 relative rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 h-64 md:h-80 cursor-pointer group bg-zinc-900" onClick={() => onMemberClick(spotlightMember)}>
           <img 
-            src={(spotlightMember.cars && spotlightMember.cars[0]?.image) || DEFAULT_CAR} 
+            src={getCarImageUrl(spotlightMember.cars && spotlightMember.cars[0]?.image)} 
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }}
             loading="lazy" 
             decoding="async" 
             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
-            alt="" 
+            alt={spotlightMember.name || "Club Member"} 
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
           <div className="absolute top-4 right-4 bg-lime-500 text-black text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded shadow-lg backdrop-blur-md">{isBirthdaySpotlight ? '🎉 Happy Birthday! 🎂' : 'Member Spotlight'}</div>
           <div className="absolute bottom-6 left-6 flex items-center gap-4">
             <img 
-              src={spotlightMember.avatar || DEFAULT_AVATAR} 
+              src={getAvatarUrl(spotlightMember.avatar)} 
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
               loading="lazy" 
               decoding="async" 
-              className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl" 
-              alt="" 
+              className="w-20 h-20 md:w-24 md:h-24 rounded-full border-4 border-black object-cover shadow-xl bg-zinc-800" 
+              alt={spotlightMember.name || "Member"} 
             />
             <div>
               <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tighter leading-none">{spotlightMember.name || 'Pending Setup'} {isBirthdaySpotlight && '🎂'}</h3>
@@ -1112,11 +1220,25 @@ const HomeView = ({ clubDescription, spotlightMember, isBirthdaySpotlight, onMem
           {mosaicSlots.map((slot, i) => (
             <div key={i} className="aspect-square rounded-xl overflow-hidden border border-zinc-800 cursor-pointer hover:border-lime-500 transition-colors group relative bg-zinc-900 shadow-inner">
               {slot.previous && (
-                <img src={slot.previous.url} loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover" alt="" />
+                <img 
+                  src={slot.previous.url} 
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }}
+                  loading="lazy" 
+                  decoding="async" 
+                  className="absolute inset-0 w-full h-full object-cover" 
+                  alt="" 
+                />
               )}
               {slot.current && (
                 <div key={slot.fadeKey} onClick={() => onImageClick(slot.current)} className="absolute inset-0 w-full h-full mosaic-fade-in z-10">
-                  <img src={slot.current.url} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="" />
+                  <img 
+                    src={slot.current.url} 
+                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }}
+                    loading="lazy" 
+                    decoding="async" 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                    alt="" 
+                  />
                 </div>
               )}
             </div>
@@ -1195,16 +1317,22 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
           const listField = isPast ? 'attended' : 'attending';
           const rsvpList = eventRsvps[listField] || [];
           const isMarked = user && rsvpList.includes(user.uid);
-          const attendeeMembers = rsvpList.map(uid => membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR });
+          const attendeeMembers = rsvpList.map(uid => {
+            const m = membersById[uid] || { id: uid, name: 'Guest (In-App Browser)', avatar: DEFAULT_AVATAR };
+            return {
+              ...m,
+              avatar: getAvatarUrl(m.avatar)
+            };
+          });
           
           return (
             <div key={event.id} className="bg-zinc-900 rounded-2xl overflow-hidden shadow-xl border border-zinc-800 flex flex-col transition-all hover:shadow-lime-500/10 hover:border-zinc-700">
-              <div className="h-48 overflow-hidden shrink-0 relative group">
+              <div className="h-48 overflow-hidden shrink-0 relative group bg-black">
                 <img 
-                  src={event.image || DEFAULT_CAR} 
+                  src={getEventImageUrl(event)} 
                   loading="lazy"
                   decoding="async"
-                  onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_CAR; }} 
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }} 
                   alt={event.title} 
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
                 />
@@ -1239,7 +1367,7 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                     {event.meetingPoint && (
                       <div className="flex items-center gap-2 text-xs">
                         <MapPin className="w-3 h-3 text-lime-400" />
-                        <a href={`https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(event.meetingPoint)}`} target="_blank" rel="noopener noreferrer" className="text-lime-400 hover:text-lime-300 transition-colors underline decoration-lime-500/30 underline-offset-2 truncate">
+                        <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.meetingPoint)}`} target="_blank" rel="noopener noreferrer" className="text-lime-400 hover:text-lime-300 transition-colors underline decoration-lime-500/30 underline-offset-2 truncate">
                           {event.meetingPoint}
                         </a>
                       </div>
@@ -1264,7 +1392,17 @@ const EventsView = ({ title, events, cloudRsvps, cloudMembers, user, userProfile
                     </p>
                     <div className="flex -space-x-3 overflow-hidden p-1">
                       {attendeeMembers.slice(0, 6).map(m => (
-                        <img key={m.id} src={m.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" title={m.name || 'Pending Setup'} onClick={(e) => { e.stopPropagation(); onMemberClick(m); }} className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover cursor-pointer hover:scale-110 transition-transform relative z-10 hover:z-20 shadow-lg" alt="avatar" />
+                        <img 
+                          key={m.id} 
+                          src={getAvatarUrl(m.avatar)} 
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                          loading="lazy" 
+                          decoding="async" 
+                          title={m.name || 'Pending Setup'} 
+                          onClick={(e) => { e.stopPropagation(); onMemberClick(m); }} 
+                          className="inline-block h-10 w-10 rounded-full ring-2 ring-zinc-900 object-cover cursor-pointer hover:scale-110 transition-transform relative z-10 hover:z-20 shadow-lg bg-zinc-800" 
+                          alt={m.name || "Member"} 
+                        />
                       ))}
                       {attendeeMembers.length > 6 && (
                         <div className="flex items-center justify-center h-10 w-10 rounded-full ring-2 ring-zinc-900 bg-zinc-800 text-xs font-bold text-white z-10">
@@ -1318,7 +1456,14 @@ const MembersView = ({ members, onMemberClick }) => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {members.map(member => (
           <div key={member.id} onClick={() => onMemberClick(member)} className="bg-zinc-900 rounded-xl p-5 border border-zinc-800 hover:border-lime-500 hover:bg-zinc-800 transition-all cursor-pointer flex items-center gap-4">
-            <img src={member.avatar || DEFAULT_AVATAR} loading="lazy" decoding="async" alt={member.name} className="w-16 h-16 rounded-full object-cover" />
+            <img 
+              src={getAvatarUrl(member.avatar)} 
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+              loading="lazy" 
+              decoding="async" 
+              alt={member.name || 'Club Member'} 
+              className="w-16 h-16 rounded-full object-cover bg-zinc-800 shrink-0" 
+            />
             <div>
               <h3 className="text-lg font-bold text-white leading-tight">
                 {member.name || 'Pending Setup'}
@@ -1432,9 +1577,10 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
       onClick={onClick}
       className="group relative bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 hover:border-lime-500 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-lime-500/10 hover:-translate-y-1 flex flex-col"
     >
-      <div className="relative h-52 overflow-hidden shrink-0">
+      <div className="relative h-52 overflow-hidden shrink-0 bg-zinc-950">
         <img
-          src={raffle.image || DEFAULT_CAR}
+          src={getCarImageUrl(raffle.image)}
+          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }}
           loading="lazy"
           decoding="async"
           alt={raffle.title}
@@ -1490,12 +1636,13 @@ const RafflePreviewCard = ({ raffle, members, onClick }) => {
               {allEntries.slice(0, 5).map((m) => (
                 <img
                   key={m.id}
-                  src={m.avatar || DEFAULT_AVATAR}
+                  src={getAvatarUrl(m.avatar)}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                   loading="lazy"
                   decoding="async"
                   title={`${m.name} : ${m.ticketCount} entry${m.ticketCount !== 1 ? 'ies' : ''}`}
-                  className="w-7 h-7 rounded-full border-2 border-zinc-900 object-cover relative z-10"
-                  alt=""
+                  className="w-7 h-7 rounded-full border-2 border-zinc-900 object-cover relative z-10 bg-zinc-800"
+                  alt={m.name || "entrant"}
                 />
               ))}
               {allEntries.length > 5 && (
@@ -1676,7 +1823,8 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
               {galleryImages.length > 0 ? (
                 <img
                   key={activeImg}
-                  src={galleryImages[activeImg]}
+                  src={getCarImageUrl(galleryImages[activeImg])}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }}
                   alt="Prize"
                   loading="lazy"
                   decoding="async"
@@ -1725,7 +1873,14 @@ const RaffleDetailPage = ({ raffleId, raffles, members, user, onBack }) => {
                       activeImg === i ? 'border-lime-500 opacity-100' : 'border-zinc-700 opacity-50 hover:opacity-75'
                     }`}
                   >
-                    <img src={img} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                    <img 
+                      src={getCarImageUrl(img)} 
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_CAR; }}
+                      alt="" 
+                      loading="lazy" 
+                      decoding="async" 
+                      className="w-full h-full object-cover" 
+                    />
                   </button>
                 ))}
               </div>

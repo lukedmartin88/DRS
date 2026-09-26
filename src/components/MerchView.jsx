@@ -261,6 +261,7 @@ const ProductImageUploader = ({
             <img
               src={value}
               alt="Product preview"
+              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/merch/tshirt.svg'; }}
               className="w-full h-full object-cover"
             />
           </div>
@@ -1074,6 +1075,7 @@ export const MerchStoreView = ({
                 alt={product.title}
                 loading="lazy"
                 decoding="async"
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/merch/tshirt.svg'; }}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-75" />
@@ -1387,6 +1389,7 @@ export const MerchStoreView = ({
                       alt={selectedProduct.title}
                       loading="lazy"
                       decoding="async"
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/merch/tshirt.svg'; }}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -2429,6 +2432,7 @@ export const AdminMerchSection = ({
                     <img
                       src={prod.image}
                       alt={prod.title}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/merch/tshirt.svg'; }}
                       className="w-full h-full object-cover"
                     />
                   </div>
